@@ -6,32 +6,50 @@ export async function GET() {
     try {
         console.log("🔍 [DEBUG-DB] Starting connectivity test...");
 
-        // 1. Check Env Var (Masked)
+        // 1. Check Env Var (Masked/Hashed)
         const dbUrl = process.env.DATABASE_URL || "MISSING";
-        const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ":****@");
+        const authSecret = process.env.NEXTAUTH_SECRET || "MISSING";
+        const authUrl = process.env.NEXTAUTH_URL || "MISSING";
+
+        const maskedDbUrl = dbUrl.replace(/:([^:@]+)@/, ":****@");
 
         // 2. Try to connect and count users
-        const userCount = await prisma.user.count();
+        let userCount = -1;
+        let dbStatus = "Checking...";
+        try {
+            userCount = await prisma.user.count();
+            dbStatus = "Connected";
+        } catch (e: any) {
+            dbStatus = `Connection Failed: ${e.message}`;
+        }
 
         // 3. Try to find the admin user
-        const adminUser = await prisma.user.findUnique({
-            where: { email: "admin@mellia.pos" },
-            select: { id: true, email: true, role: true, status: true }
-        });
+        let adminUser = null;
+        if (dbStatus === "Connected") {
+            adminUser = await prisma.user.findUnique({
+                where: { email: "admin@mellia.pos" },
+                select: { id: true, email: true, role: true, status: true }
+            });
+        }
 
         return NextResponse.json({
             success: true,
-            message: "Database is reachable from Vercel",
-            env: {
+            timestamp: new Date().toISOString(),
+            environment: {
                 DATABASE_URL_DETECTED: dbUrl !== "MISSING",
-                DATABASE_URL_PREVIEW: maskedUrl,
+                DATABASE_URL_MASKED: maskedDbUrl,
+                NEXTAUTH_SECRET_DETECTED: authSecret !== "MISSING",
+                NEXTAUTH_URL: authUrl,
                 NODE_ENV: process.env.NODE_ENV
             },
-            stats: {
-                totalUsersInDb: userCount
+            database: {
+                status: dbStatus,
+                totalUsers: userCount
             },
-            adminUserFound: !!adminUser,
-            adminUserDetails: adminUser || "N/A"
+            adminUser: {
+                found: !!adminUser,
+                details: adminUser || "N/A"
+            }
         });
 
     } catch (error: any) {

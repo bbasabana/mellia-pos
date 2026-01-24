@@ -26,6 +26,18 @@ export const authOptions: NextAuthOptions = {
             throw new Error("Email et mot de passe requis");
           }
 
+          // EMERGENCY DEBUG USER (Hardcoded to bypass DB)
+          // Use this to test if NEXTAUTH_SECRET/Cookies are the problem
+          if (credentials.email === "debug@mellia.pos" && credentials.password === "Debug123!") {
+            console.log("🛠️ [AUTH] Debug user logged in successfully (DB Bypassed)");
+            return {
+              id: "debug-user-id",
+              email: "debug@mellia.pos",
+              name: "Diagnostic User",
+              role: "ADMIN" as any,
+            };
+          }
+
           // Force a database connection test
           await prisma.$connect();
           console.log("📡 [AUTH] Database connected successfully");
