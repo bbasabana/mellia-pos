@@ -38,8 +38,12 @@ function LoginPage() {
         console.log("🔐 Login result:", result);
 
         if (result?.error) {
-          console.error("❌ Login error:", result.error);
-          setError("Email ou mot de passe incorrect");
+          console.log("❌ Login error code:", result.error);
+          // Show explicit error if it's one of our thrown errors
+          const errorMsg = result.error === "CredentialsSignin"
+            ? "Email ou mot de passe incorrect"
+            : result.error;
+          setError(errorMsg);
         } else if (result?.ok) {
           console.log("✅ Login successful, redirecting...");
           router.push("/dashboard");
