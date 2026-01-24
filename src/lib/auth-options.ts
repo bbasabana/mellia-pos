@@ -11,6 +11,17 @@ import { UserRole } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV !== "production",
+  logger: {
+    error(code, metadata) {
+      console.error(`🚨 [NEXTAUTH_ERROR] ${code}`, metadata);
+    },
+    warn(code) {
+      console.warn(`⚠️ [NEXTAUTH_WARN] ${code}`);
+    },
+    debug(code, metadata) {
+      console.log(`🔍 [NEXTAUTH_DEBUG] ${code}`, metadata);
+    },
+  },
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -20,42 +31,40 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         try {
-          console.log("🔐 [AUTH] Login attempt for:", credentials?.email);
+          const email = credentials?.email?.toLowerCase().trim();
+          console.log(`🔐 [AUTH] Attempting login for: ${email}`);
 
-          if (!credentials?.email || !credentials?.password) {
+          if (!email || !credentials?.password) {
             throw new Error("Email et mot de passe requis");
           }
 
-          // EMERGENCY DEBUG USER (Hardcoded to bypass DB)
-          // Use this to test if NEXTAUTH_SECRET/Cookies are the problem
-          if (credentials.email === "debug@mellia.pos" && credentials.password === "Debug123!") {
-            console.log("🛠️ [AUTH] Debug user logged in successfully (DB Bypassed)");
+          // 🛠️ ISOLATION TEST: Hardcoded user
+          // If this works but admin@mellia.pos fails, the problem is DATABASE.
+          // If this ALSO fails, the problem is VERCEL/COOKIES/SECRET.
+          if (email === "debug@mellia.pos" && credentials.password === "Debug123!") {
+            console.log("🛠️ [AUTH] Debug user login successful (DB Bypassed)");
             return {
-              id: "debug-user-id",
+              id: "debug-id",
               email: "debug@mellia.pos",
               name: "Diagnostic User",
               role: "ADMIN" as any,
             };
           }
 
-          // Force a database connection test
+          // Database check
           await prisma.$connect();
-          console.log("📡 [AUTH] Database connected successfully");
-
-          // Normalize email
-          const email = credentials.email.toLowerCase().trim();
 
           const user = await prisma.user.findUnique({
             where: { email },
           });
 
           if (!user) {
-            console.error(`❌ [AUTH] User not found in database: ${email}`);
-            throw new Error("Utilisateur non trouvé");
+            console.error(`❌ [AUTH] User not found: ${email}`);
+            throw new Error("Identifiants incorrects");
           }
 
           if (user.status !== "ACTIVE") {
-            console.error(`❌ [AUTH] User account is not active: ${email}`);
+            console.error(`❌ [AUTH] Account inactive: ${email}`);
             throw new Error("Compte inactif");
           }
 
@@ -65,11 +74,11 @@ export const authOptions: NextAuthOptions = {
           );
 
           if (!isValid) {
-            console.error(`❌ [AUTH] Invalid password for: ${email}`);
-            throw new Error("Mot de passe incorrect");
+            console.error(`❌ [AUTH] Incorrect password for: ${email}`);
+            throw new Error("Identifiants incorrects");
           }
 
-          console.log(`✅ [AUTH] Authentication successful for: ${email}`);
+          console.log(`✅ [AUTH] Success: ${email}`);
           return {
             id: user.id,
             email: user.email,
@@ -77,9 +86,8 @@ export const authOptions: NextAuthOptions = {
             role: user.role,
           };
         } catch (error: any) {
-          console.error("🚨 [AUTH] CRITICAL ERROR:", error.message || error);
-          // Re-throw or return null, but now it will be in the server logs
-          throw new Error(error.message || "Erreur d'authentification");
+          console.error("🚨 [AUTH] Authorize Error:", error.message || error);
+          throw new Error(error.message || "Authentication failed");
         }
       },
     }),
