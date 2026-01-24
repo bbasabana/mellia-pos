@@ -89,6 +89,12 @@ const menuItems = [
     icon: Settings,
     roles: ["ADMIN"],
   },
+  {
+    label: "Utilisateurs",
+    href: "/dashboard/users",
+    icon: Users,
+    roles: ["ADMIN", "MANAGER"],
+  },
 ];
 
 interface DashboardLayoutProps {

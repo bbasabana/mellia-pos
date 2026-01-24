@@ -18,6 +18,17 @@ export default function TransactionsPage() {
     const [dateRange, setDateRange] = useState({ start: "", end: "" });
 
     // Printing
+    const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+    const [rate, setRate] = useState(2800);
+
+    // Fetch rate
+    useEffect(() => {
+        fetch("/api/exchange-rate").then(res => res.json()).then(data => {
+            if (data.success) setRate(Number(data.data.rateUsdToCdf));
+        });
+    }, []);
+
+    // Printing
     const [printSale, setPrintSale] = useState<any | null>(null);
     const printRef = useRef<HTMLDivElement>(null);
 
@@ -66,7 +77,25 @@ export default function TransactionsPage() {
 
     const triggerPrint = (sale: any) => {
         setPrintSale(sale);
-        // The useEffect will trigger handlePrint once state is set and ref is ready
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Voulez-vous vraiment annuler cette vente ? Cette action restaurera le stock.")) return;
+        setDeleteLoading(id);
+        try {
+            const res = await fetch(`/api/transactions?id=${id}`, { method: "DELETE" });
+            const json = await res.json();
+            if (json.success) {
+                showToast("Vente annulée avec succès", "success");
+                fetchTransactions();
+            } else {
+                showToast(json.error || "Erreur lors de l'annulation", "error");
+            }
+        } catch (e) {
+            showToast("Erreur serveur", "error");
+        } finally {
+            setDeleteLoading(null);
+        }
     };
 
     return (
@@ -118,9 +147,8 @@ export default function TransactionsPage() {
                             <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-bold border-b border-gray-100">
                                 <tr>
                                     <th className="px-6 py-3">Date</th>
-                                    <th className="px-6 py-3">Ticket</th>
-                                    <th className="px-6 py-3">Client</th>
-                                    <th className="px-6 py-3 text-center">Type</th>
+                                    <th className="px-6 py-3">Ticket / Client</th>
+                                    <th className="px-6 py-3">Détails Produits</th>
                                     <th className="px-6 py-3 text-right">Montant</th>
                                     <th className="px-6 py-3 text-center">Caissier</th>
                                     <th className="px-6 py-3 text-right">Actions</th>
@@ -129,49 +157,84 @@ export default function TransactionsPage() {
                             <tbody className="divide-y divide-gray-50">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-12 text-gray-400">
+                                        <td colSpan={6} className="text-center py-12 text-gray-400">
                                             <Loader2 className="animate-spin inline-block mr-2" size={16} /> Chargement...
                                         </td>
                                     </tr>
                                 ) : transactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-12 text-gray-400 italic">
+                                        <td colSpan={6} className="text-center py-12 text-gray-400 italic">
                                             Aucune vente trouvée.
                                         </td>
                                     </tr>
                                 ) : (
                                     transactions.map((tx) => (
-                                        <tr key={tx.id} className="hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-gray-600">
-                                                {format(new Date(tx.createdAt), "dd MMM yyyy HH:mm", { locale: fr })}
-                                            </td>
-                                            <td className="px-6 py-4 font-bold text-gray-800">
-                                                {tx.ticketNum}
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-600">
-                                                {tx.client ? tx.client.name : <span className="text-gray-400 italic">Passager</span>}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`px-2 py-1 rounded-sm text-[10px] uppercase font-bold ${tx.orderType === 'DELIVERY' ? 'bg-orange-50 text-orange-600' :
-                                                        tx.orderType === 'TAKEAWAY' ? 'bg-blue-50 text-blue-600' :
-                                                            'bg-green-50 text-green-600'
+                                        <tr key={tx.id} className="hover:bg-gray-50/50 transition-colors group">
+                                            <td className="px-6 py-4 font-medium text-gray-600 align-top w-32">
+                                                {format(new Date(tx.createdAt), "dd MMM HH:mm", { locale: fr })}
+                                                <div className={`mt-1 inline-flex text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${tx.status === "CANCELLED" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
                                                     }`}>
-                                                    {tx.orderType === 'DINE_IN' ? 'Sur Place' : tx.orderType}
-                                                </span>
+                                                    {tx.status === "CANCELLED" ? "Annulée" : "Validée"}
+                                                </div>
                                             </td>
-                                            <td className="px-6 py-4 text-right font-black text-gray-900">
-                                                {Number(tx.totalNet).toLocaleString()} FC
+                                            <td className="px-6 py-4 align-top w-48">
+                                                <div className="font-bold text-gray-800">{tx.ticketNum}</div>
+                                                <div className="text-xs text-gray-500 mt-0.5">
+                                                    {tx.client ? tx.client.name : "Passager"}
+                                                </div>
+                                                <div className="mt-1">
+                                                    <span className={`px-1.5 py-0.5 rounded-sm text-[9px] uppercase font-bold border ${tx.orderType === 'DELIVERY' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                        tx.orderType === 'TAKEAWAY' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                            'bg-gray-50 text-gray-600 border-gray-100'
+                                                        }`}>
+                                                        {tx.orderType === 'DINE_IN' ? 'Sur Place' : tx.orderType}
+                                                    </span>
+                                                </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center text-xs text-gray-500">
-                                                {tx.user?.name}
+                                            <td className="px-6 py-4 align-top">
+                                                <div className="text-xs text-gray-600 space-y-1 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+                                                    {tx.items?.map((item: any, i: number) => (
+                                                        <div key={i} className="flex justify-between border-b border-dashed border-gray-100 pb-1 last:border-0 last:pb-0">
+                                                            <span className="font-medium">{Number(item.quantity)}x {item.product?.name}</span>
+                                                            <span className="text-gray-400">{(item.unitPrice * rate).toLocaleString()} FC</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => triggerPrint(tx)}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-black text-white text-xs font-bold rounded-sm hover:bg-gray-800 transition-all shadow-sm"
-                                                >
-                                                    <Printer size={14} /> Imprimer
-                                                </button>
+                                            <td className="px-6 py-4 text-right align-top w-40">
+                                                <div className="font-black text-gray-900 text-base">
+                                                    {Math.round(Number(tx.totalNet) * rate).toLocaleString()} FC
+                                                </div>
+                                                <div className="text-xs text-gray-400 font-medium">
+                                                    ${Number(tx.totalNet).toFixed(2)} USD
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center text-xs text-gray-500 align-top w-32">
+                                                <div className="font-bold">{tx.user?.name.split(" ")[0]}</div>
+                                                <div className="text-[10px] uppercase text-gray-400">Caissier</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right align-top w-40">
+                                                <div className="flex flex-col gap-2 items-end">
+                                                    <button
+                                                        onClick={() => triggerPrint(tx)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-sm hover:bg-gray-200 transition-all w-full justify-center"
+                                                    >
+                                                        <Printer size={14} /> Imprimer
+                                                    </button>
+                                                    {tx.status !== "CANCELLED" && (
+                                                        <button
+                                                            onClick={() => handleDelete(tx.id)}
+                                                            disabled={deleteLoading === tx.id}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-red-600 text-xs font-bold rounded-sm hover:bg-red-50 transition-all w-full justify-center border border-transparent hover:border-red-100"
+                                                        >
+                                                            {deleteLoading === tx.id ? (
+                                                                <Loader2 className="animate-spin" size={14} />
+                                                            ) : (
+                                                                <>Supprimer</>
+                                                            )}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
