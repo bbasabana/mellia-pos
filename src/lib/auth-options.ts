@@ -10,6 +10,7 @@ import { verifyPassword } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
+  debug: process.env.NODE_ENV !== "production",
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -18,43 +19,52 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        console.log("🔑 Authorization attempt:", { email: credentials?.email });
+        try {
+          console.log("🔐 [AUTH] Attempting authorization for:", credentials?.email);
 
-        if (!credentials?.email || !credentials?.password) {
-          console.error("❌ Missing credentials");
-          throw new Error("Email and password required");
+          if (!credentials?.email || !credentials?.password) {
+            console.error("❌ [AUTH] Missing email or password");
+            return null;
+          }
+
+          // Normalize email to avoid case sensitivity issues
+          const email = credentials.email.toLowerCase().trim();
+
+          const user = await prisma.user.findUnique({
+            where: { email },
+          });
+
+          if (!user) {
+            console.error(`❌ [AUTH] User not found: ${email}`);
+            return null;
+          }
+
+          if (user.status !== "ACTIVE") {
+            console.error(`❌ [AUTH] User inactive: ${email}`);
+            return null;
+          }
+
+          const isValid = await verifyPassword(
+            credentials.password,
+            user.passwordHash
+          );
+
+          if (!isValid) {
+            console.error(`❌ [AUTH] Invalid password for: ${email}`);
+            return null;
+          }
+
+          console.log(`✅ [AUTH] Success for: ${email}`);
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          };
+        } catch (error) {
+          console.error("🚨 [AUTH] Internal error during authorize:", error);
+          return null;
         }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
-
-        console.log("👤 User found:", user ? { id: user.id, email: user.email, status: user.status } : "null");
-
-        if (!user || user.status !== "ACTIVE") {
-          console.error("❌ Invalid user or inactive account");
-          throw new Error("Invalid credentials or inactive account");
-        }
-
-        const isValid = await verifyPassword(
-          credentials.password,
-          user.passwordHash
-        );
-
-        console.log("🔐 Password valid:", isValid);
-
-        if (!isValid) {
-          console.error("❌ Invalid password");
-          throw new Error("Invalid credentials");
-        }
-
-        console.log("✅ Authorization successful");
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
       },
     }),
   ],
@@ -76,9 +86,11 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
