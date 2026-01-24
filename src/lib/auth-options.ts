@@ -20,14 +20,17 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         try {
-          console.log("🔐 [AUTH] Attempting authorization for:", credentials?.email);
+          console.log("🔐 [AUTH] Login attempt for:", credentials?.email);
 
           if (!credentials?.email || !credentials?.password) {
-            console.error("❌ [AUTH] Missing email or password");
-            return null;
+            throw new Error("Email et mot de passe requis");
           }
 
-          // Normalize email to avoid case sensitivity issues
+          // Force a database connection test
+          await prisma.$connect();
+          console.log("📡 [AUTH] Database connected successfully");
+
+          // Normalize email
           const email = credentials.email.toLowerCase().trim();
 
           const user = await prisma.user.findUnique({
@@ -35,13 +38,13 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!user) {
-            console.error(`❌ [AUTH] User not found: ${email}`);
-            return null;
+            console.error(`❌ [AUTH] User not found in database: ${email}`);
+            throw new Error("Utilisateur non trouvé");
           }
 
           if (user.status !== "ACTIVE") {
-            console.error(`❌ [AUTH] User inactive: ${email}`);
-            return null;
+            console.error(`❌ [AUTH] User account is not active: ${email}`);
+            throw new Error("Compte inactif");
           }
 
           const isValid = await verifyPassword(
@@ -51,19 +54,20 @@ export const authOptions: NextAuthOptions = {
 
           if (!isValid) {
             console.error(`❌ [AUTH] Invalid password for: ${email}`);
-            return null;
+            throw new Error("Mot de passe incorrect");
           }
 
-          console.log(`✅ [AUTH] Success for: ${email}`);
+          console.log(`✅ [AUTH] Authentication successful for: ${email}`);
           return {
             id: user.id,
             email: user.email,
             name: user.name,
             role: user.role,
           };
-        } catch (error) {
-          console.error("🚨 [AUTH] Internal error during authorize:", error);
-          return null;
+        } catch (error: any) {
+          console.error("🚨 [AUTH] CRITICAL ERROR:", error.message || error);
+          // Re-throw or return null, but now it will be in the server logs
+          throw new Error(error.message || "Erreur d'authentification");
         }
       },
     }),
