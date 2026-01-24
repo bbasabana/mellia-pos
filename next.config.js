@@ -11,8 +11,8 @@ const nextConfig = {
 
   // Performance optimizations
   compiler: {
-    // Remove console logs in production
-    removeConsole: process.env.NODE_ENV === 'production',
+    // Remove console logs in production (DISABLED FOR DEBUGGING)
+    removeConsole: false,
   },
 
   // Enable SWC minification (faster than Terser)
