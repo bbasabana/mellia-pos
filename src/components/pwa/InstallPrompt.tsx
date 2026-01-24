@@ -60,7 +60,7 @@ export default function InstallPwaPrompt() {
 
             <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
-                    Installer l'application
+                    Installer l&apos;application
                 </h3>
                 <p className="text-zinc-500 dark:text-zinc-400 text-xs truncate">
                     Ajoutez Mellia POS à votre bureau

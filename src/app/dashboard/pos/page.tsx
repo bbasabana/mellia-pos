@@ -1,8 +1,10 @@
 "use client";
 
 import { usePosStore } from "@/store/usePosStore";
-import { Search, Calculator, Trash2, UserPlus, CreditCard, Minus, Plus, Save, Store, Filter } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Search, Calculator, Trash2, UserPlus, CreditCard, Minus, Plus, Save, Store, Filter, ShoppingCart, X, Printer } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { useReactToPrint } from "react-to-print";
+import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import ClientFormModal from "@/components/clients/ClientFormModal";
 import PaymentModal from "@/components/pos/PaymentModal";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -11,6 +13,7 @@ import OrderTypeSelector from "@/components/pos/OrderTypeSelector";
 import DeliveryFormModal from "@/components/pos/DeliveryFormModal";
 import DraftSalesList from "@/components/pos/DraftSalesList";
 import { cn } from "@/lib/utils";
+import { showToast } from "@/components/ui/Toast";
 
 // --- Components (Inline for now, can extract) ---
 
@@ -97,7 +100,7 @@ const ClientSelector = () => {
     );
 };
 
-const Cart = () => {
+const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
     const {
         cart,
         updateQuantity,
@@ -271,8 +274,10 @@ const Cart = () => {
             <PaymentModal
                 isOpen={isPaymentOpen}
                 onClose={() => setIsPaymentOpen(false)}
-                onSuccess={() => {
-                    // Refresh if needed
+                onSuccess={(sale) => {
+                    if (sale) {
+                        setPrintSale(sale);
+                    }
                 }}
             />
 
@@ -349,14 +354,14 @@ const ProductGrid = () => {
     const handleProductClick = (product: any) => {
         const availableStock = getProductStock(product);
         if (availableStock <= 0) {
-            alert(`Stock épuisé pour ${product.name}`);
+            showToast(`Stock épuisé pour ${product.name}`, "error");
             return;
         }
 
         // Check prices
         const prices = product.prices || [];
         if (prices.length === 0) {
-            alert("Ce produit n'a pas de prix défini.");
+            showToast("Ce produit n'a pas de prix défini.", "error");
             return;
         }
 
@@ -448,8 +453,8 @@ const ProductGrid = () => {
             </div>
 
             {/* Product Grid */}
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                     {filtered.map((product) => {
                         const stock = getProductStock(product);
                         const isOutOfStock = stock <= 0;
@@ -504,18 +509,74 @@ const ProductGrid = () => {
 };
 
 export default function PosPage() {
+    const { cart } = usePosStore();
+    const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+
+    // Printing Logic
+    const [printSale, setPrintSale] = useState<any | null>(null);
+    const printRef = useRef<HTMLDivElement>(null);
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        onAfterPrint: () => setPrintSale(null),
+    });
+
+    useEffect(() => {
+        if (printSale && printRef.current) {
+            handlePrint();
+        }
+    }, [printSale, handlePrint]);
+
     return (
         <DashboardLayout disablePadding={true}>
-            <div className="flex h-full overflow-hidden">
+            <div className="flex h-full overflow-hidden relative">
                 {/* Left: Product Grid */}
                 <div className="flex-1 h-full overflow-hidden bg-gray-50 relative">
                     <ProductGrid />
+
+                    {/* FAB for Mobile Cart */}
+                    <button
+                        onClick={() => setIsMobileCartOpen(true)}
+                        className="lg:hidden absolute bottom-6 right-6 w-14 h-14 bg-[#000] text-white rounded-full shadow-xl flex items-center justify-center z-40 transition-transform active:scale-95"
+                    >
+                        <ShoppingCart size={24} />
+                        {cart.length > 0 && (
+                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-white">
+                                {cart.length}
+                            </span>
+                        )}
+                    </button>
                 </div>
 
-                {/* Right: Cart */}
-                <div className="w-[380px] h-full shrink-0 z-10 relative">
-                    <Cart />
+                {/* Right: Cart (Responsive: Hidden on small screens, sidebar on large) */}
+                <div className="hidden lg:flex w-[350px] xl:w-[380px] h-full shrink-0 z-10 relative border-l border-gray-200">
+                    <Cart setPrintSale={setPrintSale} />
                 </div>
+
+                {/* Hidden Print Area */}
+                <div style={{ display: "none" }}>
+                    <div ref={printRef}>
+                        {printSale && <ReceiptTemplate sale={printSale} />}
+                    </div>
+                </div>
+
+                {/* Mobile: Drawer/Overlay */}
+                {isMobileCartOpen && (
+                    <div className="lg:hidden fixed inset-0 z-50 bg-white animate-in slide-in-from-right duration-200 flex flex-col">
+                        <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
+                            <span className="font-bold text-sm text-gray-700 pl-2">Panier & Résumé</span>
+                            <button
+                                onClick={() => setIsMobileCartOpen(false)}
+                                className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 text-gray-700"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            <Cart setPrintSale={setPrintSale} />
+                        </div>
+                    </div>
+                )}
             </div>
         </DashboardLayout>
     );

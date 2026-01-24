@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ArrowRightLeft, AlertTriangle, PlusCircle, MinusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { showToast } from "@/components/ui/Toast";
 
 const LOCATIONS = ["DEPOT", "FRIGO", "CASIER", "ECONOMAT", "CUISINE"];
 
@@ -89,16 +90,16 @@ export function StockMovementModal({ isOpen, onClose, initialProductId, initialT
             const data = await res.json();
 
             if (data.success) {
-                alert("Mouvement enregistré !");
+                showToast("Mouvement enregistré !", "success");
                 onClose();
                 // Reset form
                 setQuantity("");
                 setReason("");
             } else {
-                alert("Erreur: " + data.error);
+                showToast("Erreur: " + data.error, "error");
             }
         } catch (err) {
-            alert("Erreur serveur");
+            showToast("Erreur serveur", "error");
         } finally {
             setLoading(false);
         }

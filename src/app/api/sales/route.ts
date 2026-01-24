@@ -130,6 +130,15 @@ export async function POST(req: Request) {
                             priority: 0 // Default priority
                         }
                     }
+                },
+                include: {
+                    client: true,
+                    user: true,
+                    items: {
+                        include: {
+                            product: true
+                        }
+                    }
                 }
             });
 

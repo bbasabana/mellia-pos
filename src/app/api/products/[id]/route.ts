@@ -107,7 +107,7 @@ export async function PUT(
           productId: params.id,
           unitCostUsd: cost,
           unitCostCdf: cost * exchangeRate,
-          forUnit: product.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE",
+          forUnit: product.saleUnit,
         },
       });
 

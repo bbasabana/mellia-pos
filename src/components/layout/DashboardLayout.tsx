@@ -21,7 +21,8 @@ import {
   Settings,
   Menu,
   LogOut,
-  Flame
+  Flame,
+  FileText
 } from "lucide-react";
 import "@/styles/theme.scss";
 import { cn } from "@/lib/utils";
@@ -75,6 +76,12 @@ const menuItems = [
     href: "/dashboard/reports",
     icon: BarChart3,
     roles: ["ADMIN", "MANAGER"],
+  },
+  {
+    label: "Transactions",
+    href: "/dashboard/transactions",
+    icon: FileText,
+    roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
     label: "Paramètres",
@@ -182,7 +189,7 @@ function DashboardLayout({ children, disablePadding = false }: DashboardLayoutPr
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 z-50 flex flex-col transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-0",
+          "fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 z-50 flex flex-col transition-transform duration-300 transform lg:translate-x-0 lg:static lg:inset-0",
           sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         )}
       >

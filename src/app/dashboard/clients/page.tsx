@@ -21,6 +21,7 @@ import ClientFormModal from "@/components/clients/ClientFormModal";
 import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
+import { showToast } from "@/components/ui/Toast";
 
 export default function ClientsPage() {
     const { data: session } = useSession();
@@ -78,14 +79,15 @@ export default function ClientsPage() {
             const res = await fetch(`/api/clients/${clientToDelete.id}`, { method: "DELETE" });
             const data = await res.json();
             if (data.success) {
+                showToast("Client supprimé avec succès", "success");
                 fetchClients();
                 setDeleteModalOpen(false);
                 setClientToDelete(null);
             } else {
-                alert("Erreur: " + (data.error || "Impossible de supprimer"));
+                showToast("Erreur: " + (data.error || "Impossible de supprimer"), "error");
             }
         } catch (e) {
-            alert("Erreur serveur");
+            showToast("Erreur serveur lors de la suppression", "error");
         } finally {
             setIsDeleting(false);
         }

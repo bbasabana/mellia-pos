@@ -32,7 +32,8 @@ export async function GET() {
 
                 // Calculate value (using USD cost as base)
                 // Safe access with optional chaining and fallback
-                const costObj = p.costs?.find(c => c.forUnit === p.saleUnit);
+                // FIX: Try to find exact unit match, otherwise fallback to any cost available (fixes Plate/Bottle mismatch)
+                const costObj = p.costs?.find(c => c.forUnit === p.saleUnit) || p.costs?.[0];
                 const unitCost = costObj?.unitCostUsd?.toNumber() || 0;
 
                 const totalValue = total * unitCost;

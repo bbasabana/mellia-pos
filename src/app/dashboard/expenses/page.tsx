@@ -20,6 +20,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { showToast } from "@/components/ui/Toast";
 
 interface Summary {
     totalSales: number;
@@ -119,11 +120,12 @@ export default function ExpensesPage() {
                     date: new Date().toISOString().split('T')[0]
                 });
                 fetchData();
+                showToast("Dépense enregistrée avec succès", "success");
             } else {
-                alert("Erreur: " + data.error);
+                showToast("Erreur: " + data.error, "error");
             }
         } catch (error) {
-            alert("Une erreur est survenue");
+            showToast("Une erreur est survenue", "error");
         } finally {
             setSubmitting(false);
         }

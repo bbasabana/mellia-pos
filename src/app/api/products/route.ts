@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
           productId: newProduct.id,
           unitCostUsd: cost,
           unitCostCdf: cost * exchangeRate,
-          forUnit: product.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE", // Default unit logic
+          forUnit: product.saleUnit, // FIX: Use the actual sale unit
         },
       });
 

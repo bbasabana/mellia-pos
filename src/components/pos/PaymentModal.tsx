@@ -3,11 +3,12 @@
 import { usePosStore } from "@/store/usePosStore";
 import { useState } from "react";
 import { X, DollarSign, Award, Loader2 } from "lucide-react";
+import { showToast } from "@/components/ui/Toast";
 
 interface PaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: () => void;
+    onSuccess: (sale?: any) => void;
 }
 
 export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) {
@@ -64,11 +65,13 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
             }
 
             const data = await res.json();
-            onSuccess();
+            showToast("Paiement effectué avec succès", "success");
+            onSuccess(data.data);
             clearCart();
             onClose();
         } catch (e: any) {
             setError(e.message);
+            showToast(e.message, "error");
         } finally {
             setLoading(false);
         }

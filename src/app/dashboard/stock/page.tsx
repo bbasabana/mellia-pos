@@ -11,6 +11,7 @@ import { MovementHistory } from "@/components/stock/MovementHistory";
 import { InventorySessionModal } from "@/components/stock/InventorySessionModal";
 import { StockMovementModal } from "@/components/stock/StockMovementModal";
 import { Modal } from "@/components/ui/Modal";
+import { showToast } from "@/components/ui/Toast";
 
 export default function StockPage() {
     const [activeTab, setActiveTab] = useState<"overview" | "movements" | "inventory">("overview");
@@ -224,13 +225,13 @@ function StockInventory({ onOpenSession, onResumeSession }: { onOpenSession: () 
             const res = await fetch(`/api/inventory/${sessionToDelete}`, { method: "DELETE" });
             const data = await res.json();
             if (data.success) {
-                // alert("Session supprimée"); // Optional: toast
+                showToast("Session supprimée avec succès", "success");
                 fetchSessions();
             } else {
-                alert("Erreur: " + data.error);
+                showToast("Erreur: " + data.error, "error");
             }
         } catch (e) {
-            alert("Erreur serveur");
+            showToast("Erreur serveur lors de la suppression", "error");
         } finally {
             setSessionToDelete(null);
         }

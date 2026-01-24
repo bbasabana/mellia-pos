@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Check, X, AlertOctagon } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { showToast } from "@/components/ui/Toast";
 
 interface Props {
     isOpen: boolean;
@@ -90,8 +91,9 @@ export function InventorySessionModal({ isOpen, onClose, initialSessionId }: Pro
                 setSessionId(data.data.id);
                 setStep("COUNTING");
                 fetchProducts();
+                fetchProducts();
             } else {
-                alert(data.message || "Erreur");
+                showToast(data.message || "Erreur", "error");
             }
         } finally {
             setLoading(false);
@@ -122,7 +124,7 @@ export function InventorySessionModal({ isOpen, onClose, initialSessionId }: Pro
         });
 
         if (res.ok) {
-            alert("Inventaire Clôturé ! Les écarts ont été enregistrés.");
+            showToast("Inventaire Clôturé ! Les écarts ont été enregistrés.", "success");
             onClose();
         }
         setLoading(false);

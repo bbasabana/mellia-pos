@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form";
 import { X, Save, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { showToast } from "@/components/ui/Toast";
 
 type ClientFormData = {
     name: string;
@@ -50,10 +51,12 @@ export default function ClientFormModal({ isOpen, onClose, onSuccess, clientToEd
                 throw new Error(text || "Error saving client");
             }
 
+            showToast(clientToEdit ? "Client modifié avec succès" : "Client créé avec succès", "success");
             onSuccess();
             onClose();
         } catch (e: any) {
             setError(e.message);
+            showToast(e.message, "error");
         } finally {
             setLoading(false);
         }
