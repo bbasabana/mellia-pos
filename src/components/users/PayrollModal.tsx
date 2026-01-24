@@ -40,9 +40,37 @@ export function PayrollModal({ isOpen, onClose, user, onSuccess }: PayrollModalP
 
     const fetchHistory = async () => {
         try {
-            const res = await fetch(`/api/payroll/advances?userId=${user.id}`);
-            const data = await res.json();
-            if (data.success) setHistory(data.data);
+            const [advRes, payRes] = await Promise.all([
+                fetch(`/api/payroll/advances?userId=${user.id}`),
+                fetch(`/api/payroll?userId=${user.id}`)
+            ]);
+
+            const advData = await advRes.json();
+            const payData = await payRes.json();
+
+            const advances = advData.success ? advData.data.map((a: any) => ({
+                ...a,
+                type: 'ADVANCE',
+                displayDate: a.date,
+                displayAmount: -Number(a.amount), // Negative as it's taking money out (or shown as advance)
+                description: `Avance: ${a.reason}`
+            })) : [];
+
+            const payrolls = payData.success ? payData.data.map((p: any) => ({
+                ...p,
+                type: 'PAYROLL',
+                displayDate: p.paymentDate,
+                displayAmount: -Number(p.netPaid), // Payment out
+                description: `Salaire ${new Date(0, p.month - 1).toLocaleString('fr', { month: 'long' })} ${p.year}`,
+                status: "PAID" // Payrolls are always completed effectively
+            })) : [];
+
+            // Combine and sort by date descending
+            const combined = [...advances, ...payrolls].sort((a, b) =>
+                new Date(b.displayDate).getTime() - new Date(a.displayDate).getTime()
+            );
+
+            setHistory(combined);
         } catch (e) { console.error(e); }
     };
 
@@ -210,13 +238,22 @@ export function PayrollModal({ isOpen, onClose, user, onSuccess }: PayrollModalP
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {history.map(h => (
-                                    <tr key={h.id}>
-                                        <td className="px-2 py-2 text-gray-500">{new Date(h.date).toLocaleDateString()}</td>
-                                        <td className="px-2 py-2 font-bold">{formatCurrency(h.amount)}</td>
-                                        <td className="px-2 py-2 text-gray-600">{h.reason}</td>
+                                    <tr key={h.id || h.createdAt}>
+                                        <td className="px-2 py-2 text-gray-500">{new Date(h.displayDate).toLocaleDateString()}</td>
+                                        <td className="px-2 py-2 font-bold">
+                                            <span className={h.type === 'PAYROLL' ? 'text-green-600' : 'text-orange-600'}>
+                                                {formatCurrency(Math.abs(h.displayAmount))}
+                                            </span>
+                                        </td>
+                                        <td className="px-2 py-2 text-gray-600 text-xs">
+                                            {h.description}
+                                            {h.notes && <div className="text-[10px] italic text-gray-400">{h.notes}</div>}
+                                        </td>
                                         <td className="px-2 py-2 text-right">
-                                            <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${h.status.includes('DEDUCTED') ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                {h.status}
+                                            <span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${h.type === 'PAYROLL' ? 'bg-green-100 text-green-700' :
+                                                    h.status.includes('DEDUCTED') ? 'bg-gray-100 text-gray-500 line-through' : 'bg-yellow-100 text-yellow-700'
+                                                }`}>
+                                                {h.type === 'PAYROLL' ? 'PAYÉ' : h.status}
                                             </span>
                                         </td>
                                     </tr>
