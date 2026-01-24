@@ -84,12 +84,6 @@ const menuItems = [
     roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
-    label: "Paramètres",
-    href: "/dashboard/settings",
-    icon: Settings,
-    roles: ["ADMIN"],
-  },
-  {
     label: "Utilisateurs",
     href: "/dashboard/users",
     icon: Users,
@@ -99,6 +93,12 @@ const menuItems = [
     label: "Employés (RH)",
     href: "/dashboard/employees",
     icon: Users,
+    roles: ["ADMIN"],
+  },
+  {
+    label: "Paramètres",
+    href: "/dashboard/settings",
+    icon: Settings,
     roles: ["ADMIN"],
   },
 ];

@@ -75,6 +75,165 @@ export async function GET(req: NextRequest) {
     }
 }
 
+// ... (previous imports)
+
+export async function PUT(req: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user || !["ADMIN", "MANAGER"].includes((session.user as any).role)) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get("id");
+
+        if (!id) {
+            return new NextResponse("Missing ID", { status: 400 });
+        }
+
+        const body = await req.json();
+        const { items: incomingItems } = body; // List of items with new quantities
+
+        if (!incomingItems || !Array.isArray(incomingItems)) {
+            return new NextResponse("Invalid Data", { status: 400 });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Fetch current sale
+            const sale = await tx.sale.findUnique({
+                where: { id },
+                include: { items: true }
+            });
+
+            if (!sale) throw new Error("Sale not found");
+            if (sale.status === "CANCELLED") throw new Error("Cannot edit cancelled sale");
+
+            let newTotal = 0;
+
+            // 2. Process Incoming Items (Updates & Adds)
+            for (const item of incomingItems) {
+                const existingItem = sale.items.find((i) => i.productId === item.productId);
+                const quantity = Number(item.quantity);
+                const price = Number(item.unitPrice);
+
+                if (existingItem) {
+                    // UPDATE Logic
+                    const oldQuantity = Number(existingItem.quantity);
+                    const diff = quantity - oldQuantity;
+
+                    if (diff !== 0) {
+                        // Stock Check/Update
+                        const product = await tx.product.findUnique({ where: { id: item.productId } });
+                        const location = product?.type === "BEVERAGE" ? "FRIGO" : "CUISINE";
+
+                        if (diff > 0) {
+                            // Buying MORE -> Deduct Stock
+                            const stockItem = await tx.stockItem.findUnique({
+                                where: { productId_location: { productId: item.productId, location: location as any } }
+                            });
+
+                            if (!stockItem || Number(stockItem.quantity) < diff) {
+                                throw new Error(`Stock insuffisant pour ${product?.name}`);
+                            }
+
+                            await tx.stockItem.update({
+                                where: { productId_location: { productId: item.productId, location: location as any } },
+                                data: { quantity: { decrement: diff } }
+                            });
+                        } else {
+                            // Buying LESS -> Return to Stock
+                            await tx.stockItem.update({
+                                where: { productId_location: { productId: item.productId, location: location as any } },
+                                data: { quantity: { increment: Math.abs(diff) } }
+                            });
+                        }
+
+                        // Record Movement
+                        await tx.stockMovement.create({
+                            data: {
+                                productId: item.productId,
+                                type: "ADJUSTMENT",
+                                quantity: new Prisma.Decimal(Math.abs(diff)),
+                                // if diff > 0 (bought more) -> OUT (or just ADJUSTMENT implied)
+                                // if diff < 0 (bought less) -> IN
+                                fromLocation: diff > 0 ? location : undefined,
+                                toLocation: diff < 0 ? location : undefined,
+                                reason: `Modification Vente #${sale.ticketNum}`,
+                                userId: session.user.id
+                            }
+                        });
+
+                        // Update Sale Item
+                        await tx.saleItem.update({
+                            where: { id: existingItem.id },
+                            data: {
+                                quantity: quantity,
+                                totalPrice: quantity * price
+                            }
+                        });
+                    }
+                } else {
+                    // NEW ITEM (Not supported by UI yet but good for safety)
+                    // Skip for now or throw error
+                }
+
+                newTotal += quantity * price;
+            }
+
+            // 3. Process Removed Items
+            const incomingIds = incomingItems.map((i: any) => i.productId);
+            const removedItems = sale.items.filter((i) => !incomingIds.includes(i.productId));
+
+            for (const item of removedItems) {
+                const product = await tx.product.findUnique({ where: { id: item.productId } });
+                const location = product?.type === "BEVERAGE" ? "FRIGO" : "CUISINE";
+
+                // Restore Stock
+                await tx.stockItem.update({
+                    where: { productId_location: { productId: item.productId, location: location as any } },
+                    data: { quantity: { increment: item.quantity } }
+                });
+
+                // Record Movement
+                await tx.stockMovement.create({
+                    data: {
+                        productId: item.productId,
+                        type: "ADJUSTMENT",
+                        quantity: item.quantity,
+                        toLocation: location as any,
+                        reason: `Retrait produit Vente #${sale.ticketNum}`,
+                        userId: session.user.id
+                    }
+                });
+
+                // Delete Item
+                await tx.saleItem.delete({ where: { id: item.id } });
+            }
+
+            // 4. Update Sale Totals
+            // Recalculate DISCOUNT if it was percentage? For now assume fixed or re-calc
+            // Simple logic: New Total Net = New Total Items (assuming no discount change logic provided)
+
+            return await tx.sale.update({
+                where: { id },
+                data: {
+                    totalBrut: newTotal,
+                    totalNet: newTotal - Number(sale.discount), // Keep same discount value
+                    updatedAt: new Date()
+                }
+            });
+        });
+
+        return NextResponse.json({ success: true, data: result });
+
+    } catch (error: any) {
+        console.error("Update error:", error);
+        return NextResponse.json(
+            { success: false, error: error.message },
+            { status: 500 }
+        );
+    }
+}
 export async function DELETE(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);

@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, FileText } from "lucide-react";
+import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, FileText, Trash2, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useReactToPrint } from "react-to-print";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { showToast } from "@/components/ui/Toast";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
+import EditTransactionModal from "@/components/transactions/EditTransactionModal";
 
 export default function TransactionsPage() {
     const [transactions, setTransactions] = useState<any[]>([]);
@@ -17,8 +19,12 @@ export default function TransactionsPage() {
     const [search, setSearch] = useState("");
     const [dateRange, setDateRange] = useState({ start: "", end: "" });
 
+    // Modals State
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
+    const [editModal, setEditModal] = useState<{ isOpen: boolean, tx: any | null }>({ isOpen: false, tx: null });
+
     // Printing
-    const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
     const [rate, setRate] = useState(2800);
 
     // Fetch rate
@@ -79,23 +85,32 @@ export default function TransactionsPage() {
         setPrintSale(sale);
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Voulez-vous vraiment annuler cette vente ? Cette action restaurera le stock.")) return;
-        setDeleteLoading(id);
+    const confirmDelete = (id: string) => {
+        setDeleteModal({ isOpen: true, id });
+    };
+
+    const handleDelete = async () => {
+        if (!deleteModal.id) return;
+        setDeleteLoading(true);
         try {
-            const res = await fetch(`/api/transactions?id=${id}`, { method: "DELETE" });
+            const res = await fetch(`/api/transactions?id=${deleteModal.id}`, { method: "DELETE" });
             const json = await res.json();
             if (json.success) {
                 showToast("Vente annulée avec succès", "success");
                 fetchTransactions();
+                setDeleteModal({ isOpen: false, id: null });
             } else {
                 showToast(json.error || "Erreur lors de l'annulation", "error");
             }
         } catch (e) {
             showToast("Erreur serveur", "error");
         } finally {
-            setDeleteLoading(null);
+            setDeleteLoading(false);
         }
+    };
+
+    const openEditModal = (tx: any) => {
+        setEditModal({ isOpen: true, tx });
     };
 
     return (
@@ -222,17 +237,20 @@ export default function TransactionsPage() {
                                                         <Printer size={14} /> Imprimer
                                                     </button>
                                                     {tx.status !== "CANCELLED" && (
-                                                        <button
-                                                            onClick={() => handleDelete(tx.id)}
-                                                            disabled={deleteLoading === tx.id}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-red-600 text-xs font-bold rounded-sm hover:bg-red-50 transition-all w-full justify-center border border-transparent hover:border-red-100"
-                                                        >
-                                                            {deleteLoading === tx.id ? (
-                                                                <Loader2 className="animate-spin" size={14} />
-                                                            ) : (
-                                                                <>Supprimer</>
-                                                            )}
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                onClick={() => openEditModal(tx)}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-blue-600 text-xs font-bold rounded-sm hover:bg-blue-50 transition-all w-full justify-center border border-transparent hover:border-blue-100"
+                                                            >
+                                                                <Edit size={14} /> Modifier
+                                                            </button>
+                                                            <button
+                                                                onClick={() => confirmDelete(tx.id)}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-red-600 text-xs font-bold rounded-sm hover:bg-red-50 transition-all w-full justify-center border border-transparent hover:border-red-100"
+                                                            >
+                                                                <Trash2 size={14} /> Supprimer
+                                                            </button>
+                                                        </>
                                                     )}
                                                 </div>
                                             </td>
@@ -263,10 +281,30 @@ export default function TransactionsPage() {
                     </div>
                 </div>
 
+                {/* Confirm Delete Modal */}
+                <ConfirmationModal
+                    isOpen={deleteModal.isOpen}
+                    onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                    onConfirm={handleDelete}
+                    title="Annuler cette vente ?"
+                    description="Cette action est irréversible. Le stock sera automatiquement restauré."
+                    confirmText="Oui, Annuler Vente"
+                    loading={deleteLoading}
+                />
+
+                {/* Edit Modal */}
+                <EditTransactionModal
+                    isOpen={editModal.isOpen}
+                    onClose={() => setEditModal({ ...editModal, isOpen: false })}
+                    transaction={editModal.tx}
+                    onSuccess={fetchTransactions}
+                    exchangeRate={rate}
+                />
+
                 {/* Hidden Print Area */}
                 <div style={{ display: "none" }}>
                     <div ref={printRef}>
-                        {printSale && <ReceiptTemplate sale={printSale} />}
+                        {printSale && <ReceiptTemplate sale={printSale} exchangeRate={rate} />}
                     </div>
                 </div>
             </div>
