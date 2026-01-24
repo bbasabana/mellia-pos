@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Check, X, AlertOctagon } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 
@@ -17,20 +17,16 @@ export function InventorySessionModal({ isOpen, onClose, initialSessionId }: Pro
     const [counts, setCounts] = useState<Record<string, number>>({}); // key: "prodId-loc"
     const [loading, setLoading] = useState(false);
 
-    // If initialSessionId is provided, we skip start and load data
-    useEffect(() => {
-        if (isOpen && initialSessionId) {
-            setSessionId(initialSessionId);
-            setStep("COUNTING");
-            fetchSessionDetails(initialSessionId);
-        } else if (isOpen && !initialSessionId) {
-            setStep("START");
-            setSessionId("");
-            setCounts({});
-        }
-    }, [isOpen, initialSessionId]);
+    // Quick fetch for MVP counting
+    const [products, setProducts] = useState<any[]>([]);
 
-    const fetchSessionDetails = async (id: string) => {
+    const fetchProducts = useCallback(async () => {
+        const res = await fetch("/api/stock");
+        const data = await res.json();
+        if (data.success) setProducts(data.data);
+    }, []);
+
+    const fetchSessionDetails = useCallback(async (id: string) => {
         setLoading(true);
         try {
             const res = await fetch(`/api/inventory/${id}`);
@@ -70,7 +66,20 @@ export function InventorySessionModal({ isOpen, onClose, initialSessionId }: Pro
         } finally {
             setLoading(false);
         }
-    };
+    }, [fetchProducts]);
+
+    // If initialSessionId is provided, we skip start and load data
+    useEffect(() => {
+        if (isOpen && initialSessionId) {
+            setSessionId(initialSessionId);
+            setStep("COUNTING");
+            fetchSessionDetails(initialSessionId);
+        } else if (isOpen && !initialSessionId) {
+            setStep("START");
+            setSessionId("");
+            setCounts({});
+        }
+    }, [isOpen, initialSessionId, fetchSessionDetails]);
 
     const startSession = async () => {
         setLoading(true);
@@ -87,14 +96,6 @@ export function InventorySessionModal({ isOpen, onClose, initialSessionId }: Pro
         } finally {
             setLoading(false);
         }
-    };
-
-    // Quick fetch for MVP counting
-    const [products, setProducts] = useState<any[]>([]);
-    const fetchProducts = async () => {
-        const res = await fetch("/api/stock");
-        const data = await res.json();
-        if (data.success) setProducts(data.data);
     };
 
     const handleCountChange = (productId: string, location: string, val: string) => {

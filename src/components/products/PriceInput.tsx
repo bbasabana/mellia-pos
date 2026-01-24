@@ -34,7 +34,7 @@ export function PriceInput({
     if (Math.abs(currentCdf - newCdf) > 1) {
       setCdfValue(newCdf.toFixed(0));
     }
-  }, [value, exchangeRate]);
+  }, [value, exchangeRate, cdfValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newCdfValue = e.target.value;

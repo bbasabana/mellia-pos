@@ -1,7 +1,7 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
     Plus,
     Search,
@@ -39,14 +39,7 @@ export default function ClientsPage() {
     const [clientToDelete, setClientToDelete] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchClients();
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [search]);
-
-    const fetchClients = async () => {
+    const fetchClients = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetch(`/api/clients?query=${search}`);
@@ -57,7 +50,14 @@ export default function ClientsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [search]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchClients();
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search, fetchClients]);
 
     const handleEdit = (client: any) => {
         if (!canEdit) return;

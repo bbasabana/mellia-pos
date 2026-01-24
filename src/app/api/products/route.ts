@@ -17,29 +17,77 @@ export async function GET(request: NextRequest) {
     const vendableOnly = searchParams.get("vendable") === "true";
     const activeOnly = searchParams.get("active") !== "false"; // Default to true
 
-    const products = await prisma.product.findMany({
-      where: {
-        ...(activeOnly && { active: true }),
-        ...(vendableOnly && { vendable: true }),
-      },
-      include: {
-        prices: {
-          include: {
-            space: {
-              select: {
-                id: true,
-                name: true,
+    // Optimized query for POS (vendable=true)
+    let products;
+
+    if (vendableOnly) {
+      products = await prisma.product.findMany({
+        where: {
+          ...(activeOnly && { active: true }),
+          vendable: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          beverageCategory: true,
+          foodCategory: true,
+          size: true, // Needed for POS logic
+          saleUnit: true,
+          active: true,
+          // Relations needed for POS only
+          prices: {
+            select: {
+              id: true,
+              priceUsd: true,
+              priceCdf: true,
+              forUnit: true,
+              space: {
+                select: {
+                  id: true,
+                  name: true,
+                },
               },
             },
           },
+          stockItems: {
+            select: {
+              location: true,
+              quantity: true
+            }
+          },
         },
-        costs: true,
-        stockItems: true, // Include stock for POS
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
+        orderBy: {
+          name: "asc",
+        },
+      });
+    } else {
+      // Full data for Admin / Management
+      products = await prisma.product.findMany({
+        where: {
+          ...(activeOnly && { active: true }),
+          // If vendable param was passed but false, we respect it, otherwise ignored
+          ...(searchParams.has("vendable") && { vendable: false }),
+        },
+        include: {
+          prices: {
+            include: {
+              space: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          costs: true,
+          stockItems: true,
+        },
+        orderBy: {
+          name: "asc",
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, data: products });
   } catch (error: any) {
