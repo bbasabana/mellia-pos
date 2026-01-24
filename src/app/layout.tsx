@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import AuthProvider from "@/components/AuthProvider";
 import { ToastContainer } from "@/components/ui/Toast";
+import InstallPwaPrompt from "@/components/pwa/InstallPrompt";
 import "./globals.css";
 import "@/styles/products.scss";
 
@@ -37,6 +38,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <ToastContainer />
+          <InstallPwaPrompt />
         </AuthProvider>
       </body>
     </html>
