@@ -1,0 +1,113 @@
+/**
+ * Login Page Styles - SIMPLE & CLEAN
+ * Minimal design, no shadows, compact form
+ */
+
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+  background-color: var(--color-bg-secondary);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background-color: white;
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-xl) var(--spacing-lg);
+  border: 1px solid var(--color-border-light);
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+  
+  img {
+    height: 60px;
+    width: auto;
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  p {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+  }
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  
+  label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+}
+
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  
+  input {
+    padding-right: 2.5rem;
+  }
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  
+  &:hover:not(:disabled) {
+    color: var(--color-text-secondary);
+  }
+  
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  
+  svg {
+    display: block;
+  }
+}
+
+.login-error {
+  padding: var(--spacing-sm);
+  background-color: var(--color-danger-pale);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--border-radius-md);
+  color: var(--color-danger-dark);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  font-weight: 500;
+}
+
+.login-footer {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border-light);
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
