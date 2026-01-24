@@ -28,7 +28,7 @@ const nextConfig = {
   // Experimental features for better performance
   experimental: {
     optimizeCss: false, // Disabled to avoid missing 'critters' dependency
-    optimizePackageImports: ['react-icons', '@prisma/client'],
+    optimizePackageImports: ['react-icons'],
   },
 
   // Webpack optimizations
