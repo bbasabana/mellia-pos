@@ -19,6 +19,11 @@ export default function UsersPage() {
         role: "CASHIER",
     });
 
+    // Reset Password State
+    const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+    const [resetStep, setResetStep] = useState<'CONFIRM' | 'SUCCESS'>('CONFIRM');
+    const [userToReset, setUserToReset] = useState<{ id: string, name: string } | null>(null);
+
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -72,16 +77,24 @@ export default function UsersPage() {
         setIsCreateOpen(true);
     };
 
-    const handleResetPassword = async (id: string, name: string) => {
-        if (!confirm(`Réinitialiser le mot de passe de ${name} à "U" ?`)) return;
+    const handleResetClick = (user: any) => {
+        setUserToReset(user);
+        setResetStep('CONFIRM');
+        setIsResetModalOpen(true);
+    };
+
+    const confirmReset = async () => {
+        if (!userToReset) return;
 
         try {
-            const res = await fetch(`/api/users/${id}`, {
+            const res = await fetch(`/api/users/${userToReset.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "RESET_PASSWORD" })
             });
-            if (res.ok) showToast("Mot de passe réinitialisé", "success");
+            if (res.ok) {
+                setResetStep('SUCCESS');
+            }
         } catch (e) { showToast("Erreur", "error"); }
     };
 
@@ -133,8 +146,8 @@ export default function UsersPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded-sm text-[10px] uppercase font-bold ${user.role === 'ADMIN' ? 'bg-purple-50 text-purple-600' :
-                                                    user.role === 'MANAGER' ? 'bg-orange-50 text-orange-600' :
-                                                        'bg-blue-50 text-blue-600'
+                                                user.role === 'MANAGER' ? 'bg-orange-50 text-orange-600' :
+                                                    'bg-blue-50 text-blue-600'
                                                 }`}>
                                                 {user.role}
                                             </span>
@@ -151,7 +164,7 @@ export default function UsersPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2">
-                                                <button onClick={() => handleResetPassword(user.id, user.name)} className="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded" title="Réinitialiser MDP">
+                                                <button onClick={() => handleResetClick(user)} className="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded" title="Réinitialiser MDP">
                                                     <Unlock size={16} />
                                                 </button>
                                                 <button onClick={() => handleEdit(user)} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded" title="Modifier">
@@ -166,6 +179,7 @@ export default function UsersPage() {
                     </div>
                 </div>
 
+                {/* Create/Edit Modal */}
                 <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title={selectedUser ? "Modifier Utilisateur" : "Nouvel Utilisateur"}>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-1">
@@ -191,6 +205,61 @@ export default function UsersPage() {
                             <button type="submit" className="px-6 py-2 bg-black text-white font-bold text-sm rounded-sm hover:bg-gray-800 shadow-sm">Enregistrer</button>
                         </div>
                     </form>
+                </Modal>
+
+                {/* Reset Password Modal */}
+                <Modal
+                    isOpen={isResetModalOpen}
+                    onClose={() => setIsResetModalOpen(false)}
+                    title={resetStep === 'CONFIRM' ? "Confirmation Réinitialisation" : "Mot de passe réinitialisé"}
+                >
+                    {resetStep === 'CONFIRM' ? (
+                        <div className="space-y-4">
+                            <div className="bg-yellow-50 text-yellow-800 p-4 rounded-sm text-sm border border-yellow-100 flex items-start gap-3">
+                                <Unlock className="shrink-0 mt-0.5" size={18} />
+                                <div>
+                                    <p className="font-bold">Attention</p>
+                                    <p>Vous êtes sur le point de réinitialiser le mot de passe de <span className="font-bold">{userToReset?.name}</span>.</p>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    onClick={() => setIsResetModalOpen(false)}
+                                    className="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-100 rounded-sm"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={confirmReset}
+                                    className="px-4 py-2 bg-black text-white font-bold text-sm rounded-sm hover:bg-gray-800"
+                                >
+                                    Confirmer
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-6 text-center py-4">
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                                <Shield size={32} />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-800">C&apos;est fait !</h3>
+                                <p className="text-gray-500 text-sm">Le mot de passe a été réinitialisé.</p>
+                            </div>
+
+                            <div className="bg-gray-100 p-4 rounded border border-gray-200">
+                                <p className="text-xs uppercase font-bold text-gray-400 mb-1">Nouveau Mot de Passe</p>
+                                <p className="text-3xl font-mono font-bold text-black tracking-widest">U</p>
+                            </div>
+
+                            <button
+                                onClick={() => setIsResetModalOpen(false)}
+                                className="w-full py-2 bg-black text-white font-bold text-sm rounded-sm"
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    )}
                 </Modal>
             </div>
         </DashboardLayout>

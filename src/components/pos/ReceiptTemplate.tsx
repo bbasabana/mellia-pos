@@ -11,9 +11,10 @@ type ReceiptProps = {
         items: (SaleItem & { product: Product })[];
     };
     width?: "58mm" | "80mm";
+    exchangeRate?: number;
 };
 
-export const ReceiptTemplate = ({ sale, width = "80mm" }: ReceiptProps) => {
+export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: ReceiptProps) => {
     // Styles specifics to print
     const containerStyle = {
         width: width === "58mm" ? "58mm" : "80mm",
@@ -27,6 +28,13 @@ export const ReceiptTemplate = ({ sale, width = "80mm" }: ReceiptProps) => {
     };
 
     const separator = "------------------------------------------";
+
+    // Helper for currency conversion and rounding
+    const toFC = (amountUsd: any) => {
+        const val = Number(amountUsd) * exchangeRate;
+        // Round to nearest 50
+        return Math.ceil(val / 50) * 50;
+    };
 
     return (
         <div id="receipt-print-area" style={containerStyle} className="print-only">
@@ -68,11 +76,11 @@ export const ReceiptTemplate = ({ sale, width = "80mm" }: ReceiptProps) => {
                                 {Number(item.quantity)} x {item.product.name}
                                 <br />
                                 <span style={{ fontSize: "10px", color: "#444" }}>
-                                    @{Number(item.unitPrice).toLocaleString()} FC
+                                    @{toFC(item.unitPrice).toLocaleString()} FC
                                 </span>
                             </td>
                             <td style={{ textAlign: "right", verticalAlign: "top" }}>
-                                {Number(item.totalPrice).toLocaleString()}
+                                {toFC(item.totalPrice).toLocaleString()}
                             </td>
                         </tr>
                     ))}
@@ -84,7 +92,11 @@ export const ReceiptTemplate = ({ sale, width = "80mm" }: ReceiptProps) => {
             {/* Totals */}
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginBottom: "2px" }}>
                 <span>TOTAL A PAYER:</span>
-                <span>{Number(sale.totalNet).toLocaleString()} FC</span>
+                <span>{toFC(sale.totalNet).toLocaleString()} FC</span>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#666", marginBottom: "10px" }}>
+                <span>(Ref USD: ${Number(sale.totalNet).toFixed(2)})</span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "10px" }}>

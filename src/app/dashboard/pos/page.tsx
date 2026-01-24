@@ -23,6 +23,7 @@ const ClientSelector = () => {
     const [results, setResults] = useState<any[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
+
     useEffect(() => {
         if (!search) {
             setResults([]);
@@ -511,6 +512,23 @@ const ProductGrid = () => {
 export default function PosPage() {
     const { cart } = usePosStore();
     const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+    const [exchangeRate, setExchangeRate] = useState(2850); // Default fallback
+
+    // Fetch exchange rate on mount
+    useEffect(() => {
+        const fetchRate = async () => {
+            try {
+                const res = await fetch("/api/exchange-rate");
+                const json = await res.json();
+                if (json.success && json.data?.rateUsdToCdf) {
+                    setExchangeRate(Number(json.data.rateUsdToCdf));
+                }
+            } catch (e) {
+                console.error("Failed to fetch exchange rate", e);
+            }
+        };
+        fetchRate();
+    }, []);
 
     // Printing Logic
     const [printSale, setPrintSale] = useState<any | null>(null);
@@ -556,7 +574,7 @@ export default function PosPage() {
                 {/* Hidden Print Area */}
                 <div style={{ display: "none" }}>
                     <div ref={printRef}>
-                        {printSale && <ReceiptTemplate sale={printSale} />}
+                        {printSale && <ReceiptTemplate sale={printSale} exchangeRate={exchangeRate} />}
                     </div>
                 </div>
 

@@ -93,13 +93,13 @@ const menuItems = [
     label: "Utilisateurs",
     href: "/dashboard/users",
     icon: Users,
-    roles: ["ADMIN", "MANAGER"],
+    roles: ["ADMIN"],
   },
   {
     label: "Employés (RH)",
     href: "/dashboard/employees",
     icon: Users,
-    roles: ["ADMIN", "MANAGER"],
+    roles: ["ADMIN"],
   },
 ];
 
