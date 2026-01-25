@@ -73,9 +73,8 @@ export async function POST(req: Request) {
                 const lineTotal = item.price * item.quantity;
                 totalBrut += lineTotal;
 
-                // Calculate CDF Total (Trust frontend priceCdf or approximate)
-                // In a stricter system, we would fetch ProductPrice here.
-                const priceCdf = item.priceCdf ? Number(item.priceCdf) : (item.price * 2800); // Fallback
+                // Calculate CDF Total (Directly use priceCdf which is the master)
+                const priceCdf = Math.round(Number(item.priceCdf || 0));
                 totalCdf += priceCdf * item.quantity;
 
                 // Calculate Cost
@@ -116,7 +115,7 @@ export async function POST(req: Request) {
                     paymentMethod: paymentMethod || "CASH",
                     orderType: orderType || "DINE_IN",
                     totalBrut: totalBrut,
-                    totalCdf: totalCdf, // Storing exact CDF
+                    totalCdf: Math.round(totalCdf), // Storing exact rounded CDF
                     discount: 0,
                     totalNet: totalBrut,
                     pointsEarned: clientId ? pointsEarned : 0,

@@ -135,6 +135,13 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
         }
     };
 
+    const formatUsd = (val: number) => {
+        // Round to 2 decimals
+        const rounded = Math.round(val * 100) / 100;
+        // Format to string and remove useless trailing zeros
+        return rounded.toString();
+    };
+
     const handleSaveDraft = async () => {
         if (cart.length === 0) return;
         setSavingDraft(true);
@@ -146,6 +153,7 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                     productId: item.productId,
                     quantity: item.quantity,
                     price: item.price,
+                    priceCdf: item.priceCdf, // CRITICAL: Pass exact CDF
                     saleUnit: item.saleUnit
                 })),
                 clientId: usePosStore.getState().selectedClient?.id,
@@ -153,11 +161,6 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                 deliveryInfo,
                 status: "DRAFT"
             };
-
-            // Assuming we only CREATE new drafts with this button.
-            // If we are Editing a draft and hit Save, maybe we should UPDATE it?
-            // For now, let's say "Save" always creates/updates. 
-            // If currentDraftId exists, we might want to UPDATE it via PUT.
 
             let res;
             if (currentDraftId) {
@@ -168,9 +171,9 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                         items: payload.items.map(i => ({
                             productId: i.productId,
                             quantity: i.quantity,
-                            unitPrice: i.price
+                            unitPrice: i.price,
+                            unitPriceCdf: i.priceCdf // Pass exact CDF for update
                         })),
-                        // Keep status DRAFT implies just updating items
                     })
                 });
             } else {
@@ -183,11 +186,9 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
 
             const json = await res.json();
 
-            if (json.success || (res.ok && json.id)) { // POST returns sale object directly, PUT returns {success: true}
+            if (json.success || (res.ok && json.id)) {
                 showToast("Brouillon enregistré !", "success");
                 clearCart();
-                // If it was a create, we clear. If update, we also clear to start fresh?
-                // Usually POS workflow: save & next customer.
             } else {
                 throw new Error(json.error || "Erreur inconnue");
             }
@@ -209,11 +210,8 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
             productId: item.productId,
             name: item.product.name,
             price: Number(item.unitPrice),
-            priceCdf: Number(item.unitPrice) * 2850, // Approximation or fetch rate? Ideally store should hold rate
-            // But for now let's hope pricing is consistent.
-            // Actually, we should probably fetch current price? 
-            // Or trust the draft price? Draft price preserves what was negotiated/set.
-            spaceName: "Standard", // Lost in translation unless we store it
+            priceCdf: Math.round(Number(item.unitPriceCdf)), // Use stored CDF, rounded to be sure
+            spaceName: "Standard",
             quantity: Number(item.quantity),
             saleUnit: item.product.saleUnit
         }));
@@ -327,7 +325,7 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                                         {(item.quantity * item.priceCdf).toLocaleString()}
                                     </span>
                                     <span className="text-[10px] text-gray-400 font-medium block mt-0.5">
-                                        ${(item.price * item.quantity).toFixed(2)}
+                                        ${formatUsd(item.price * item.quantity)}
                                     </span>
                                 </div>
                             </div>
@@ -363,7 +361,7 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                             {mounted ? totalCdf().toLocaleString() : '0'} <span className="text-lg text-gray-500 font-bold">FC</span>
                         </div>
                         <div className="text-sm font-medium text-gray-400 mt-1">
-                            ${mounted ? total().toFixed(2) : '0.00'} USD
+                            ${mounted ? formatUsd(total()) : '0'} USD
                         </div>
                     </div>
                 </div>

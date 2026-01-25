@@ -99,7 +99,7 @@ export const usePosStore = create<PosState>()(
                                 productId: productId,
                                 name: product.name,
                                 price: typeof product.price === 'string' ? parseFloat(product.price) : (product.price || 0),
-                                priceCdf: typeof product.priceCdf === 'string' ? parseFloat(product.priceCdf) : (product.priceCdf || 0),
+                                priceCdf: Math.round(typeof product.priceCdf === 'string' ? parseFloat(product.priceCdf) : (product.priceCdf || 0)),
                                 spaceName: product.spaceName,
                                 quantity: 1,
                                 saleUnit: product.saleUnit || 'UNIT',

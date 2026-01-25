@@ -119,8 +119,8 @@ export async function PUT(req: NextRequest) {
                     const existingItem = sale.items.find((i) => i.productId === item.productId);
                     const quantity = Number(item.quantity);
                     const price = Number(item.unitPrice);
-                    // Use passed unitPriceCdf or fallback
-                    const priceCdf = item.unitPriceCdf ? Number(item.unitPriceCdf) : (price * rate);
+                    // Use passed unitPriceCdf (rounded) or fallback (rounded)
+                    const priceCdf = Math.round(item.unitPriceCdf ? Number(item.unitPriceCdf) : (price * rate));
 
                     if (existingItem) {
                         // UPDATE Existing Item
@@ -353,9 +353,9 @@ export async function PUT(req: NextRequest) {
             return await tx.sale.update({
                 where: { id },
                 data: {
-                    totalBrut: newTotal > 0 ? newTotal : undefined, // Update total if we recalculated it
+                    totalBrut: newTotal > 0 ? newTotal : undefined,
                     totalNet: newTotal > 0 ? newTotal : undefined,
-                    totalCdf: newTotalCdf > 0 ? newTotalCdf : undefined, // Update CDF
+                    totalCdf: newTotalCdf > 0 ? Math.round(newTotalCdf) : undefined, // Round total CDF to integer
                     status: newStatus || undefined, // Update status if provided (DRAFT -> COMPLETED)
                     updatedAt: new Date()
                 }

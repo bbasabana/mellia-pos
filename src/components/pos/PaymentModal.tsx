@@ -22,6 +22,11 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
     const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MOBILE_MONEY" | "CARD" | "">("");
     const [paymentReference, setPaymentReference] = useState("");
 
+    const formatUsd = (val: number) => {
+        const rounded = Math.round(val * 100) / 100;
+        return rounded.toString();
+    };
+
     const isAdmin = session?.user?.role === "ADMIN";
 
     const totalAmountUsd = total();
@@ -120,10 +125,10 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                     <div className="text-center">
                         <p className="text-gray-500 font-medium uppercase tracking-wider text-sm mb-2">Total à Payer</p>
                         <div className="text-5xl font-extrabold text-blue-600 tracking-tight">
-                            {amountToPayCdf.toLocaleString()} FC
+                            {Math.round(amountToPayCdf).toLocaleString()} FC
                         </div>
                         <div className="text-lg text-gray-500 mt-1">
-                            ${amountToPayUsd.toFixed(2)}
+                            ${formatUsd(amountToPayUsd)}
                         </div>
                     </div>
 
@@ -195,8 +200,8 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                             <div className="text-right">
                                 {usePoints ? (
                                     <div>
-                                        <div className="text-green-700 font-bold">-{possibleDiscountCdf.toLocaleString()} FC</div>
-                                        <div className="text-xs text-green-600">-${possibleDiscountUsd.toFixed(2)}</div>
+                                        <div className="text-green-700 font-bold">-{Math.round(possibleDiscountCdf).toLocaleString()} FC</div>
+                                        <div className="text-xs text-green-600">-${formatUsd(possibleDiscountUsd)}</div>
                                     </div>
                                 ) : (
                                     <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
@@ -242,7 +247,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                             className="py-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
                         >
                             {loading ? <Loader2 className="animate-spin" /> : <DollarSign />}
-                            Encaisser {amountToPayCdf.toLocaleString()} FC
+                            Encaisser {Math.round(amountToPayCdf).toLocaleString()} FC
                         </button>
                     </div>
                 </div>
