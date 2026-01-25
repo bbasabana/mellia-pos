@@ -86,6 +86,7 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
     };
 
     const totalDraftsValue = drafts.reduce((acc, curr) => acc + Number(curr.totalBrut), 0);
+    const totalDraftsValueCdf = drafts.reduce((acc, curr) => acc + Number((curr as any).totalCdf || 0), 0);
 
     return (
         <div className="space-y-3">
@@ -108,8 +109,7 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
                     <p className="text-[10px] text-orange-600 font-bold uppercase mb-1">Total en attente</p>
                     <div className="flex items-end justify-between">
                         <span className="text-orange-900 font-black text-lg">
-                            {(totalDraftsValue * 2850).toLocaleString()} FC
-                            {/* Assuming fixed rate for display approximation, or fetch real rate */}
+                            {totalDraftsValueCdf.toLocaleString()} FC
                         </span>
                         <span className="text-xs text-orange-500 font-medium">
                             ${totalDraftsValue.toFixed(2)}
@@ -180,7 +180,10 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
 
                                     <div className="text-right">
                                         <span className="block font-bold text-gray-800 text-sm">
-                                            {Number(draft.totalBrut).toFixed(2)}$
+                                            {Number((draft as any).totalCdf).toLocaleString()} FC
+                                        </span>
+                                        <span className="block text-[10px] text-gray-400 font-bold uppercase">
+                                            ${Number(draft.totalBrut).toFixed(2)}
                                         </span>
                                         {currentDraftId !== draft.id && (
                                             <button

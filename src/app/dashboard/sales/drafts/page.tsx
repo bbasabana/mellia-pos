@@ -55,7 +55,7 @@ export default function DraftsPage() {
             productId: item.productId,
             name: item.product.name,
             price: Number(item.unitPrice),
-            priceCdf: Number(item.unitPrice) * 2850, // Fallback approx or ideally real rate
+            priceCdf: Number(item.unitPriceCdf), // CRITICAL: Use stored CDF, zero recalculation
             spaceName: "Standard",
             quantity: Number(item.quantity),
             saleUnit: item.product.saleUnit
