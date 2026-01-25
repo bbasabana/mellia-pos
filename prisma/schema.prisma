@@ -672,6 +672,9 @@ model Sale {
   discount      Decimal     @default(0) @db.Decimal(10, 2)
   totalNet      Decimal     @db.Decimal(10, 2)
   
+  // Exact CDF Amount (avoid rounding errors)
+  totalCdf      Decimal     @default(0) @db.Decimal(15, 2)
+  
   // Réduction (Admin/Manager uniquement)
   discountType  String?     // "PERCENTAGE" ou "FIXED"
   discountValue Decimal?    @db.Decimal(10, 2)

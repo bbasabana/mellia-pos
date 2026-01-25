@@ -2,8 +2,9 @@
 
 import { usePosStore } from "@/store/usePosStore";
 import { useState } from "react";
-import { X, DollarSign, Award, Loader2 } from "lucide-react";
+import { X, DollarSign, Award, Loader2, Calendar } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
+import { useSession } from "next-auth/react";
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -12,10 +13,14 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) {
-    const { total, totalCdf, cart, selectedClient, clearCart } = usePosStore();
+    const { total, totalCdf, cart, selectedClient, clearCart, currentDraftId } = usePosStore();
+    const { data: session } = useSession();
     const [usePoints, setUsePoints] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [customDate, setCustomDate] = useState("");
+
+    const isAdmin = session?.user?.role === "ADMIN";
 
     const totalAmountUsd = total();
     const totalAmountCdf = totalCdf();
@@ -46,18 +51,33 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                     quantity: i.quantity,
                     price: i.price,
                     priceCdf: i.priceCdf,
-                    saleUnit: i.saleUnit
+                    saleUnit: i.saleUnit,
+                    // Pass unitPrice for PUT consistency
+                    unitPrice: i.price
                 })),
                 clientId: selectedClient?.id,
                 paymentMethod: usePoints && amountToPayUsd === 0 ? "LOYALTY_POINTS" : (usePoints ? "SPLIT" : "CASH"),
-                totalReceived: amountToPayUsd
+                totalReceived: amountToPayUsd,
+                status: "COMPLETED",
+                ...(customDate && isAdmin && { createdAt: new Date(customDate).toISOString() })
             };
 
-            const res = await fetch("/api/sales", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+            let res;
+            if (currentDraftId) {
+                // UPDATE/VALIDATE DRAFT
+                res = await fetch(`/api/transactions?id=${currentDraftId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                // NEW SALE
+                res = await fetch("/api/sales", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+            }
 
             if (!res.ok) {
                 const json = await res.json();
@@ -127,6 +147,24 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                                     <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
                                 )}
                             </div>
+                        </div>
+                    )}
+
+                    {isAdmin && (
+                        <div className="border-2 border-gray-200 rounded-xl p-4">
+                            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
+                                <Calendar size={16} className="text-gray-500" />
+                                Date de la vente (optionnel)
+                            </label>
+                            <input
+                                type="datetime-local"
+                                value={customDate}
+                                onChange={(e) => setCustomDate(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                                Laissez vide pour utiliser la date actuelle
+                            </p>
                         </div>
                     )}
 

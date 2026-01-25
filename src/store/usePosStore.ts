@@ -35,18 +35,23 @@ type DraftSale = {
     createdAt: Date;
 };
 
+// ... types ...
+
 interface PosState {
     cart: CartItem[];
     selectedClient: Client | null;
     orderType: OrderType;
     deliveryInfo: DeliveryInfo | null;
-    draftSales: DraftSale[];
+
+    // Server-side draft tracking
+    currentDraftId: string | null;
 
     // Cart actions
     addToCart: (product: any) => void;
     removeFromCart: (productId: string) => void;
     updateQuantity: (productId: string, delta: number) => void;
     clearCart: () => void;
+    setCart: (items: CartItem[]) => void; // Needed to load draft
 
     // Client actions
     setClient: (client: Client | null) => void;
@@ -56,9 +61,7 @@ interface PosState {
     setDeliveryInfo: (info: DeliveryInfo | null) => void;
 
     // Draft actions
-    saveDraft: (name?: string) => void;
-    loadDraft: (id: string) => void;
-    deleteDraft: (id: string) => void;
+    setCurrentDraftId: (id: string | null) => void;
 
     // Computed
     total: () => number;
@@ -73,11 +76,10 @@ export const usePosStore = create<PosState>()(
             selectedClient: null,
             orderType: 'DINE_IN',
             deliveryInfo: null,
-            draftSales: [],
+            currentDraftId: null,
 
             addToCart: (product) => {
                 const { cart } = get();
-                // Handle both product.id and product.productId
                 const productId = product.id || product.productId;
                 const existing = cart.find((item) => item.productId === productId);
 
@@ -124,18 +126,20 @@ export const usePosStore = create<PosState>()(
                 });
             },
 
-            setClient: (client) => set({ selectedClient: client }),
-
             clearCart: () => set({
                 cart: [],
                 selectedClient: null,
                 orderType: 'DINE_IN',
-                deliveryInfo: null
+                deliveryInfo: null,
+                currentDraftId: null
             }),
+
+            setCart: (items) => set({ cart: items }),
+
+            setClient: (client) => set({ selectedClient: client }),
 
             setOrderType: (type) => {
                 set({ orderType: type });
-                // Clear delivery info if not delivery
                 if (type !== 'DELIVERY') {
                     set({ deliveryInfo: null });
                 }
@@ -143,48 +147,7 @@ export const usePosStore = create<PosState>()(
 
             setDeliveryInfo: (info) => set({ deliveryInfo: info }),
 
-            saveDraft: (name) => {
-                const { cart, selectedClient, orderType, deliveryInfo, draftSales } = get();
-
-                if (cart.length === 0) return;
-
-                const draft: DraftSale = {
-                    id: `draft-${Date.now()}`,
-                    name: name || `Brouillon ${new Date().toLocaleTimeString()}`,
-                    cart: [...cart],
-                    client: selectedClient,
-                    orderType,
-                    deliveryInfo,
-                    createdAt: new Date(),
-                };
-
-                set({
-                    draftSales: [...draftSales, draft],
-                    cart: [],
-                    selectedClient: null,
-                    orderType: 'DINE_IN',
-                    deliveryInfo: null
-                });
-            },
-
-            loadDraft: (id) => {
-                const { draftSales } = get();
-                const draft = draftSales.find(d => d.id === id);
-
-                if (draft) {
-                    set({
-                        cart: [...draft.cart],
-                        selectedClient: draft.client,
-                        orderType: draft.orderType,
-                        deliveryInfo: draft.deliveryInfo,
-                    });
-                }
-            },
-
-            deleteDraft: (id) => {
-                const { draftSales } = get();
-                set({ draftSales: draftSales.filter(d => d.id !== id) });
-            },
+            setCurrentDraftId: (id) => set({ currentDraftId: id }),
 
             total: () => {
                 return get().cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -200,6 +163,13 @@ export const usePosStore = create<PosState>()(
         }),
         {
             name: 'pos-storage',
+            partialize: (state) => ({
+                cart: state.cart,
+                selectedClient: state.selectedClient,
+                orderType: state.orderType,
+                deliveryInfo: state.deliveryInfo,
+                currentDraftId: state.currentDraftId
+            }),
         }
     )
 );

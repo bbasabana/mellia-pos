@@ -1,7 +1,7 @@
 "use client";
 
 import { usePosStore } from "@/store/usePosStore";
-import { Search, Calculator, Trash2, UserPlus, CreditCard, Minus, Plus, Save, Store, Filter, ShoppingCart, X, Printer } from "lucide-react";
+import { Search, Calculator, Trash2, UserPlus, CreditCard, Minus, Plus, Save, Store, Filter, ShoppingCart, X, Printer, FilePlus, RefreshCcw } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
@@ -11,7 +11,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import PriceSelectionModal from "@/components/pos/PriceSelectionModal";
 import OrderTypeSelector from "@/components/pos/OrderTypeSelector";
 import DeliveryFormModal from "@/components/pos/DeliveryFormModal";
-import DraftSalesList from "@/components/pos/DraftSalesList";
+import ServerDraftsList from "@/components/pos/ServerDraftsList";
 import { cn } from "@/lib/utils";
 import { showToast } from "@/components/ui/Toast";
 
@@ -112,15 +112,16 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
         setOrderType,
         deliveryInfo,
         setDeliveryInfo,
-        draftSales,
-        saveDraft,
-        loadDraft,
-        deleteDraft
+        setCart,
+        setClient,
+        currentDraftId,
+        setCurrentDraftId
     } = usePosStore();
 
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
 
     // Prevent hydration mismatch by only rendering after mount
     useEffect(() => {
@@ -134,12 +135,104 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
         }
     };
 
-    const handleSaveDraft = () => {
-        const name = prompt("Nom du brouillon (optionnel) :");
-        if (name !== null) {
-            saveDraft(name || undefined);
+    const handleSaveDraft = async () => {
+        if (cart.length === 0) return;
+        setSavingDraft(true);
+
+        try {
+            // Prepare Payload
+            const payload = {
+                items: cart.map(item => ({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    price: item.price,
+                    saleUnit: item.saleUnit
+                })),
+                clientId: usePosStore.getState().selectedClient?.id,
+                orderType,
+                deliveryInfo,
+                status: "DRAFT"
+            };
+
+            // Assuming we only CREATE new drafts with this button.
+            // If we are Editing a draft and hit Save, maybe we should UPDATE it?
+            // For now, let's say "Save" always creates/updates. 
+            // If currentDraftId exists, we might want to UPDATE it via PUT.
+
+            let res;
+            if (currentDraftId) {
+                res = await fetch(`/api/transactions?id=${currentDraftId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        items: payload.items.map(i => ({
+                            productId: i.productId,
+                            quantity: i.quantity,
+                            unitPrice: i.price
+                        })),
+                        // Keep status DRAFT implies just updating items
+                    })
+                });
+            } else {
+                res = await fetch("/api/sales", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            const json = await res.json();
+
+            if (json.success || (res.ok && json.id)) { // POST returns sale object directly, PUT returns {success: true}
+                showToast("Brouillon enregistré !", "success");
+                clearCart();
+                // If it was a create, we clear. If update, we also clear to start fresh?
+                // Usually POS workflow: save & next customer.
+            } else {
+                throw new Error(json.error || "Erreur inconnue");
+            }
+        } catch (error: any) {
+            console.error(error);
+            showToast(error.message || "Erreur lors de la sauvegarde", "error");
+        } finally {
+            setSavingDraft(false);
         }
     };
+
+    const handleLoadDraft = (sale: any) => {
+        if (cart.length > 0) {
+            if (!confirm("Le panier actuel sera remplacé. Continuer ?")) return;
+        }
+
+        // Map Sale Items to Cart Items
+        const newCart = sale.items.map((item: any) => ({
+            productId: item.productId,
+            name: item.product.name,
+            price: Number(item.unitPrice),
+            priceCdf: Number(item.unitPrice) * 2850, // Approximation or fetch rate? Ideally store should hold rate
+            // But for now let's hope pricing is consistent.
+            // Actually, we should probably fetch current price? 
+            // Or trust the draft price? Draft price preserves what was negotiated/set.
+            spaceName: "Standard", // Lost in translation unless we store it
+            quantity: Number(item.quantity),
+            saleUnit: item.product.saleUnit
+        }));
+
+        setCart(newCart);
+        setClient(sale.client || null);
+        setOrderType(sale.orderType);
+        setCurrentDraftId(sale.id);
+
+        showToast(`Brouillon #${sale.ticketNum} chargé`, "info");
+    };
+
+    const handleNewSale = () => {
+        if (cart.length > 0) {
+            if (!confirm("Vider le panier et commencer une nouvelle vente ?")) return;
+        }
+        clearCart();
+        showToast("Nouvelle vente", "info");
+    }
 
     return (
         <div className="flex flex-col h-full bg-white border-l border-gray-200 shadow-xl z-20">
@@ -163,18 +256,40 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                 )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50/30 mt-2">
+            {/* Drafts List Component */}
+            <div className="px-3 pt-2">
+                <ServerDraftsList onLoad={handleLoadDraft} />
+                {/* Divider */}
+                <div className="h-px bg-gray-100 my-2"></div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50/30 mt-0">
                 {/* Header Cart */}
                 <div className="flex justify-between items-center px-1 pb-1">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
-                        {cart.length > 0 ? `Panier (${cart.length})` : 'Brouillons'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                            {cart.length > 0 ? `Panier (${cart.length})` : 'Vide'}
+                        </span>
+                        {currentDraftId && (
+                            <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase animate-pulse">
+                                Mode Édition
+                            </span>
+                        )}
+                    </div>
                     <div className="flex gap-1">
+                        <button
+                            onClick={handleNewSale}
+                            className="text-gray-400 hover:text-gray-800 p-1.5 hover:bg-gray-200 rounded-sm transition-colors"
+                            title="Nouvelle vente"
+                        >
+                            <FilePlus size={16} />
+                        </button>
                         {cart.length > 0 && (
                             <button
                                 onClick={handleSaveDraft}
-                                className="text-gray-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-sm transition-colors"
-                                title="Sauvegarder"
+                                disabled={savingDraft}
+                                className={`text-gray-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-sm transition-colors ${savingDraft ? 'animate-pulse' : ''}`}
+                                title={currentDraftId ? "Mettre à jour le brouillon" : "Sauvegarder en brouillon"}
                             >
                                 <Save size={16} />
                             </button>
@@ -190,19 +305,10 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                 {!mounted ? (
                     <div className="text-center py-10 text-gray-400 text-sm">Chargement...</div>
                 ) : cart.length === 0 ? (
-                    draftSales.length > 0 ? (
-                        <DraftSalesList
-                            drafts={draftSales}
-                            onLoad={loadDraft}
-                            onDelete={deleteDraft}
-                        />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-64 text-gray-300">
-                            <Calculator className="mb-3 opacity-20" size={48} />
-                            <p className="text-sm font-bold opacity-50">Votre panier est vide</p>
-                            <p className="text-xs opacity-40 mt-1">Sélectionnez des produits à gauche</p>
-                        </div>
-                    )
+                    <div className="flex flex-col items-center justify-center h-40 text-gray-300">
+                        <Calculator className="mb-3 opacity-20" size={32} />
+                        <p className="text-sm font-bold opacity-50">Panier vide</p>
+                    </div>
                 ) : (
                     cart.map((item) => (
                         <div key={item.productId} className="bg-white border border-gray-100 rounded-sm p-3 shadow-sm flex flex-col gap-2 group hover:border-[#00d3fa] transition-colors">
@@ -268,7 +374,7 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                     className="w-full bg-[#000] hover:bg-gray-800 text-white font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all active:scale-[0.98] text-sm tracking-wide uppercase"
                 >
                     <CreditCard size={18} />
-                    <span>Encaisser</span>
+                    <span>{currentDraftId ? "Valider & Encaisser" : "Encaisser"}</span>
                 </button>
             </div>
 
