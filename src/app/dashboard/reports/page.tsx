@@ -45,6 +45,7 @@ export default function ReportsPage() {
     }, []);
 
     useEffect(() => {
+        setStats(null); // Reset stats when changing mode or period to trigger clean load
         if (mode === 'PERFORMANCE') {
             fetchPerformance();
         } else {
@@ -58,6 +59,11 @@ export default function ReportsPage() {
         'month': "Ce Mois",
         'year': "Cette Année",
         'all': "Global (Tout)"
+    };
+
+    const formatSafe = (val: any, decimals: number = 2) => {
+        const num = Number(val);
+        return isNaN(num) ? (0).toFixed(decimals) : num.toFixed(decimals);
     };
 
     return (
@@ -122,7 +128,7 @@ export default function ReportsPage() {
 
                 {/* CONTENT AREA */}
                 <div className="flex-1 overflow-auto p-6 space-y-6">
-                    {loading ? (
+                    {loading || !stats ? (
                         <div className="flex justify-center p-12">
                             <Loader2 className="animate-spin text-[#00d3fa]" size={40} />
                         </div>
@@ -134,62 +140,62 @@ export default function ReportsPage() {
                                     <>
                                         <KpiCard
                                             title="Ventes Réalisées"
-                                            value={`$${stats?.summary.totalSales.toFixed(2) || "0.00"}`}
+                                            value={`$${formatSafe(stats?.summary?.totalSales)}`}
                                             icon={<ShoppingCart size={20} />}
                                             color="text-blue-500"
                                             subtitle="Chiffre d'affaires encaissé"
-                                            cdfValue={stats?.summary.totalSales * 2850}
+                                            cdfValue={Number(stats?.summary?.totalSales || 0) * 2850}
                                         />
                                         <KpiCard
                                             title="Investissement Stock"
-                                            value={`$${stats?.summary.totalInvestment.toFixed(2) || "0.00"}`}
+                                            value={`$${formatSafe(stats?.summary?.totalInvestment)}`}
                                             icon={<Package size={20} />}
                                             color="text-orange-500"
                                             subtitle="Achats de stock effectués"
-                                            cdfValue={stats?.summary.totalInvestment * 2850}
+                                            cdfValue={Number(stats?.summary?.totalInvestment || 0) * 2850}
                                         />
                                         <KpiCard
                                             title="Charges (Dépenses)"
-                                            value={`$${stats?.summary.totalExpenses.toFixed(2) || "0.00"}`}
+                                            value={`$${formatSafe(stats?.summary?.totalExpenses)}`}
                                             icon={<Calculator size={20} />}
                                             color="text-red-500"
                                             subtitle="Frais de fonctionnement"
-                                            cdfValue={stats?.summary.totalExpenses * 2850}
+                                            cdfValue={Number(stats?.summary?.totalExpenses || 0) * 2850}
                                         />
                                         <KpiCard
                                             title="Bénéfice Net"
-                                            value={`$${stats?.summary.netProfit.toFixed(2) || "0.00"}`}
+                                            value={`$${formatSafe(stats?.summary?.netProfit)}`}
                                             icon={<DollarSign size={20} />}
                                             color="text-green-500"
-                                            subtitle={`Marge: ${stats?.summary.marginPercent.toFixed(1)}%`}
-                                            cdfValue={stats?.summary.netProfit * 2850}
+                                            subtitle={`Marge: ${formatSafe(stats?.summary?.marginPercent, 1)}%`}
+                                            cdfValue={Number(stats?.summary?.netProfit || 0) * 2850}
                                         />
                                     </>
                                 ) : (
                                     <>
                                         <KpiCard
                                             title="Valeur de rachat Stock"
-                                            value={`$${stats?.totalCost.toFixed(2) || "0.00"}`}
+                                            value={`$${formatSafe(stats?.totalCost)}`}
                                             icon={<Package size={20} />}
                                             color="text-blue-500"
                                             subtitle="Prix payé pour le stock actuel"
-                                            cdfValue={stats?.totalCost * 2850}
+                                            cdfValue={Number(stats?.totalCost || 0) * 2850}
                                         />
                                         <KpiCard
                                             title="Revenu Potentiel"
-                                            value={`$${stats?.totalPotentialRevenue.toFixed(2) || "0.00"}`}
+                                            value={`$${formatSafe(stats?.totalPotentialRevenue)}`}
                                             icon={<TrendingUp size={20} />}
                                             color="text-purple-500"
                                             subtitle="Si tout est vendu"
-                                            cdfValue={stats?.totalPotentialRevenue * 2850}
+                                            cdfValue={Number(stats?.totalPotentialRevenue || 0) * 2850}
                                         />
                                         <KpiCard
                                             title="Profit Attendu"
-                                            value={`$${stats?.totalPotentialProfit.toFixed(2) || "0.00"}`}
+                                            value={`$${formatSafe(stats?.totalPotentialProfit)}`}
                                             icon={<DollarSign size={20} />}
                                             color="text-green-500"
-                                            subtitle={`Marge possible: ${stats?.globalMarginPercent.toFixed(1)}%`}
-                                            cdfValue={stats?.totalPotentialProfit * 2850}
+                                            subtitle={`Marge possible: ${formatSafe(stats?.globalMarginPercent, 1)}%`}
+                                            cdfValue={Number(stats?.totalPotentialProfit || 0) * 2850}
                                         />
                                         <div className="hidden lg:block"></div> {/* Spacer */}
                                     </>
@@ -228,61 +234,61 @@ export default function ReportsPage() {
                                             )}
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
-                                            {mode === 'PERFORMANCE' ? (
-                                                stats?.details.map((item: any, i: number) => (
-                                                    <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                                                        <td className="px-6 py-4">
-                                                            <span className="font-bold text-gray-800 text-sm">{item.name}</span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-center text-sm font-medium text-gray-700">
-                                                            {item.qty}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right text-sm text-gray-800">
-                                                            ${item.revenue.toFixed(2)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right text-sm text-gray-500">
-                                                            ${item.cost.toFixed(2)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right text-sm font-bold text-green-600">
-                                                            ${item.profit.toFixed(2)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right">
-                                                            <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded-sm">
-                                                                {item.margin.toFixed(1)}%
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            ) : (
-                                                stats?.details.map((item: any, i: number) => (
-                                                    <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex flex-col">
+                                            {(stats?.details || []).map((item: any, i: number) => (
+                                                <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                                                    {mode === 'PERFORMANCE' ? (
+                                                        <>
+                                                            <td className="px-6 py-4">
                                                                 <span className="font-bold text-gray-800 text-sm">{item.name}</span>
-                                                                <span className="text-[10px] text-gray-400">{item.category}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-center text-sm font-medium text-gray-700">
-                                                            {item.quantity}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right text-sm text-gray-500">
-                                                            ${item.unitCost.toFixed(2)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right text-sm font-medium text-gray-800">
-                                                            ${item.totalCost.toFixed(2)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right text-sm font-bold text-purple-600">
-                                                            ${item.potentialRevenue.toFixed(2)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right">
-                                                            <span className="inline-flex items-center gap-1 text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-sm">
-                                                                <ArrowUpRight size={12} />
-                                                                ${item.potentialProfit.toFixed(2)}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center text-sm font-medium text-gray-700">
+                                                                {item.qty}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right text-sm text-gray-800">
+                                                                ${formatSafe(item.revenue)}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right text-sm text-gray-500">
+                                                                ${formatSafe(item.cost)}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right text-sm font-bold text-green-600">
+                                                                ${formatSafe(item.profit)}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded-sm">
+                                                                    {formatSafe(item.margin, 1)}%
+                                                                </span>
+                                                            </td>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <td className="px-6 py-4">
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-bold text-gray-800 text-sm">{item.name}</span>
+                                                                    <span className="text-[10px] text-gray-400">{item.category}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center text-sm font-medium text-gray-700">
+                                                                {item.quantity}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right text-sm text-gray-500">
+                                                                ${formatSafe(item.unitCost)}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right text-sm font-medium text-gray-800">
+                                                                ${formatSafe(item.totalCost)}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right text-sm font-bold text-purple-600">
+                                                                ${formatSafe(item.potentialRevenue)}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                <span className="inline-flex items-center gap-1 text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-sm">
+                                                                    <ArrowUpRight size={12} />
+                                                                    ${formatSafe(item.potentialProfit)}
+                                                                </span>
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                </tr>
+                                            ))}
                                         </tbody>
                                     </table>
                                 </div>
@@ -302,7 +308,7 @@ function KpiCard({ title, value, icon, color, subtitle, cdfValue }: any) {
                 <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">{title}</p>
                     <h3 className="text-2xl font-black text-gray-800 mt-1 tracking-tight">{value}</h3>
-                    {cdfValue !== undefined && (
+                    {cdfValue !== undefined && !isNaN(Number(cdfValue)) && (
                         <p className="text-[11px] font-bold text-gray-500 mt-0.5">
                             ~ {Math.round(cdfValue).toLocaleString()} FC
                         </p>
