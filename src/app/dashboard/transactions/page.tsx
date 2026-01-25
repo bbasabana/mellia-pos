@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useSession } from "next-auth/react";
 import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, FileText, Trash2, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -12,6 +13,9 @@ import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import EditTransactionModal from "@/components/transactions/EditTransactionModal";
 
 export default function TransactionsPage() {
+    const { data: session } = useSession();
+    const isAdmin = (session?.user as any)?.role === "ADMIN";
+
     const [transactions, setTransactions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -212,8 +216,8 @@ export default function TransactionsPage() {
                                                     {format(new Date(tx.createdAt), "dd MMM yyyy HH:mm", { locale: fr })}
                                                 </div>
                                                 <div className={`mt-2 inline-block px-1.5 py-0.5 rounded-[2px] text-[8px] font-black uppercase tracking-widest ${tx.status === "COMPLETED" ? "bg-green-50 text-green-600 border border-green-100" :
-                                                        tx.status === "CANCELLED" ? "bg-red-50 text-red-600 border border-red-100" :
-                                                            "bg-orange-50 text-orange-600 border border-orange-100"
+                                                    tx.status === "CANCELLED" ? "bg-red-50 text-red-600 border border-red-100" :
+                                                        "bg-orange-50 text-orange-600 border border-orange-100"
                                                     }`}>
                                                     {tx.status}
                                                 </div>
@@ -255,7 +259,7 @@ export default function TransactionsPage() {
                                                     >
                                                         <Printer size={14} /> Imprimer
                                                     </button>
-                                                    {tx.status !== "CANCELLED" && (
+                                                    {tx.status !== "CANCELLED" && isAdmin && (
                                                         <>
                                                             <button
                                                                 onClick={() => openEditModal(tx)}

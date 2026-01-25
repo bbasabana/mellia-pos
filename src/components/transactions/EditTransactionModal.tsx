@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Save, Trash2, Plus, Minus, Loader2, AlertTriangle } from "lucide-react";
+import { X, Save, Trash2, Plus, Minus, Loader2, AlertTriangle, Search, Calculator } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 
 interface EditTransactionModalProps {
@@ -23,20 +23,65 @@ export default function EditTransactionModal({
     const [items, setItems] = useState<any[]>([]);
     const [isVisible, setIsVisible] = useState(false);
 
+    // Product search state
+    const [search, setSearch] = useState("");
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+
     useEffect(() => {
         if (isOpen && transaction) {
             setIsVisible(true);
-            // Deep copy items to avoid mutating original state before save
             setItems(transaction.items.map((item: any) => ({
                 ...item,
                 quantity: Number(item.quantity),
                 unitPrice: Number(item.unitPrice),
-                currentStock: 0 // Will need to fetch real-time stock if increasing quantity
             })));
         } else {
             setIsVisible(false);
+            setSearch("");
+            setSearchResults([]);
         }
     }, [isOpen, transaction]);
+
+    useEffect(() => {
+        if (!search || search.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setLoadingProducts(true);
+            try {
+                const res = await fetch(`/api/products?query=${search}&active=true&vendable=true`);
+                const json = await res.json();
+                if (json.success) {
+                    setSearchResults(json.data);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoadingProducts(false);
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const addProduct = (product: any) => {
+        const existing = items.find(i => i.productId === product.id);
+        if (existing) {
+            handleQuantityChange(items.indexOf(existing), 1);
+        } else {
+            // Get default price (first one found)
+            const price = product.prices?.[0];
+            setItems([...items, {
+                productId: product.id,
+                product: { name: product.name },
+                quantity: 1,
+                unitPrice: Number(price?.priceUsd || 0),
+            }]);
+        }
+        setSearch("");
+        setSearchResults([]);
+    };
 
     const handleQuantityChange = (index: number, change: number) => {
         const newItems = [...items];
@@ -53,6 +98,14 @@ export default function EditTransactionModal({
             // For now, we allow it but backend should validate
             item.quantity = newQuantity;
         }
+        setItems(newItems);
+    };
+
+    const handlePriceChange = (index: number, newPrice: string) => {
+        const val = parseFloat(newPrice);
+        if (isNaN(val)) return;
+        const newItems = [...items];
+        newItems[index].unitPrice = val;
         setItems(newItems);
     };
 
@@ -120,6 +173,44 @@ export default function EditTransactionModal({
                     </p>
                 </div>
 
+                {/* Product search */}
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                    <div className="relative group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#00d3fa] transition-colors" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Ajouter un produit (nom du produit...)"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-sm text-sm outline-none focus:border-[#00d3fa] transition-all"
+                        />
+                        {loadingProducts && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#00d3fa] animate-spin" size={14} />}
+
+                        {searchResults.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 bg-white shadow-2xl rounded-b-sm mt-1 border border-gray-200 z-[60] max-h-60 overflow-y-auto">
+                                {searchResults.map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => addProduct(p)}
+                                        className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex justify-between items-center group/item"
+                                    >
+                                        <div>
+                                            <div className="font-bold text-sm text-gray-800 group-hover/item:text-[#00d3fa] transition-colors">{p.name}</div>
+                                            <div className="text-[10px] text-gray-400 uppercase font-black">{p.type}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-black text-xs text-gray-900">
+                                                {Number(p.prices?.[0]?.priceCdf || 0).toLocaleString()} FC
+                                            </div>
+                                            <div className="text-[10px] text-gray-400 font-bold">${Number(p.prices?.[0]?.priceUsd || 0).toFixed(2)}</div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 {/* Items List */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
                     {items.length === 0 ? (
@@ -128,21 +219,38 @@ export default function EditTransactionModal({
                         </div>
                     ) : (
                         items.map((item, index) => (
-                            <div key={item.productId} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm hover:border-[#00d3fa] transition-colors group">
-                                <div className="flex-1">
-                                    <div className="font-bold text-gray-800 text-sm">{item.product?.name || item.name}</div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                        PU: {Number(item.unitPrice * exchangeRate).toLocaleString()} FC
-                                        <span className="text-gray-300 mx-2">|</span>
-                                        ${Number(item.unitPrice).toFixed(2)}
+                            <div key={item.productId || index} className="flex flex-col gap-3 p-4 bg-white border border-gray-100 rounded-lg shadow-sm hover:border-[#00d3fa] transition-colors group">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <div className="font-bold text-gray-800 text-sm">{item.product?.name || item.name}</div>
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase mt-1">
+                                            Code: {item.productId?.slice(-6) || "NOUVEAU"}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="font-black text-gray-900 text-base">
+                                            {(item.quantity * item.unitPrice * exchangeRate).toLocaleString()} FC
+                                        </div>
+                                        <div className="text-xs text-gray-400 font-bold">
+                                            ${(item.quantity * item.unitPrice).toFixed(2)}
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                        <div className="font-bold text-gray-900 text-sm">
-                                            {(item.quantity * item.unitPrice * exchangeRate).toLocaleString()} FC
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[9px] font-black text-gray-400 uppercase">Prix Unitaire $</label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={item.unitPrice}
+                                                onChange={(e) => handlePriceChange(index, e.target.value)}
+                                                className="w-24 pl-5 pr-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs font-bold outline-none focus:border-[#00d3fa]"
+                                            />
+                                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">$</span>
                                         </div>
+                                        <div className="text-[9px] text-gray-400">≈ {Math.round(item.unitPrice * exchangeRate).toLocaleString()} FC</div>
                                     </div>
 
                                     <div className="flex items-center bg-gray-50 rounded-md border border-gray-200 h-8">
@@ -150,7 +258,7 @@ export default function EditTransactionModal({
                                             onClick={() => handleQuantityChange(index, -1)}
                                             className="w-8 h-full flex items-center justify-center hover:bg-red-50 text-gray-500 hover:text-red-500 transition-colors border-r border-gray-200"
                                         >
-                                            {item.quantity === 1 ? <Trash2 size={14} /> : <Minus size={14} />}
+                                            {item.quantity <= 1 ? <Trash2 size={14} /> : <Minus size={14} />}
                                         </button>
                                         <div className="w-10 text-center font-bold text-sm text-gray-800">
                                             {item.quantity}

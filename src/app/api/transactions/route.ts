@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || !session.user) {
+        if (!session || !session.user || (session.user as any).role !== "ADMIN") {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
@@ -114,9 +114,6 @@ export async function PUT(req: NextRequest) {
             let newTotalCdf = 0;
 
             // 2. Process Items (Update SaleItems in DB)
-            // If DRAFT, we don't care about stock "diffs" yet, because we haven't deducted anything.
-            // If COMPLETED, we DO care about stock diffs.
-
             if (incomingItems && Array.isArray(incomingItems)) {
                 for (const item of incomingItems) {
                     const existingItem = sale.items.find((i) => i.productId === item.productId);
@@ -152,8 +149,8 @@ export async function PUT(req: NextRequest) {
                                         type: "ADJUSTMENT",
                                         quantity: new Prisma.Decimal(diff),
                                         fromLocation: location as any,
-                                        reason: `Ajout Vente #${sale.ticketNum}`,
-                                        userId: session.user.id
+                                        reason: `Modif Vente #${sale.ticketNum}`,
+                                        userId: (session.user as any).id
                                     }
                                 });
                             } else { // Bought LESS
@@ -168,18 +165,19 @@ export async function PUT(req: NextRequest) {
                                         type: "ADJUSTMENT",
                                         quantity: new Prisma.Decimal(Math.abs(diff)),
                                         toLocation: location as any,
-                                        reason: `Retrait Vente #${sale.ticketNum}`,
-                                        userId: session.user.id
+                                        reason: `Modif Vente #${sale.ticketNum}`,
+                                        userId: (session.user as any).id
                                     }
                                 });
                             }
                         }
 
-                        // Just update SaleItem (stock logic handled above if needed, or later if finalizing)
+                        // Just update SaleItem
                         await tx.saleItem.update({
                             where: { id: existingItem.id },
                             data: {
                                 quantity: quantity,
+                                unitPrice: price, // Allow price updates
                                 totalPrice: quantity * price
                             }
                         });

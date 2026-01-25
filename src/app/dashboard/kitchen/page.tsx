@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Utensils, Clock, CheckCircle, Flame, Truck, ShoppingBag, RotateCcw, ChefHat } from "lucide-react";
+import { Utensils, Clock, CheckCircle, Flame, Truck, ShoppingBag, RotateCcw, ChefHat, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSession } from "next-auth/react";
 
 interface KitchenOrder {
     id: string;
@@ -30,8 +31,12 @@ interface KitchenOrder {
 }
 
 export default function KitchenPage() {
+    const { data: session } = useSession();
+    const isAdmin = (session?.user as any)?.role === "ADMIN";
+
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const fetchOrders = async () => {
         try {
@@ -66,6 +71,26 @@ export default function KitchenPage() {
             }
         } catch (error) {
             console.error("Failed to update status", error);
+        }
+    };
+
+    const handleDeleteOrder = async (id: string) => {
+        if (!confirm("Supprimer définitivement cette commande ?")) return;
+        setDeletingId(id);
+        try {
+            const res = await fetch(`/api/kitchen/orders/${id}`, {
+                method: "DELETE",
+            });
+            if (res.ok) {
+                fetchOrders();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Erreur lors de la suppression");
+            }
+        } catch (error) {
+            console.error("Failed to delete order", error);
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -149,13 +174,25 @@ export default function KitchenPage() {
                                                     <span className={isLate ? 'font-bold text-red-600' : ''}>{elapsedTime} min</span>
                                                 </div>
                                             </div>
-                                            <div className={cn("px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider",
-                                                order.status === 'PENDING' ? 'bg-red-100 text-red-700' :
-                                                    order.status === 'PREPARING' ? 'bg-orange-100 text-orange-700' :
-                                                        'bg-green-100 text-green-700'
-                                            )}>
-                                                {order.status === 'PENDING' ? 'EN ATTENTE' :
-                                                    order.status === 'PREPARING' ? 'EN COURS' : 'PRÊT'}
+                                            <div className="flex flex-col items-end gap-2">
+                                                <div className={cn("px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider",
+                                                    order.status === 'PENDING' ? 'bg-red-100 text-red-700' :
+                                                        order.status === 'PREPARING' ? 'bg-orange-100 text-orange-700' :
+                                                            'bg-green-100 text-green-700'
+                                                )}>
+                                                    {order.status === 'PENDING' ? 'EN ATTENTE' :
+                                                        order.status === 'PREPARING' ? 'EN COURS' : 'PRÊT'}
+                                                </div>
+                                                {isAdmin && (
+                                                    <button
+                                                        onClick={() => handleDeleteOrder(order.id)}
+                                                        disabled={deletingId === order.id}
+                                                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-sm transition-colors"
+                                                        title="Supprimer la commande"
+                                                    >
+                                                        {deletingId === order.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
 
