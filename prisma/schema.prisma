@@ -712,6 +712,7 @@ model SaleItem {
   
   // Snapshot prices at moment of sale
   unitPrice     Decimal  @db.Decimal(10, 2)
+  unitPriceCdf  Decimal  @default(0) @db.Decimal(15, 2)
   totalPrice    Decimal  @db.Decimal(10, 2)
   
   // Cost tracking

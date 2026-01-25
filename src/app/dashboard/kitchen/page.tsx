@@ -5,6 +5,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Utensils, Clock, CheckCircle, Flame, Truck, ShoppingBag, RotateCcw, ChefHat, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
+import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
+import { showToast } from "@/components/ui/Toast";
 
 interface KitchenOrder {
     id: string;
@@ -37,6 +39,8 @@ export default function KitchenPage() {
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState<KitchenOrder | null>(null);
 
     const fetchOrders = async () => {
         try {
@@ -74,24 +78,33 @@ export default function KitchenPage() {
         }
     };
 
-    const handleDeleteOrder = async (id: string) => {
-        if (!confirm("Supprimer définitivement cette commande ?")) return;
-        setDeletingId(id);
+    const handleDeleteOrder = async () => {
+        if (!orderToDelete) return;
+        setDeletingId(orderToDelete.id);
         try {
-            const res = await fetch(`/api/kitchen/orders/${id}`, {
+            const res = await fetch(`/api/kitchen/orders/${orderToDelete.id}`, {
                 method: "DELETE",
             });
             if (res.ok) {
+                showToast("Commande supprimée avec succès", "success");
                 fetchOrders();
+                setIsDeleteModalOpen(false);
+                setOrderToDelete(null);
             } else {
                 const data = await res.json();
-                alert(data.error || "Erreur lors de la suppression");
+                showToast(data.error || "Erreur lors de la suppression", "error");
             }
         } catch (error) {
             console.error("Failed to delete order", error);
+            showToast("Une erreur est survenue lors de la suppression", "error");
         } finally {
             setDeletingId(null);
         }
+    };
+
+    const confirmDelete = (order: KitchenOrder) => {
+        setOrderToDelete(order);
+        setIsDeleteModalOpen(true);
     };
 
     const getStatusColor = (status: string) => {
@@ -185,7 +198,7 @@ export default function KitchenPage() {
                                                 </div>
                                                 {isAdmin && (
                                                     <button
-                                                        onClick={() => handleDeleteOrder(order.id)}
+                                                        onClick={() => confirmDelete(order)}
                                                         disabled={deletingId === order.id}
                                                         className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-sm transition-colors"
                                                         title="Supprimer la commande"
@@ -247,6 +260,19 @@ export default function KitchenPage() {
                         </div>
                     )}
                 </div>
+
+                <ConfirmDeleteModal
+                    isOpen={isDeleteModalOpen}
+                    onClose={() => {
+                        setIsDeleteModalOpen(false);
+                        setOrderToDelete(null);
+                    }}
+                    onConfirm={handleDeleteOrder}
+                    title="Supprimer définitivement cette commande ?"
+                    message="Cette action est irréversible. L'ordre de cuisine sera supprimé."
+                    itemName={orderToDelete ? `Ticket #${orderToDelete.sale.ticketNum.split('-')[1]}` : ""}
+                    isLoading={!!deletingId}
+                />
             </div>
         </DashboardLayout>
     );

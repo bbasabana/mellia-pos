@@ -119,8 +119,8 @@ export async function PUT(req: NextRequest) {
                     const existingItem = sale.items.find((i) => i.productId === item.productId);
                     const quantity = Number(item.quantity);
                     const price = Number(item.unitPrice);
-                    // Use passed priceCdf or fallback
-                    const priceCdf = item.priceCdf ? Number(item.priceCdf) : (price * rate);
+                    // Use passed unitPriceCdf or fallback
+                    const priceCdf = item.unitPriceCdf ? Number(item.unitPriceCdf) : (price * rate);
 
                     if (existingItem) {
                         // UPDATE Existing Item
@@ -178,6 +178,7 @@ export async function PUT(req: NextRequest) {
                             data: {
                                 quantity: quantity,
                                 unitPrice: price, // Allow price updates
+                                unitPriceCdf: priceCdf,
                                 totalPrice: quantity * price
                             }
                         });
@@ -221,6 +222,7 @@ export async function PUT(req: NextRequest) {
                                 productId: item.productId,
                                 quantity: quantity,
                                 unitPrice: price,
+                                unitPriceCdf: priceCdf,
                                 totalPrice: quantity * price,
                                 unitCost: 0 // Should fetch cost ideally
                             }

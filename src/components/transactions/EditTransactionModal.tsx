@@ -35,6 +35,7 @@ export default function EditTransactionModal({
                 ...item,
                 quantity: Number(item.quantity),
                 unitPrice: Number(item.unitPrice),
+                unitPriceCdf: Number(item.unitPriceCdf || Math.round(Number(item.unitPrice) * exchangeRate)),
             })));
         } else {
             setIsVisible(false);
@@ -72,11 +73,15 @@ export default function EditTransactionModal({
         } else {
             // Get default price (first one found)
             const price = product.prices?.[0];
+            const upUsd = Number(price?.priceUsd || 0);
+            const upCdf = Number(price?.priceCdf || Math.round(upUsd * exchangeRate));
+
             setItems([...items, {
                 productId: product.id,
                 product: { name: product.name },
                 quantity: 1,
-                unitPrice: Number(price?.priceUsd || 0),
+                unitPrice: upUsd,
+                unitPriceCdf: upCdf,
             }]);
         }
         setSearch("");
@@ -106,11 +111,25 @@ export default function EditTransactionModal({
         if (isNaN(val)) return;
         const newItems = [...items];
         newItems[index].unitPrice = val;
+        // Also update CDF price as an approximation, but user can still override
+        newItems[index].unitPriceCdf = Math.round(val * exchangeRate);
+        setItems(newItems);
+    };
+
+    const handlePriceCdfChange = (index: number, newPrice: string) => {
+        const val = parseFloat(newPrice);
+        if (isNaN(val)) return;
+        const newItems = [...items];
+        newItems[index].unitPriceCdf = val;
         setItems(newItems);
     };
 
     const calculateTotal = () => {
         return items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    };
+
+    const calculateTotalCdf = () => {
+        return items.reduce((sum, item) => sum + (item.quantity * (item.unitPriceCdf || 0)), 0);
     };
 
     const handleSave = async () => {
@@ -124,6 +143,7 @@ export default function EditTransactionModal({
                         productId: item.productId,
                         quantity: item.quantity,
                         unitPrice: item.unitPrice,
+                        unitPriceCdf: item.unitPriceCdf,
                         // We need original quantity to calculate stock difference
                         originalQuantity: transaction.items.find((i: any) => i.productId === item.productId)?.quantity || 0
                     }))
@@ -238,21 +258,33 @@ export default function EditTransactionModal({
                                 </div>
 
                                 <div className="flex items-center justify-between pt-3 border-t border-gray-50">
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase">Prix Unitaire $</label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                value={item.unitPrice}
-                                                onChange={(e) => handlePriceChange(index, e.target.value)}
-                                                className="w-24 pl-5 pr-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs font-bold outline-none focus:border-[#00d3fa]"
-                                            />
-                                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">$</span>
+                                    <div className="flex gap-4">
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[9px] font-black text-gray-400 uppercase">Prix $</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={item.unitPrice}
+                                                    onChange={(e) => handlePriceChange(index, e.target.value)}
+                                                    className="w-20 pl-4 pr-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs font-bold outline-none focus:border-[#00d3fa]"
+                                                />
+                                                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400">$</span>
+                                            </div>
                                         </div>
-                                        <div className="text-[9px] text-gray-400">≈ {Math.round(item.unitPrice * exchangeRate).toLocaleString()} FC</div>
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[9px] font-black text-gray-400 uppercase">Prix FC</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    value={item.unitPriceCdf}
+                                                    onChange={(e) => handlePriceCdfChange(index, e.target.value)}
+                                                    className="w-24 pl-2 pr-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs font-bold outline-none focus:border-[#00d3fa]"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-
+                                    鼓
                                     <div className="flex items-center bg-gray-50 rounded-md border border-gray-200 h-8">
                                         <button
                                             onClick={() => handleQuantityChange(index, -1)}
@@ -282,7 +314,7 @@ export default function EditTransactionModal({
                         <span className="text-sm font-bold text-gray-500 uppercase">Nouveau Total</span>
                         <div className="text-right">
                             <div className="text-xl font-black text-gray-900">
-                                {(calculateTotal() * exchangeRate).toLocaleString()} FC
+                                {calculateTotalCdf().toLocaleString()} FC
                             </div>
                             <div className="text-xs font-bold text-gray-400">
                                 ${calculateTotal().toFixed(2)} USD

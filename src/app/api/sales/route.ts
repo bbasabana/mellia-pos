@@ -87,6 +87,7 @@ export async function POST(req: Request) {
                     product,
                     quantity: item.quantity,
                     unitPrice: item.price,
+                    unitPriceCdf: priceCdf,
                     totalPrice: lineTotal,
                     unitCost: unitCost,
                     location: location
@@ -126,6 +127,7 @@ export async function POST(req: Request) {
                             productId: i.product.id,
                             quantity: i.quantity,
                             unitPrice: i.unitPrice,
+                            unitPriceCdf: i.unitPriceCdf,
                             totalPrice: i.totalPrice,
                             unitCost: i.unitCost
                         }))
