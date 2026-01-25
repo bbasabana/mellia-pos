@@ -5,6 +5,7 @@ import { useState } from "react";
 import { X, DollarSign, Award, Loader2, Calendar, Smartphone, Banknote, List } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 import { useSession } from "next-auth/react";
+import { cn } from "@/lib/utils";
 
 interface PaymentModalProps {
     isOpen: boolean;
