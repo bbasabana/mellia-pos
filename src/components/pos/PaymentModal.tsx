@@ -2,7 +2,7 @@
 
 import { usePosStore } from "@/store/usePosStore";
 import { useState } from "react";
-import { X, DollarSign, Award, Loader2, Calendar } from "lucide-react";
+import { X, DollarSign, Award, Loader2, Calendar, Smartphone, Banknote, List } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 import { useSession } from "next-auth/react";
 
@@ -19,6 +19,8 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [customDate, setCustomDate] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MOBILE_MONEY" | "CARD" | "">("");
+    const [paymentReference, setPaymentReference] = useState("");
 
     const isAdmin = session?.user?.role === "ADMIN";
 
@@ -41,6 +43,10 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
     const amountToPayCdf = usePoints ? Math.max(0, totalAmountCdf - possibleDiscountCdf) : totalAmountCdf;
 
     const handlePay = async () => {
+        if (!paymentMethod) {
+            setError("Veuillez choisir un moyen de paiement");
+            return;
+        }
         setLoading(true);
         setError("");
 
@@ -56,7 +62,8 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                     unitPrice: i.price
                 })),
                 clientId: selectedClient?.id,
-                paymentMethod: usePoints && amountToPayUsd === 0 ? "LOYALTY_POINTS" : (usePoints ? "SPLIT" : "CASH"),
+                paymentMethod: paymentMethod,
+                paymentReference: paymentReference,
                 totalReceived: amountToPayUsd,
                 status: "COMPLETED",
                 ...(customDate && isAdmin && { createdAt: new Date(customDate).toISOString() })
@@ -118,6 +125,54 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                         <div className="text-lg text-gray-500 mt-1">
                             ${amountToPayUsd.toFixed(2)}
                         </div>
+                    </div>
+
+                    {/* Item Summary */}
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 max-h-40 overflow-y-auto">
+                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <List size={12} /> Récapitulatif
+                        </h4>
+                        <div className="space-y-2">
+                            {cart.map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-xs font-medium">
+                                    <span className="text-gray-600 font-bold">{item.quantity}x {item.name}</span>
+                                    <span className="text-gray-900">{(item.quantity * item.priceCdf).toLocaleString()} FC</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Payment Method Selection */}
+                    <div className="space-y-3">
+                        <label className="text-sm font-bold text-gray-700 block px-1">Moyen de paiement (Obligatoire)</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => setPaymentMethod("CASH")}
+                                className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === 'CASH' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-100 hover:border-gray-200 text-gray-500'}`}
+                            >
+                                <Banknote size={24} />
+                                <span className="font-bold text-xs">Espèces (Cash)</span>
+                            </button>
+                            <button
+                                onClick={() => setPaymentMethod("MOBILE_MONEY")}
+                                className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === 'MOBILE_MONEY' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-100 hover:border-gray-200 text-gray-500'}`}
+                            >
+                                <Smartphone size={24} />
+                                <span className="font-bold text-xs">Mobile Money</span>
+                            </button>
+                        </div>
+
+                        {paymentMethod === 'MOBILE_MONEY' && (
+                            <div className="animate-in slide-in-from-top-2 duration-200">
+                                <input
+                                    type="text"
+                                    placeholder="Référence de la transaction (Ex: MP123...)"
+                                    value={paymentReference}
+                                    onChange={(e) => setPaymentReference(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:border-orange-500 focus:outline-none bg-white shadow-sm"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {selectedClient && maxDiscountUsd > 0 && (

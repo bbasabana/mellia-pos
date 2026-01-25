@@ -91,7 +91,7 @@ export async function PUT(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { items: incomingItems, status: newStatus } = body; // List of items with new quantities
+        const { items: incomingItems, status: newStatus, paymentMethod, paymentReference } = body; // List of items with new quantities
 
         const result = await prisma.$transaction(async (tx) => {
             // Get rate for fallback
@@ -333,6 +333,18 @@ export async function PUT(req: NextRequest) {
                         orderType: sale.orderType,
                         status: "PENDING",
                         priority: 0
+                    }
+                });
+
+                // Create Financial Transaction
+                await tx.financialTransaction.create({
+                    data: {
+                        saleId: sale.id,
+                        amount: newTotal,
+                        amountCdf: newTotalCdf,
+                        paymentMethod: (paymentMethod as any) || "CASH",
+                        reference: paymentReference || null,
+                        userId: session.user.id
                     }
                 });
             }

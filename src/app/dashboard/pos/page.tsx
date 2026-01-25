@@ -368,14 +368,24 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                     </div>
                 </div>
 
-                <button
-                    disabled={!mounted || cart.length === 0}
-                    onClick={() => setIsPaymentOpen(true)}
-                    className="w-full bg-[#000] hover:bg-gray-800 text-white font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all active:scale-[0.98] text-sm tracking-wide uppercase"
-                >
-                    <CreditCard size={18} />
-                    <span>{currentDraftId ? "Valider & Encaisser" : "Encaisser"}</span>
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        disabled={!mounted || cart.length === 0}
+                        onClick={handleSaveDraft}
+                        className="flex-1 bg-white border-2 border-orange-500 text-orange-600 hover:bg-orange-50 font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] text-sm tracking-wide uppercase"
+                    >
+                        <Save size={18} />
+                        <span>Brouillon</span>
+                    </button>
+                    <button
+                        disabled={!mounted || cart.length === 0}
+                        onClick={() => setIsPaymentOpen(true)}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-500/20 transition-all active:scale-[0.98] text-sm tracking-wide uppercase"
+                    >
+                        <CreditCard size={18} />
+                        <span>Payer</span>
+                    </button>
+                </div>
             </div>
 
             <PaymentModal

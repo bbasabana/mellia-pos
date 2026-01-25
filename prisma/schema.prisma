@@ -45,6 +45,7 @@ model User {
   sales         Sale[]
   kitchenOrders KitchenOrder[]  // Commandes préparées
   deliveries    DeliveryInfo[]  // Livraisons effectuées
+  financialTransactions FinancialTransaction[] // Transactions financières
   
   // HR / Payroll
   phone         String?
@@ -694,6 +695,7 @@ model Sale {
   loyaltyTx     LoyaltyTransaction[]
   kitchenOrders KitchenOrder[]  // Commandes cuisine
   deliveryInfo  DeliveryInfo?   // Info livraison
+  transactions  FinancialTransaction[] // New: Actual payments
 
   @@index([createdAt])
   @@index([clientId])
@@ -773,4 +775,25 @@ model DeliveryInfo {
   @@index([deliveryStatus])
   @@index([saleId])
   @@map("delivery_info")
+}
+
+model FinancialTransaction {
+  id              String        @id @default(cuid())
+  saleId          String
+  amount          Decimal       @db.Decimal(10, 2)      // Amount in USD
+  amountCdf       Decimal?      @db.Decimal(15, 2)      // Original CDF amount
+  paymentMethod   PaymentMethod
+  reference       String?       // Reference (Mobile Money etc.)
+  userId          String        // Agent who handled it
+  createdAt       DateTime      @default(now())
+
+  // Relations
+  sale            Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@index([saleId])
+  @@index([userId])
+  @@index([paymentMethod])
+  @@index([createdAt])
+  @@map("financial_transactions")
 }

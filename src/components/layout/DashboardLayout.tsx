@@ -22,7 +22,9 @@ import {
   Menu,
   LogOut,
   Flame,
-  FileText
+  FileText,
+  TrendingUp,
+  Receipt
 } from "lucide-react";
 import "@/styles/theme.scss";
 import { cn } from "@/lib/utils";
@@ -72,16 +74,28 @@ const menuItems = [
     roles: ["ADMIN", "MANAGER"],
   },
   {
+    label: "Brouillons",
+    href: "/dashboard/sales/drafts",
+    icon: FileText,
+    roles: ["ADMIN", "MANAGER", "CASHIER"],
+  },
+  {
+    label: "Historique Ventes",
+    href: "/dashboard/transactions",
+    icon: Receipt,
+    roles: ["ADMIN", "MANAGER", "CASHIER"],
+  },
+  {
+    label: "Transactions",
+    href: "/dashboard/sales/transactions",
+    icon: TrendingUp,
+    roles: ["ADMIN", "MANAGER"],
+  },
+  {
     label: "Rapports",
     href: "/dashboard/reports",
     icon: BarChart3,
     roles: ["ADMIN", "MANAGER"],
-  },
-  {
-    label: "Transactions",
-    href: "/dashboard/transactions",
-    icon: FileText,
-    roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
     label: "Utilisateurs",

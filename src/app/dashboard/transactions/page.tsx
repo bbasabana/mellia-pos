@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useSession } from "next-auth/react";
-import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, FileText, Trash2, Edit } from "lucide-react";
+import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, FileText, Trash2, Edit, Receipt } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useReactToPrint } from "react-to-print";
@@ -136,10 +136,10 @@ export default function TransactionsPage() {
                 <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-10 shadow-sm">
                     <div>
                         <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <FileText className="text-[#00d3fa]" />
-                            Historique des Transactions (Ventes)
+                            <Receipt className="text-green-600" />
+                            Historique des Ventes
                         </h1>
-                        <p className="text-sm text-gray-500">Consultez, modifiez ou annulez vos tickets de vente</p>
+                        <p className="text-sm text-gray-500">Consultez les ventes validées et payées</p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">

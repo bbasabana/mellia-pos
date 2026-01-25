@@ -11,7 +11,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { items, clientId, paymentMethod, orderType, deliveryInfo, status = "COMPLETED", createdAt } = body;
+        const { items, clientId, paymentMethod, paymentReference, orderType, deliveryInfo, status = "COMPLETED", createdAt } = body;
 
         if (!items || items.length === 0) {
             return new NextResponse("No items in cart", { status: 400 });
@@ -143,13 +143,23 @@ export async function POST(req: Request) {
                             }
                         }
                     }),
-                    // Create Kitchen Order automatically (Only if COMPLETED)
+                    // Create Kitchen Order & Transaction automatically (Only if COMPLETED)
                     ...(status === "COMPLETED" && {
                         kitchenOrders: {
                             create: {
                                 orderType: orderType || "DINE_IN",
                                 status: "PENDING",
                                 priority: 0,
+                                ...(saleDate && { createdAt: saleDate }) // Match sale date
+                            }
+                        },
+                        transactions: {
+                            create: {
+                                amount: totalBrut,
+                                amountCdf: totalCdf,
+                                paymentMethod: paymentMethod || "CASH",
+                                reference: paymentReference || null,
+                                userId: session.user.id,
                                 ...(saleDate && { createdAt: saleDate }) // Match sale date
                             }
                         }
