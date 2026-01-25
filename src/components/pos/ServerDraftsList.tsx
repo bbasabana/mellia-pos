@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { FileText, Trash2, Clock, User, Utensils, Truck, ShoppingBag, RefreshCw } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 import { usePosStore } from "@/store/usePosStore";
+import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
 
 type OrderType = 'DINE_IN' | 'DELIVERY' | 'TAKEAWAY';
 
@@ -26,6 +27,10 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
     const [loading, setLoading] = useState(false);
     const { currentDraftId } = usePosStore();
 
+    // Delete modal state
+    const [idToDelete, setIdToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const fetchDrafts = async () => {
         setLoading(true);
         try {
@@ -45,21 +50,29 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
         fetchDrafts();
     }, [currentDraftId]); // Refetch when current draft changes (saved/validated)
 
-    const handleDelete = async (id: string, e: React.MouseEvent) => {
+    const handleDeleteClick = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm("Supprimer ce brouillon définitivement ?")) return;
+        setIdToDelete(id);
+    };
+
+    const confirmDelete = async () => {
+        if (!idToDelete) return;
+        setIsDeleting(true);
 
         try {
-            const res = await fetch(`/api/transactions?id=${id}`, { method: "DELETE" });
+            const res = await fetch(`/api/transactions?id=${idToDelete}`, { method: "DELETE" });
             const json = await res.json();
             if (json.success) {
                 showToast("Brouillon supprimé", "success");
                 fetchDrafts();
+                setIdToDelete(null);
             } else {
                 showToast(json.error || "Erreur", "error");
             }
         } catch (error) {
             showToast("Erreur de connexion", "error");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -151,7 +164,7 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
                                         )}
                                     </div>
                                     <button
-                                        onClick={(e) => handleDelete(draft.id, e)}
+                                        onClick={(e) => handleDeleteClick(draft.id, e)}
                                         className="p-1.5 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
                                         title="Supprimer"
                                     >
@@ -184,6 +197,15 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
                     })}
                 </div>
             )}
+
+            <ConfirmDeleteModal
+                isOpen={!!idToDelete}
+                onClose={() => setIdToDelete(null)}
+                onConfirm={confirmDelete}
+                title="Supprimer le brouillon"
+                message="Supprimer ce brouillon définitivement ?"
+                isLoading={isDeleting}
+            />
         </div>
     );
 }
