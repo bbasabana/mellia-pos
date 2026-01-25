@@ -12,7 +12,7 @@ interface KitchenOrder {
     id: string;
     ticketNum: string; // From Sale
     orderType: string;
-    status: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED';
+    status: 'PENDING' | 'IN_PREPARATION' | 'READY' | 'DELIVERED';
     createdAt: string;
     priority: number;
     sale: {
@@ -72,9 +72,14 @@ export default function KitchenPage() {
             });
             if (res.ok) {
                 fetchOrders(); // Refresh immediately
+            } else {
+                const errorData = await res.json();
+                console.error("Status update failed:", errorData);
+                showToast(errorData.error || "Erreur lors de la mise à jour", "error");
             }
         } catch (error) {
             console.error("Failed to update status", error);
+            showToast("Erreur de connexion", "error");
         }
     };
 
@@ -110,7 +115,7 @@ export default function KitchenPage() {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'PENDING': return 'bg-white border-l-4 border-l-red-500 shadow-sm';
-            case 'PREPARING': return 'bg-orange-50 border-l-4 border-l-orange-500 shadow-sm';
+            case 'IN_PREPARATION': return 'bg-orange-50 border-l-4 border-l-orange-500 shadow-sm';
             case 'READY': return 'bg-green-50 border-l-4 border-l-green-500 shadow-sm';
             default: return 'bg-gray-50';
         }
@@ -125,7 +130,7 @@ export default function KitchenPage() {
     };
 
     // Filter logic if needed (e.g. separate completed)
-    const activeOrders = orders.filter(o => o.status !== 'COMPLETED');
+    const activeOrders = orders.filter(o => o.status !== 'DELIVERED');
 
     return (
         <DashboardLayout>
@@ -190,11 +195,11 @@ export default function KitchenPage() {
                                             <div className="flex flex-col items-end gap-2">
                                                 <div className={cn("px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider",
                                                     order.status === 'PENDING' ? 'bg-red-100 text-red-700' :
-                                                        order.status === 'PREPARING' ? 'bg-orange-100 text-orange-700' :
+                                                        order.status === 'IN_PREPARATION' ? 'bg-orange-100 text-orange-700' :
                                                             'bg-green-100 text-green-700'
                                                 )}>
                                                     {order.status === 'PENDING' ? 'EN ATTENTE' :
-                                                        order.status === 'PREPARING' ? 'EN COURS' : 'PRÊT'}
+                                                        order.status === 'IN_PREPARATION' ? 'EN COURS' : 'PRÊT'}
                                                 </div>
                                                 {isAdmin && (
                                                     <button
@@ -229,14 +234,14 @@ export default function KitchenPage() {
                                         <div className="mt-auto pt-2 grid grid-cols-1 gap-2">
                                             {order.status === 'PENDING' && (
                                                 <button
-                                                    onClick={() => updateStatus(order.id, 'PREPARING')}
+                                                    onClick={() => updateStatus(order.id, 'IN_PREPARATION')}
                                                     className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-sm font-bold text-xs uppercase tracking-wide transition-colors flex items-center justify-center gap-2 shadow-sm"
                                                 >
                                                     <Flame size={14} />
                                                     Lancer
                                                 </button>
                                             )}
-                                            {order.status === 'PREPARING' && (
+                                            {order.status === 'IN_PREPARATION' && (
                                                 <button
                                                     onClick={() => updateStatus(order.id, 'READY')}
                                                     className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-sm font-bold text-xs uppercase tracking-wide transition-colors flex items-center justify-center gap-2 shadow-sm"
@@ -247,7 +252,7 @@ export default function KitchenPage() {
                                             )}
                                             {order.status === 'READY' && (
                                                 <button
-                                                    onClick={() => updateStatus(order.id, 'COMPLETED')}
+                                                    onClick={() => updateStatus(order.id, 'DELIVERED')}
                                                     className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 text-white rounded-sm font-bold text-xs uppercase tracking-wide transition-colors shadow-sm"
                                                 >
                                                     Terminer
