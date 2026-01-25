@@ -113,34 +113,34 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+            <div className="bg-white rounded-sm shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <h2 className="text-xl font-bold text-gray-800">Paiement</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                        <X size={20} className="text-gray-500" />
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400">
+                        <X size={20} />
                     </button>
                 </div>
 
                 <div className="p-8 space-y-6">
                     <div className="text-center">
-                        <p className="text-gray-500 font-medium uppercase tracking-wider text-sm mb-2">Total à Payer</p>
-                        <div className="text-5xl font-extrabold text-blue-600 tracking-tight">
-                            {Math.round(amountToPayCdf).toLocaleString()} FC
+                        <p className="text-[10px] font-bold uppercase text-gray-400 tracking-widest mb-1">Total à Payer</p>
+                        <div className="text-5xl font-black text-gray-900 tracking-tighter">
+                            {Math.round(amountToPayCdf).toLocaleString()} <span className="text-2xl text-gray-400">FC</span>
                         </div>
-                        <div className="text-lg text-gray-500 mt-1">
+                        <div className="text-lg font-bold text-[#00d3fa] mt-1">
                             ${formatUsd(amountToPayUsd)}
                         </div>
                     </div>
 
                     {/* Item Summary */}
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 max-h-40 overflow-y-auto">
-                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <div className="bg-gray-50 rounded-sm p-4 border border-gray-100">
+                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                             <List size={12} /> Récapitulatif
                         </h4>
                         <div className="space-y-2">
                             {cart.map((item, idx) => (
-                                <div key={idx} className="flex justify-between text-xs font-medium">
-                                    <span className="text-gray-600 font-bold">{item.quantity}x {item.name}</span>
+                                <div key={idx} className="flex justify-between text-xs font-bold items-center border-b border-gray-100/50 pb-2 last:border-0 last:pb-0">
+                                    <span className="text-gray-600">{item.quantity}x {item.name}</span>
                                     <span className="text-gray-900">{(item.quantity * item.priceCdf).toLocaleString()} FC</span>
                                 </div>
                             ))}
@@ -149,21 +149,33 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
 
                     {/* Payment Method Selection */}
                     <div className="space-y-3">
-                        <label className="text-sm font-bold text-gray-700 block px-1">Moyen de paiement (Obligatoire)</label>
+                        <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest px-1">Moyen de paiement (Obligatoire)</label>
                         <div className="grid grid-cols-2 gap-3">
                             <button
+                                type="button"
                                 onClick={() => setPaymentMethod("CASH")}
-                                className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === 'CASH' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-100 hover:border-gray-200 text-gray-500'}`}
+                                className={cn(
+                                    "p-4 rounded-sm border transition-all flex flex-col items-center gap-2",
+                                    paymentMethod === 'CASH'
+                                        ? "bg-black text-white border-black shadow-lg"
+                                        : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                                )}
                             >
-                                <Banknote size={24} />
-                                <span className="font-bold text-xs">Espèces (Cash)</span>
+                                <Banknote size={20} />
+                                <span className="font-bold text-xs uppercase tracking-tight">Espèces (Cash)</span>
                             </button>
                             <button
+                                type="button"
                                 onClick={() => setPaymentMethod("MOBILE_MONEY")}
-                                className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === 'MOBILE_MONEY' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-100 hover:border-gray-200 text-gray-500'}`}
+                                className={cn(
+                                    "p-4 rounded-sm border transition-all flex flex-col items-center gap-2",
+                                    paymentMethod === 'MOBILE_MONEY'
+                                        ? "bg-black text-white border-black shadow-lg"
+                                        : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                                )}
                             >
-                                <Smartphone size={24} />
-                                <span className="font-bold text-xs">Mobile Money</span>
+                                <Smartphone size={20} />
+                                <span className="font-bold text-xs uppercase tracking-tight">Mobile Money</span>
                             </button>
                         </div>
 
@@ -171,83 +183,91 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                             <div className="animate-in slide-in-from-top-2 duration-200">
                                 <input
                                     type="text"
-                                    placeholder="Référence de la transaction (Ex: MP123...)"
+                                    placeholder="Référence (Ex: MP123...)"
                                     value={paymentReference}
                                     onChange={(e) => setPaymentReference(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:border-orange-500 focus:outline-none bg-white shadow-sm"
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-3 text-sm outline-none focus:border-[#00d3fa] transition-all font-bold placeholder:font-medium"
                                 />
                             </div>
                         )}
                     </div>
 
                     {selectedClient && maxDiscountUsd > 0 && (
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setUsePoints(!usePoints)}
-                            className={`cursor-pointer border-2 rounded-xl p-4 flex items-center justify-between transition-all ${usePoints ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-blue-300"
-                                }`}
+                            className={cn(
+                                "w-full border rounded-sm p-4 flex items-center justify-between transition-all group",
+                                usePoints
+                                    ? "bg-black text-white border-black"
+                                    : "bg-white border-gray-200 hover:border-[#00d3fa]"
+                            )}
                         >
                             <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${usePoints ? "bg-green-200 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                                <div className={cn(
+                                    "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                                    usePoints ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600"
+                                )}>
                                     <Award size={20} />
                                 </div>
-                                <div>
-                                    <h4 className="font-bold text-gray-900">Utiliser mes points</h4>
-                                    <p className="text-xs text-gray-500">
+                                <div className="text-left">
+                                    <h4 className="font-bold text-sm uppercase tracking-tight">Utiliser mes points</h4>
+                                    <p className={cn("text-[10px] uppercase font-bold tracking-widest", usePoints ? "text-gray-400" : "text-gray-400")}>
                                         Disponible: {selectedClient.points} pts ({maxDiscountCdf.toLocaleString()} FC)
                                     </p>
                                 </div>
                             </div>
                             <div className="text-right">
                                 {usePoints ? (
-                                    <div>
-                                        <div className="text-green-700 font-bold">-{Math.round(possibleDiscountCdf).toLocaleString()} FC</div>
-                                        <div className="text-xs text-green-600">-${formatUsd(possibleDiscountUsd)}</div>
+                                    <div className="text-xs font-black">
+                                        -{Math.round(possibleDiscountCdf).toLocaleString()} FC
                                     </div>
                                 ) : (
-                                    <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
+                                    <div className="w-5 h-5 rounded-sm border-2 border-gray-200 group-hover:border-[#00d3fa]"></div>
                                 )}
                             </div>
-                        </div>
+                        </button>
                     )}
 
                     {isAdmin && (
-                        <div className="border-2 border-gray-200 rounded-xl p-4">
-                            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2">
-                                <Calendar size={16} className="text-gray-500" />
+                        <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
+                            <label className="flex items-center gap-2 text-[10px] font-bold uppercase text-gray-400 tracking-widest mb-3">
+                                <Calendar size={14} />
                                 Date de la vente (optionnel)
                             </label>
                             <input
                                 type="datetime-local"
                                 value={customDate}
                                 onChange={(e) => setCustomDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                                className="w-full bg-white border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] transition-all font-bold"
                             />
-                            <p className="text-xs text-gray-500 mt-2">
+                            <p className="text-[10px] text-gray-400 font-medium mt-2 italic">
                                 Laissez vide pour utiliser la date actuelle
                             </p>
                         </div>
                     )}
 
                     {error && (
-                        <div className="p-4 bg-red-50 text-red-600 rounded-xl text-center text-sm font-medium">
+                        <div className="p-4 bg-red-50 text-red-600 rounded-sm text-center text-xs font-bold border border-red-100">
                             {error}
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="grid grid-cols-2 gap-4 pt-2">
                         <button
+                            type="button"
                             onClick={onClose}
-                            className="py-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                            className="py-4 bg-gray-100 text-gray-600 rounded-sm font-bold text-sm uppercase tracking-widest hover:bg-gray-200 transition-all active:scale-[0.98]"
                         >
                             Annuler
                         </button>
                         <button
+                            type="button"
                             onClick={handlePay}
                             disabled={loading}
-                            className="py-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
+                            className="py-4 bg-black text-white rounded-sm font-black text-sm uppercase tracking-widest hover:bg-gray-800 transition-all shadow-xl active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                            {loading ? <Loader2 className="animate-spin" /> : <DollarSign />}
-                            Encaisser {Math.round(amountToPayCdf).toLocaleString()} FC
+                            {loading ? <Loader2 className="animate-spin" size={18} /> : <span>Encaisser {Math.round(amountToPayCdf).toLocaleString()} FC</span>}
                         </button>
                     </div>
                 </div>
