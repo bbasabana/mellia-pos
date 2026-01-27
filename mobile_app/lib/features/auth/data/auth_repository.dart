@@ -45,7 +45,7 @@ class AuthRepository {
       };
 
       final response = await _dio.post(
-        "/api/auth/signin/credentials",
+        "/api/auth/callback/credentials",
         data: requestData, // Dio will encode as JSON by default if not FormData
         options: Options(
           headers: {"Content-Type": "application/json"},
