@@ -45,19 +45,38 @@ class AuthRepository {
       };
 
       final response = await _dio.post(
-        "/api/auth/callback/credentials",
-        data: requestData, // Dio will encode as JSON by default if not FormData
+        "/api/auth/signin/credentials",
+        data: requestData,
         options: Options(
-          headers: {"Content-Type": "application/json"},
-          validateStatus: (status) {
-            return status! < 500; // Accept 401/403 to handle them manually
+          headers: {
+            "Content-Type": "application/json",
+            "X-Auth-Return-Redirect": "1", // Hint for NextAuth to return JSON
           },
+          followRedirects: false,
+          validateStatus: (status) => status! < 500,
         ),
       );
 
-      if (response.statusCode != 200) {
+      print(
+        "Login Response: ${response.statusCode} - ${response.headers['content-type']}",
+      );
+
+      if (response.statusCode == 302) {
+        final location = response.headers.value('location');
+        if (location != null && location.contains('error=')) {
+          throw Exception("Erreur NextAuth: ${location.split('error=').last}");
+        }
+        // If it's a redirect to success, we might still be okay if cookies are set
+      } else if (response.statusCode != 200) {
+        throw Exception("Échec de connexion (${response.statusCode})");
+      }
+
+      // If we got HTML instead of JSON, something is wrong
+      final contentType = response.headers.value('content-type') ?? '';
+      if (!contentType.contains('application/json') &&
+          response.statusCode == 200) {
         throw Exception(
-          "Login failed: ${response.statusCode} - ${response.data}",
+          "Le serveur a renvoyé une page HTML au lieu de JSON. Vérifiez l'URL.",
         );
       }
 
@@ -80,9 +99,11 @@ class AuthRepository {
 
   Future<Map<String, dynamic>> getSession() async {
     try {
-      final response = await _dio.get(ApiConstants.session);
-      return response
-          .data; // { user: { name, email, image }, expires: ... } or volatile
+      final response = await _dio.get(
+        ApiConstants.session,
+        options: Options(headers: {"X-Auth-Return-Redirect": "1"}),
+      );
+      return response.data;
     } catch (e) {
       throw Exception("Failed to get session");
     }
