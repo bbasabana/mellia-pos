@@ -50,6 +50,13 @@ class AuthNotifier extends _$AuthNotifier {
 
       // Validate Role immediately
       final session = await repo.getSession();
+
+      if (session == null || !session.containsKey('user')) {
+        throw Exception(
+          'Session non établie après connexion. Veuillez réessayer.',
+        );
+      }
+
       final user = session['user'];
       final role = user['role'];
 
