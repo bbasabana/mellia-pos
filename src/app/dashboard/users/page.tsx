@@ -2,7 +2,7 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useState, useEffect } from "react";
-import { Users, UserPlus, Edit2, Unlock, Trash2, Shield, Mail } from "lucide-react";
+import { Users, UserPlus, Edit2, Unlock, Trash2, Shield, Mail, Key } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 
@@ -12,6 +12,14 @@ export default function UsersPage() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<any>(null);
 
+    // Roles matching Prisma Schema (UserRole)
+    const AVAILABLE_ROLES = [
+        { value: "CASHIER", label: "Caissier" },
+        { value: "MANAGER", label: "Manager" },
+        { value: "ADMIN", label: "Admin" },
+        { value: "KITCHEN", label: "Cuisine" },
+    ];
+
     // Form State
     const [formData, setFormData] = useState({
         name: "",
@@ -19,9 +27,13 @@ export default function UsersPage() {
         role: "CASHIER",
     });
 
-    // Reset Password State
-    const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-    const [resetStep, setResetStep] = useState<'CONFIRM' | 'SUCCESS'>('CONFIRM');
+    // Password Display State (for Create & Reset)
+    const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
+    const [generatedPwd, setGeneratedPwd] = useState("");
+    const [pwdModalTitle, setPwdModalTitle] = useState("");
+
+    // Reset Confirmation State
+    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
     const [userToReset, setUserToReset] = useState<{ id: string, name: string } | null>(null);
 
     useEffect(() => {
@@ -59,6 +71,13 @@ export default function UsersPage() {
                 setSelectedUser(null);
                 setFormData({ name: "", email: "", role: "CASHIER" });
                 fetchUsers();
+
+                // If created new user, show password
+                if (!selectedUser && json.data.generatedPassword) {
+                    setGeneratedPwd(json.data.generatedPassword);
+                    setPwdModalTitle("Utilisateur Créé");
+                    setIsPwdModalOpen(true);
+                }
             } else {
                 showToast(json.error, "error");
             }
@@ -79,8 +98,7 @@ export default function UsersPage() {
 
     const handleResetClick = (user: any) => {
         setUserToReset(user);
-        setResetStep('CONFIRM');
-        setIsResetModalOpen(true);
+        setIsResetConfirmOpen(true);
     };
 
     const confirmReset = async () => {
@@ -92,8 +110,15 @@ export default function UsersPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "RESET_PASSWORD" })
             });
-            if (res.ok) {
-                setResetStep('SUCCESS');
+
+            const json = await res.json();
+            if (res.ok && json.success) {
+                setIsResetConfirmOpen(false);
+                setGeneratedPwd(json.generatedPassword);
+                setPwdModalTitle("Mot de passe réinitialisé");
+                setIsPwdModalOpen(true);
+            } else {
+                showToast("Erreur lors de la réinitialisation", "error");
             }
         } catch (e) { showToast("Erreur", "error"); }
     };
@@ -193,10 +218,9 @@ export default function UsersPage() {
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold uppercase text-gray-400">Rôle</label>
                             <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] appearance-none">
-                                <option value="CASHIER">Caissier</option>
-                                <option value="MANAGER">Manager</option>
-                                <option value="ADMIN">Admin</option>
-                                <option value="KITCHEN">Cuisine</option>
+                                {AVAILABLE_ROLES.map(role => (
+                                    <option key={role.value} value={role.value}>{role.label}</option>
+                                ))}
                             </select>
                         </div>
 
@@ -207,59 +231,64 @@ export default function UsersPage() {
                     </form>
                 </Modal>
 
-                {/* Reset Password Modal */}
+                {/* Reset Password Confirmation Modal */}
                 <Modal
-                    isOpen={isResetModalOpen}
-                    onClose={() => setIsResetModalOpen(false)}
-                    title={resetStep === 'CONFIRM' ? "Confirmation Réinitialisation" : "Mot de passe réinitialisé"}
+                    isOpen={isResetConfirmOpen}
+                    onClose={() => setIsResetConfirmOpen(false)}
+                    title="Confirmer Réinitialisation"
                 >
-                    {resetStep === 'CONFIRM' ? (
-                        <div className="space-y-4">
-                            <div className="bg-yellow-50 text-yellow-800 p-4 rounded-sm text-sm border border-yellow-100 flex items-start gap-3">
-                                <Unlock className="shrink-0 mt-0.5" size={18} />
-                                <div>
-                                    <p className="font-bold">Attention</p>
-                                    <p>Vous êtes sur le point de réinitialiser le mot de passe de <span className="font-bold">{userToReset?.name}</span>.</p>
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-2">
-                                <button
-                                    onClick={() => setIsResetModalOpen(false)}
-                                    className="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-100 rounded-sm"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    onClick={confirmReset}
-                                    className="px-4 py-2 bg-black text-white font-bold text-sm rounded-sm hover:bg-gray-800"
-                                >
-                                    Confirmer
-                                </button>
+                    <div className="space-y-4">
+                        <div className="bg-yellow-50 text-yellow-800 p-4 rounded-sm text-sm border border-yellow-100 flex items-start gap-3">
+                            <Unlock className="shrink-0 mt-0.5" size={18} />
+                            <div>
+                                <p className="font-bold">Attention</p>
+                                <p>Vous êtes sur le point de réinitialiser le mot de passe de <span className="font-bold">{userToReset?.name}</span>.</p>
                             </div>
                         </div>
-                    ) : (
-                        <div className="space-y-6 text-center py-4">
-                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                                <Shield size={32} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-800">C&apos;est fait !</h3>
-                                <p className="text-gray-500 text-sm">Le mot de passe a été réinitialisé.</p>
-                            </div>
-
-                            <div className="bg-gray-100 p-4 rounded border border-gray-200">
-                                <p className="text-xs uppercase font-bold text-gray-400 mb-1">Nouveau Mot de Passe</p>
-                                <p className="text-3xl font-mono font-bold text-black tracking-widest">U</p>
-                            </div>
-
+                        <div className="flex justify-end gap-2 pt-2">
                             <button
-                                onClick={() => setIsResetModalOpen(false)}
-                                className="w-full py-2 bg-black text-white font-bold text-sm rounded-sm"
+                                onClick={() => setIsResetConfirmOpen(false)}
+                                className="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-100 rounded-sm"
                             >
-                                Fermer
+                                Annuler
+                            </button>
+                            <button
+                                onClick={confirmReset}
+                                className="px-4 py-2 bg-black text-white font-bold text-sm rounded-sm hover:bg-gray-800"
+                            >
+                                Confirmer
                             </button>
                         </div>
-                    )}
+                    </div>
+                </Modal>
+
+                {/* Password Display Modal (Success) */}
+                <Modal
+                    isOpen={isPwdModalOpen}
+                    onClose={() => setIsPwdModalOpen(false)}
+                    title={pwdModalTitle}
+                >
+                    <div className="space-y-6 text-center py-4">
+                        <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <Key size={32} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-800">Mot de passe généré</h3>
+                            <p className="text-gray-500 text-sm">Veuillez noter ce mot de passe, il ne sera plus affiché.</p>
+                        </div>
+
+                        <div className="bg-gray-100 p-4 rounded border border-gray-200">
+                            <p className="text-xs uppercase font-bold text-gray-400 mb-1">Mot de Passe</p>
+                            <p className="text-3xl font-mono font-bold text-black tracking-widest">{generatedPwd}</p>
+                        </div>
+
+                        <button
+                            onClick={() => setIsPwdModalOpen(false)}
+                            className="w-full py-2 bg-black text-white font-bold text-sm rounded-sm"
+                        >
+                            Fermer
+                        </button>
+                    </div>
                 </Modal>
             </div>
         </DashboardLayout>

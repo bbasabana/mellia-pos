@@ -73,8 +73,9 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { name, email, role, baseSalary, phone } = body;
 
-        // Default password "U"
-        const passwordHash = await hash("U", 10);
+        // Generate random 8-char password
+        const generatedPassword = Math.random().toString(36).slice(-8);
+        const passwordHash = await hash(generatedPassword, 10);
 
         const newUser = await prisma.user.create({
             data: {
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
             }
         });
 
-        return NextResponse.json({ success: true, data: newUser });
+        return NextResponse.json({ success: true, data: { ...newUser, generatedPassword } });
 
     } catch (error: any) {
         if (error.code === 'P2002') {

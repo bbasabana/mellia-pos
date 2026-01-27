@@ -56,13 +56,15 @@ export async function PATCH(
         const { action } = body;
 
         if (action === "RESET_PASSWORD") {
-            // Reset to "U"
-            const passwordHash = await hash("U", 10);
+            // Reset to random 8-char password
+            const generatedPassword = Math.random().toString(36).slice(-8);
+            const passwordHash = await hash(generatedPassword, 10);
+
             await prisma.user.update({
                 where: { id: params.id },
                 data: { passwordHash }
             });
-            return NextResponse.json({ success: true, message: "Mot de passe réinitialisé à 'U'" });
+            return NextResponse.json({ success: true, message: "Mot de passe réinitialisé", generatedPassword });
         }
 
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });
