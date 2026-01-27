@@ -36,6 +36,10 @@ export default function UsersPage() {
     const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
     const [userToReset, setUserToReset] = useState<{ id: string, name: string } | null>(null);
 
+    // Delete Confirmation State
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<{ id: string, name: string } | null>(null);
+
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -123,6 +127,33 @@ export default function UsersPage() {
         } catch (e) { showToast("Erreur", "error"); }
     };
 
+    const handleDeleteClick = (user: any) => {
+        setUserToDelete(user);
+        setIsDeleteConfirmOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!userToDelete) return;
+
+        try {
+            const res = await fetch(`/api/users/${userToDelete.id}`, {
+                method: "DELETE"
+            });
+
+            const json = await res.json();
+            if (res.ok && json.success) {
+                showToast("Utilisateur supprimé", "success");
+                setIsDeleteConfirmOpen(false);
+                setUserToDelete(null);
+                fetchUsers();
+            } else {
+                showToast(json.error || "Erreur lors de la suppression", "error");
+            }
+        } catch (e) {
+            showToast("Erreur serveur", "error");
+        }
+    };
+
     return (
         <DashboardLayout>
             <div className="flex flex-col h-full bg-gray-50">
@@ -195,6 +226,9 @@ export default function UsersPage() {
                                                 <button onClick={() => handleEdit(user)} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded" title="Modifier">
                                                     <Edit2 size={16} />
                                                 </button>
+                                                <button onClick={() => handleDeleteClick(user)} className="p-1.5 hover:bg-red-50 text-red-600 rounded" title="Supprimer">
+                                                    <Trash2 size={16} />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -257,6 +291,38 @@ export default function UsersPage() {
                                 className="px-4 py-2 bg-black text-white font-bold text-sm rounded-sm hover:bg-gray-800"
                             >
                                 Confirmer
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+
+                {/* Delete Confirmation Modal */}
+                <Modal
+                    isOpen={isDeleteConfirmOpen}
+                    onClose={() => setIsDeleteConfirmOpen(false)}
+                    title="Confirmer Suppression"
+                >
+                    <div className="space-y-4">
+                        <div className="bg-red-50 text-red-800 p-4 rounded-sm text-sm border border-red-100 flex items-start gap-3">
+                            <Trash2 className="shrink-0 mt-0.5" size={18} />
+                            <div>
+                                <p className="font-bold">Action Irréversible</p>
+                                <p>Êtes-vous sûr de vouloir supprimer <span className="font-bold">{userToDelete?.name}</span> ?</p>
+                                <p className="mt-2 text-xs opacity-80 italic">Note: La suppression échouera si l&apos;utilisateur a déjà effectué des opérations (ventes, etc.).</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button
+                                onClick={() => setIsDeleteConfirmOpen(false)}
+                                className="px-4 py-2 text-gray-600 font-bold text-sm hover:bg-gray-100 rounded-sm"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="px-4 py-2 bg-red-600 text-white font-bold text-sm rounded-sm hover:bg-red-700 shadow-sm"
+                            >
+                                Supprimer
                             </button>
                         </div>
                     </div>
