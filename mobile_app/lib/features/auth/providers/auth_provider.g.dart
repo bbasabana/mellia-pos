@@ -25,7 +25,7 @@ Map<String, dynamic> _$UserStateToJson(_UserState instance) =>
 // RiverpodGenerator
 // **************************************************************************
 
-String _$authNotifierHash() => r'4568c0c4f400452aba40d921cb79ba311e41e19f';
+String _$authNotifierHash() => r'73f98c9d37815ca1fd772d83423fc17ee6c9c2b5';
 
 /// See also [AuthNotifier].
 @ProviderFor(AuthNotifier)

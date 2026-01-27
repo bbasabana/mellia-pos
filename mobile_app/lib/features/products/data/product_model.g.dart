@@ -23,8 +23,8 @@ _Product _$ProductFromJson(Map<String, dynamic> json) => _Product(
           ?.map((e) => ProductPrice.fromJson(e as Map<String, dynamic>))
           .toList() ??
       const [],
-  priceUsd: (json['priceUsd'] as num?)?.toDouble(),
-  priceCdf: (json['priceCdf'] as num?)?.toDouble(),
+  priceUsd: toDouble(json['priceUsd']),
+  priceCdf: toDouble(json['priceCdf']),
   stockItems:
       (json['stockItems'] as List<dynamic>?)
           ?.map((e) => StockItem.fromJson(e as Map<String, dynamic>))
@@ -54,8 +54,8 @@ _ProductPrice _$ProductPriceFromJson(Map<String, dynamic> json) =>
     _ProductPrice(
       id: json['id'] as String,
       spaceId: json['spaceId'] as String,
-      priceUsd: (json['priceUsd'] as num).toDouble(),
-      priceCdf: (json['priceCdf'] as num).toDouble(),
+      priceUsd: toDouble(json['priceUsd']),
+      priceCdf: toDouble(json['priceCdf']),
       forUnit: json['forUnit'] as String? ?? 'BOTTLE',
     );
 
@@ -70,7 +70,7 @@ Map<String, dynamic> _$ProductPriceToJson(_ProductPrice instance) =>
 
 _StockItem _$StockItemFromJson(Map<String, dynamic> json) => _StockItem(
   location: json['location'] as String,
-  quantity: (json['quantity'] as num).toDouble(),
+  quantity: toDouble(json['quantity']),
 );
 
 Map<String, dynamic> _$StockItemToJson(_StockItem instance) =>

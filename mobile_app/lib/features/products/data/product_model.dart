@@ -3,6 +3,13 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'product_model.freezed.dart';
 part 'product_model.g.dart';
 
+double toDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0.0;
+  return 0.0;
+}
+
 @freezed
 abstract class Product with _$Product {
   const factory Product({
@@ -28,8 +35,8 @@ abstract class Product with _$Product {
     @Default([]) List<ProductPrice> prices,
 
     // Flattened price for Grid (optional, helper)
-    double? priceUsd,
-    double? priceCdf,
+    @JsonKey(fromJson: toDouble) double? priceUsd,
+    @JsonKey(fromJson: toDouble) double? priceCdf,
 
     // Stock (from API /api/products/stock or embedded)
     // If API returns stockItems
@@ -45,8 +52,8 @@ abstract class ProductPrice with _$ProductPrice {
   const factory ProductPrice({
     required String id,
     required String spaceId,
-    required double priceUsd,
-    required double priceCdf,
+    @JsonKey(fromJson: toDouble) required double priceUsd,
+    @JsonKey(fromJson: toDouble) required double priceCdf,
     @Default('BOTTLE') String forUnit,
   }) = _ProductPrice;
 
@@ -58,7 +65,7 @@ abstract class ProductPrice with _$ProductPrice {
 abstract class StockItem with _$StockItem {
   const factory StockItem({
     required String location,
-    required double quantity,
+    @JsonKey(fromJson: toDouble) required double quantity,
   }) = _StockItem;
 
   factory StockItem.fromJson(Map<String, dynamic> json) =>

@@ -16,8 +16,45 @@ class ProductGridScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text("Caisse")),
       body: productsAsync.when(
         data: (products) => _ProductGridContent(allProducts: products),
-        error: (err, stack) => Center(child: Text("Erreur: $err")),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  "Oups ! Une erreur est survenue lors du chargement des produits.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  err.toString(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => ref.invalidate(productsProvider),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text("Réessayer"),
+                ),
+              ],
+            ),
+          ),
+        ),
+        loading: () => const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text("Chargement des produits..."),
+            ],
+          ),
+        ),
       ),
     );
   }

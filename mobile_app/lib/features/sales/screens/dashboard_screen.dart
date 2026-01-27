@@ -60,16 +60,20 @@ class DashboardScreen extends ConsumerWidget {
                 : null,
             drawer: Drawer(
               child: ListView(
+                padding: EdgeInsets.zero,
                 children: [
-                  const DrawerHeader(
-                    child: Center(
-                      child: Text(
-                        "Menu Mellia POS",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  UserAccountsDrawerHeader(
+                    accountName: Text(
+                      ref.watch(authNotifierProvider).asData?.value?.name ??
+                          "Utilisateur",
+                    ),
+                    accountEmail: Text(
+                      "${ref.watch(authNotifierProvider).asData?.value?.email} (${ref.watch(authNotifierProvider).asData?.value?.role})",
+                    ),
+                    decoration: const BoxDecoration(color: Color(0xFF1E293B)),
+                    currentAccountPicture: const CircleAvatar(
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person, color: Color(0xFF1E293B)),
                     ),
                   ),
                   ListTile(

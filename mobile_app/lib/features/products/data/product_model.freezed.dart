@@ -23,7 +23,7 @@ mixin _$Product {
  bool get active; bool get vendable;// Virtual Fields (computed by API usually, or frontend logic)
 // The API /api/products returns `prices` array. We will map it.
  List<ProductPrice> get prices;// Flattened price for Grid (optional, helper)
- double? get priceUsd; double? get priceCdf;// Stock (from API /api/products/stock or embedded)
+@JsonKey(fromJson: toDouble) double? get priceUsd;@JsonKey(fromJson: toDouble) double? get priceCdf;// Stock (from API /api/products/stock or embedded)
 // If API returns stockItems
  List<StockItem> get stockItems;
 /// Create a copy of Product
@@ -58,7 +58,7 @@ abstract mixin class $ProductCopyWith<$Res>  {
   factory $ProductCopyWith(Product value, $Res Function(Product) _then) = _$ProductCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, String type, String? imageUrl, String? description, String? beverageCategory, String? foodCategory, String size, String saleUnit, bool active, bool vendable, List<ProductPrice> prices, double? priceUsd, double? priceCdf, List<StockItem> stockItems
+ String id, String name, String type, String? imageUrl, String? description, String? beverageCategory, String? foodCategory, String size, String saleUnit, bool active, bool vendable, List<ProductPrice> prices,@JsonKey(fromJson: toDouble) double? priceUsd,@JsonKey(fromJson: toDouble) double? priceCdf, List<StockItem> stockItems
 });
 
 
@@ -177,7 +177,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices,  double? priceUsd,  double? priceCdf,  List<StockItem> stockItems)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Product() when $default != null:
 return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
@@ -198,7 +198,7 @@ return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices,  double? priceUsd,  double? priceCdf,  List<StockItem> stockItems)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)  $default,) {final _that = this;
 switch (_that) {
 case _Product():
 return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
@@ -218,7 +218,7 @@ return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices,  double? priceUsd,  double? priceCdf,  List<StockItem> stockItems)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)?  $default,) {final _that = this;
 switch (_that) {
 case _Product() when $default != null:
 return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
@@ -233,7 +233,7 @@ return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,
 @JsonSerializable()
 
 class _Product implements Product {
-  const _Product({required this.id, required this.name, required this.type, this.imageUrl, this.description, this.beverageCategory, this.foodCategory, this.size = 'STANDARD', required this.saleUnit, this.active = true, this.vendable = true, final  List<ProductPrice> prices = const [], this.priceUsd, this.priceCdf, final  List<StockItem> stockItems = const []}): _prices = prices,_stockItems = stockItems;
+  const _Product({required this.id, required this.name, required this.type, this.imageUrl, this.description, this.beverageCategory, this.foodCategory, this.size = 'STANDARD', required this.saleUnit, this.active = true, this.vendable = true, final  List<ProductPrice> prices = const [], @JsonKey(fromJson: toDouble) this.priceUsd, @JsonKey(fromJson: toDouble) this.priceCdf, final  List<StockItem> stockItems = const []}): _prices = prices,_stockItems = stockItems;
   factory _Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);
 
 @override final  String id;
@@ -264,8 +264,8 @@ class _Product implements Product {
 }
 
 // Flattened price for Grid (optional, helper)
-@override final  double? priceUsd;
-@override final  double? priceCdf;
+@override@JsonKey(fromJson: toDouble) final  double? priceUsd;
+@override@JsonKey(fromJson: toDouble) final  double? priceCdf;
 // Stock (from API /api/products/stock or embedded)
 // If API returns stockItems
  final  List<StockItem> _stockItems;
@@ -311,7 +311,7 @@ abstract mixin class _$ProductCopyWith<$Res> implements $ProductCopyWith<$Res> {
   factory _$ProductCopyWith(_Product value, $Res Function(_Product) _then) = __$ProductCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, String type, String? imageUrl, String? description, String? beverageCategory, String? foodCategory, String size, String saleUnit, bool active, bool vendable, List<ProductPrice> prices, double? priceUsd, double? priceCdf, List<StockItem> stockItems
+ String id, String name, String type, String? imageUrl, String? description, String? beverageCategory, String? foodCategory, String size, String saleUnit, bool active, bool vendable, List<ProductPrice> prices,@JsonKey(fromJson: toDouble) double? priceUsd,@JsonKey(fromJson: toDouble) double? priceCdf, List<StockItem> stockItems
 });
 
 
@@ -356,7 +356,7 @@ as List<StockItem>,
 /// @nodoc
 mixin _$ProductPrice {
 
- String get id; String get spaceId; double get priceUsd; double get priceCdf; String get forUnit;
+ String get id; String get spaceId;@JsonKey(fromJson: toDouble) double get priceUsd;@JsonKey(fromJson: toDouble) double get priceCdf; String get forUnit;
 /// Create a copy of ProductPrice
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -389,7 +389,7 @@ abstract mixin class $ProductPriceCopyWith<$Res>  {
   factory $ProductPriceCopyWith(ProductPrice value, $Res Function(ProductPrice) _then) = _$ProductPriceCopyWithImpl;
 @useResult
 $Res call({
- String id, String spaceId, double priceUsd, double priceCdf, String forUnit
+ String id, String spaceId,@JsonKey(fromJson: toDouble) double priceUsd,@JsonKey(fromJson: toDouble) double priceCdf, String forUnit
 });
 
 
@@ -498,7 +498,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String spaceId,  double priceUsd,  double priceCdf,  String forUnit)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String spaceId, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProductPrice() when $default != null:
 return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
@@ -519,7 +519,7 @@ return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUn
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String spaceId,  double priceUsd,  double priceCdf,  String forUnit)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String spaceId, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)  $default,) {final _that = this;
 switch (_that) {
 case _ProductPrice():
 return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
@@ -539,7 +539,7 @@ return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUn
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String spaceId,  double priceUsd,  double priceCdf,  String forUnit)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String spaceId, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)?  $default,) {final _that = this;
 switch (_that) {
 case _ProductPrice() when $default != null:
 return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
@@ -554,13 +554,13 @@ return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUn
 @JsonSerializable()
 
 class _ProductPrice implements ProductPrice {
-  const _ProductPrice({required this.id, required this.spaceId, required this.priceUsd, required this.priceCdf, this.forUnit = 'BOTTLE'});
+  const _ProductPrice({required this.id, required this.spaceId, @JsonKey(fromJson: toDouble) required this.priceUsd, @JsonKey(fromJson: toDouble) required this.priceCdf, this.forUnit = 'BOTTLE'});
   factory _ProductPrice.fromJson(Map<String, dynamic> json) => _$ProductPriceFromJson(json);
 
 @override final  String id;
 @override final  String spaceId;
-@override final  double priceUsd;
-@override final  double priceCdf;
+@override@JsonKey(fromJson: toDouble) final  double priceUsd;
+@override@JsonKey(fromJson: toDouble) final  double priceCdf;
 @override@JsonKey() final  String forUnit;
 
 /// Create a copy of ProductPrice
@@ -596,7 +596,7 @@ abstract mixin class _$ProductPriceCopyWith<$Res> implements $ProductPriceCopyWi
   factory _$ProductPriceCopyWith(_ProductPrice value, $Res Function(_ProductPrice) _then) = __$ProductPriceCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String spaceId, double priceUsd, double priceCdf, String forUnit
+ String id, String spaceId,@JsonKey(fromJson: toDouble) double priceUsd,@JsonKey(fromJson: toDouble) double priceCdf, String forUnit
 });
 
 
@@ -631,7 +631,7 @@ as String,
 /// @nodoc
 mixin _$StockItem {
 
- String get location; double get quantity;
+ String get location;@JsonKey(fromJson: toDouble) double get quantity;
 /// Create a copy of StockItem
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -664,7 +664,7 @@ abstract mixin class $StockItemCopyWith<$Res>  {
   factory $StockItemCopyWith(StockItem value, $Res Function(StockItem) _then) = _$StockItemCopyWithImpl;
 @useResult
 $Res call({
- String location, double quantity
+ String location,@JsonKey(fromJson: toDouble) double quantity
 });
 
 
@@ -770,7 +770,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String location,  double quantity)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String location, @JsonKey(fromJson: toDouble)  double quantity)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _StockItem() when $default != null:
 return $default(_that.location,_that.quantity);case _:
@@ -791,7 +791,7 @@ return $default(_that.location,_that.quantity);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String location,  double quantity)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String location, @JsonKey(fromJson: toDouble)  double quantity)  $default,) {final _that = this;
 switch (_that) {
 case _StockItem():
 return $default(_that.location,_that.quantity);case _:
@@ -811,7 +811,7 @@ return $default(_that.location,_that.quantity);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String location,  double quantity)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String location, @JsonKey(fromJson: toDouble)  double quantity)?  $default,) {final _that = this;
 switch (_that) {
 case _StockItem() when $default != null:
 return $default(_that.location,_that.quantity);case _:
@@ -826,11 +826,11 @@ return $default(_that.location,_that.quantity);case _:
 @JsonSerializable()
 
 class _StockItem implements StockItem {
-  const _StockItem({required this.location, required this.quantity});
+  const _StockItem({required this.location, @JsonKey(fromJson: toDouble) required this.quantity});
   factory _StockItem.fromJson(Map<String, dynamic> json) => _$StockItemFromJson(json);
 
 @override final  String location;
-@override final  double quantity;
+@override@JsonKey(fromJson: toDouble) final  double quantity;
 
 /// Create a copy of StockItem
 /// with the given fields replaced by the non-null parameter values.
@@ -865,7 +865,7 @@ abstract mixin class _$StockItemCopyWith<$Res> implements $StockItemCopyWith<$Re
   factory _$StockItemCopyWith(_StockItem value, $Res Function(_StockItem) _then) = __$StockItemCopyWithImpl;
 @override @useResult
 $Res call({
- String location, double quantity
+ String location,@JsonKey(fromJson: toDouble) double quantity
 });
 
 
