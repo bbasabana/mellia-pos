@@ -387,3 +387,47 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
+
+// DELETE: Delete Investment + Reverse Stock
+export async function DELETE(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get("id");
+
+        if (!id) {
+            return NextResponse.json({ error: "Investment ID required" }, { status: 400 });
+        }
+
+        await prisma.$transaction(async (tx) => {
+            // 1. Get movements to reverse
+            const movements = await tx.stockMovement.findMany({
+                where: { investmentId: id }
+            });
+
+            // 2. Reverse Stock
+            for (const mov of movements) {
+                if (mov.type === "IN" && mov.toLocation) {
+                    await tx.stockItem.upsert({
+                        where: { productId_location: { productId: mov.productId, location: mov.toLocation } },
+                        update: { quantity: { decrement: mov.quantity } },
+                        create: { productId: mov.productId, location: mov.toLocation, quantity: 0 }
+                    });
+                }
+            }
+
+            // 3. Delete Record (Cascade deletes movements if configured, else delete movements first)
+            // Ideally schema has onDelete: Cascade, but safe to delete movements explicitly
+            await tx.stockMovement.deleteMany({ where: { investmentId: id } });
+            await tx.investment.delete({ where: { id } });
+        });
+
+        return NextResponse.json({ success: true });
+
+    } catch (error) {
+        console.error("Investment DELETE Error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
