@@ -26,6 +26,9 @@ abstract class Product with _$Product {
     // Sizes & Units
     @Default('STANDARD') String size,
     required String saleUnit, // BOTTLE, PLATE...
+    // Conditionnement d'achat
+    String? purchaseUnit, // Ex: "Casier", "Carton"
+    @Default(1) int packingQuantity, // Ex: 20, 24
     // Status
     @Default(true) bool active,
     @Default(true) bool vendable,

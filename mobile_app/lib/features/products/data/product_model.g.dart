@@ -16,6 +16,8 @@ _Product _$ProductFromJson(Map<String, dynamic> json) => _Product(
   foodCategory: json['foodCategory'] as String?,
   size: json['size'] as String? ?? 'STANDARD',
   saleUnit: json['saleUnit'] as String,
+  purchaseUnit: json['purchaseUnit'] as String?,
+  packingQuantity: (json['packingQuantity'] as num?)?.toInt() ?? 1,
   active: json['active'] as bool? ?? true,
   vendable: json['vendable'] as bool? ?? true,
   prices:
@@ -42,6 +44,8 @@ Map<String, dynamic> _$ProductToJson(_Product instance) => <String, dynamic>{
   'foodCategory': instance.foodCategory,
   'size': instance.size,
   'saleUnit': instance.saleUnit,
+  'purchaseUnit': instance.purchaseUnit,
+  'packingQuantity': instance.packingQuantity,
   'active': instance.active,
   'vendable': instance.vendable,
   'prices': instance.prices,

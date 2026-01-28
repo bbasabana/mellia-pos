@@ -281,8 +281,27 @@ export function ProductForm({
     } else if (newType === "FOOD") {
       setSaleUnit("PLATE");
       setSize("STANDARD");
+      setVendable(true);
+      setPurchaseUnit("");
+      setPackingQuantity(1);
     } else {
       setSaleUnit("PIECE");
+      setVendable(false); // DEFAULT for NON_VENDABLE
+      setPurchaseUnit("");
+      setPackingQuantity(1);
+    }
+  };
+
+  const handleCategoryChange = (newCat: string) => {
+    setCategory(newCat);
+
+    // BUSINESS LOGIC: Automatic conditioning defaults
+    if (newCat === "BIERE") {
+      setPurchaseUnit("Casier");
+      setPackingQuantity(20);
+    } else if (newCat === "SUCRE") {
+      setPurchaseUnit("Casier");
+      setPackingQuantity(24);
     }
   };
 
@@ -365,7 +384,7 @@ export function ProductForm({
             <CategorySelect
               productType={type as any}
               value={category}
-              onChange={setCategory}
+              onChange={handleCategoryChange}
               required={!isNonVendable}
               isAdmin={isAdmin}
             />
@@ -500,13 +519,16 @@ export function ProductForm({
                 onChange={(e) => setVendable(e.target.checked)}
                 className="w-4 h-4 text-[#00d3fa] rounded border-gray-300 focus:ring-[#00d3fa]"
               />
-              <span className="text-sm font-medium text-gray-700">Produit vendable (visible dans le POS)</span>
+              <span className="text-sm font-medium text-gray-700">
+                Produit vendable (visible dans le POS)
+                {isNonVendable && <span className="text-xs text-gray-400 ml-2">(Typiquement décoché pour les fournitures)</span>}
+              </span>
             </label>
           </div>
         </div>
 
-        {/* Section 2: Prix par espace */}
-        {vendable && (
+        {/* Section 2: Prix par espace - HIDE IF NOT VENDABLE */}
+        {vendable && !isNonVendable && (
           <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
             <div className="flex justify-between items-center mb-6 border-b pb-2">
               <h3 className="text-lg font-semibold text-gray-900">Prix & Marges</h3>

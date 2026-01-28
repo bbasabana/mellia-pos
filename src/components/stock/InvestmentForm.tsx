@@ -24,8 +24,11 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
     const [qty, setQty] = useState("");
     const [unitPrice, setUnitPrice] = useState(""); // In selected currency
     const [location, setLocation] = useState("DEPOT");
-    // New State for Unit Conversion
-    const [buyByPacking, setBuyByPacking] = useState(false); // true = Buying by Carton/Pack, false = Buying by Unit
+
+    // On-the-fly NEW product state
+    const [isCreatingNew, setIsCreatingNew] = useState(false);
+    const [newName, setNewName] = useState("");
+    const [newUnit, setNewUnit] = useState("Unité");
 
     useEffect(() => {
         fetchProducts();
@@ -42,56 +45,72 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
     };
 
     const addItem = () => {
-        if (!selectedProduct || !qty || !unitPrice) return;
+        if (!isCreatingNew && !selectedProduct) return;
+        if (isCreatingNew && !newName) return;
+        if (!qty || !unitPrice) return;
 
-        const product = products.find(p => p.id === selectedProduct);
         const rate = parseFloat(exchangeRate) || DEFAULT_RATE;
-        // User input price is for the UNIT they selected (Carton OR Bottle)
         const inputPriceVal = parseFloat(unitPrice);
         const inputQtyVal = parseFloat(qty);
 
         let quantityToAdd = inputQtyVal;
-        let realUnitCost = inputPriceVal; // Temporary placeholder
+        let realUnitCost = inputPriceVal;
+        let pName = "";
+        let sUnit = "";
+        let isVendable = true;
+        let productId = selectedProduct;
+        let packQty = 1;
+        let pUnit = "";
 
-        // Conversion Logic
-        if (buyByPacking && product.purchaseUnit && product.packingQuantity > 1) {
-            // User bought 2 Cartons @ 50$ each
-            // Stock needs: 2 * 24 = 48 Bottles
-            quantityToAdd = inputQtyVal * product.packingQuantity;
-
-            // Unit cost (per bottle) = Price per carton / Units per carton
-            realUnitCost = inputPriceVal / product.packingQuantity;
+        if (isCreatingNew) {
+            pName = newName;
+            sUnit = newUnit;
+            isVendable = false;
+            productId = "NEW_" + Date.now();
         } else {
-            // User bought units directly
-            realUnitCost = inputPriceVal;
+            const product = products.find(p => p.id === selectedProduct);
+            pName = product?.name;
+            sUnit = product?.saleUnit;
+            isVendable = product?.type !== "NON_VENDABLE";
+            packQty = product?.packingQuantity || 1;
+            pUnit = product?.purchaseUnit;
+
+            // BUSINESS LOGIC: Automatic conversion if purchase unit exists
+            if (pUnit && packQty > 1) {
+                quantityToAdd = inputQtyVal * packQty;
+                realUnitCost = inputPriceVal / packQty;
+            }
         }
 
-        // Always store cost in USD for the backend (per STOCK UNIT)
         const costUsd = currency === "USD" ? realUnitCost : (realUnitCost / rate);
 
         const newItem = {
-            productId: selectedProduct,
-            productName: product?.name,
+            productId,
+            productName: pName,
+            isNew: isCreatingNew,
+            newUnit: isCreatingNew ? newUnit : null,
 
             // Display Data
             displayQty: inputQtyVal,
-            displayUnit: buyByPacking && product.purchaseUnit ? product.purchaseUnit : product.saleUnit,
+            displayUnit: (!isCreatingNew && pUnit) ? pUnit : sUnit,
             displayPrice: inputPriceVal,
+            packingQuantity: packQty,
+            saleUnit: sUnit,
 
             // Backend Data
-            quantity: quantityToAdd, // Total bottles/plates
-            inputPrice: inputPriceVal, // Kept for total calculation display
+            quantity: quantityToAdd,
+            inputPrice: inputPriceVal,
             inputCurrency: currency,
             costUsd: costUsd,
             location: location,
-            isVendable: product?.type !== "NON_VENDABLE"
+            isVendable: isVendable
         };
 
         setItems([...items, newItem]);
         setQty("");
         setUnitPrice("");
-
-        // Reset toggle preference? No, keep it sticky for speed.
+        setNewName("");
+        setIsCreatingNew(false);
     };
 
     const removeItem = (idx: number) => {
@@ -113,16 +132,20 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    totalAmount: totalUsd, // USD is system base
+                    totalAmount: totalUsd,
                     totalAmountCdf: totalCdf,
                     exchangeRate: parseFloat(exchangeRate),
                     source,
                     description: finalDesc,
                     items: items.map(i => ({
                         productId: i.productId,
+                        isNew: i.isNew,
+                        productName: i.productName,
+                        newUnit: i.newUnit,
                         quantity: i.quantity,
-                        cost: i.costUsd, // Backend expects USD unit cost
-                        location: i.location
+                        cost: i.costUsd,
+                        location: i.location,
+                        isVendable: i.isVendable
                     }))
                 })
             });
@@ -204,39 +227,84 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                 </div>
             </div>
 
-            {/* 2. Add Item Row */}
-            <div className="flex flex-wrap gap-2 items-end mb-6">
-                <div className="flex-1 min-w-[200px]">
-                    <div className="text-[10px] uppercase font-bold text-gray-400 mb-1">Produit</div>
-                    <select
-                        value={selectedProduct}
-                        onChange={(e) => setSelectedProduct(e.target.value)}
-                        className="w-full p-2 border border-blue-200 rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                    >
-                        <option value="">choisir produit...</option>
-                        <optgroup label="Boissons">
-                            {products.filter(p => p.type === "BEVERAGE").map(p => (
-                                <option key={p.id} value={p.id}>{p.name} ({p.saleUnit})</option>
-                            ))}
-                        </optgroup>
-                        <optgroup label="Nourriture/Sec">
-                            {products.filter(p => p.type === "FOOD").map(p => (
-                                <option key={p.id} value={p.id}>{p.name} ({p.saleUnit})</option>
-                            ))}
-                        </optgroup>
-                        <optgroup label="Non Vendable">
-                            {products.filter(p => p.type === "NON_VENDABLE").map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </optgroup>
-                    </select>
-                </div>
+            <div className="flex flex-wrap gap-3 items-end mb-6 bg-blue-50/30 p-4 rounded border border-blue-100">
+                {!isCreatingNew ? (
+                    <div className="flex-1 min-w-[200px]">
+                        <div className="flex justify-between items-center mb-1">
+                            <div className="text-[10px] uppercase font-bold text-blue-600">Produit Existant</div>
+                            <button
+                                onClick={() => setIsCreatingNew(true)}
+                                className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded hover:bg-blue-700 font-bold"
+                            >
+                                + NOUVEAU CONSOMMABLE
+                            </button>
+                        </div>
+                        <select
+                            value={selectedProduct}
+                            onChange={(e) => setSelectedProduct(e.target.value)}
+                            className="w-full p-2 border border-blue-200 rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                        >
+                            <option value="">choisir produit...</option>
+                            <optgroup label="Boissons">
+                                {products.filter(p => p.type === "BEVERAGE").map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} ({p.saleUnit})</option>
+                                ))}
+                            </optgroup>
+                            <optgroup label="Nourriture/Sec">
+                                {products.filter(p => p.type === "FOOD").map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} ({p.saleUnit})</option>
+                                ))}
+                            </optgroup>
+                            <optgroup label="Non Vendable">
+                                {products.filter(p => p.type === "NON_VENDABLE").map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </optgroup>
+                        </select>
+                    </div>
+                ) : (
+                    <div className="flex-1 min-w-[300px] flex gap-2">
+                        <div className="flex-1">
+                            <div className="flex justify-between items-center mb-1">
+                                <div className="text-[10px] uppercase font-bold text-orange-600">Nouveau Produit (Non-Vendable)</div>
+                                <button
+                                    onClick={() => setIsCreatingNew(false)}
+                                    className="text-[10px] bg-gray-400 text-white px-2 py-0.5 rounded hover:bg-gray-500 font-bold"
+                                >
+                                    RETOUR LISTE
+                                </button>
+                            </div>
+                            <input
+                                type="text"
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                placeholder="Nom (ex: Huile, Sel, Oignons...)"
+                                className="w-full p-2 border border-orange-200 rounded text-sm focus:ring-2 focus:ring-orange-100 outline-none"
+                            />
+                        </div>
+                        <div className="w-24">
+                            <div className="text-[10px] uppercase font-bold text-orange-400 mb-1">Unité</div>
+                            <select
+                                value={newUnit}
+                                onChange={(e) => setNewUnit(e.target.value)}
+                                className="w-full p-2 border border-orange-200 rounded text-sm focus:ring-2 focus:ring-orange-100 outline-none"
+                            >
+                                <option value="PIECE">Pièce</option>
+                                <option value="KG">Kilo (kg)</option>
+                                <option value="LITRE">Litre (L)</option>
+                                <option value="BOITE">Boîte</option>
+                                <option value="SACHET">Sachet</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
                 <div className="w-24">
                     <div className="text-[10px] uppercase font-bold text-gray-400 mb-1">
-                        Qté ({buyByPacking && products.find(p => p.id === selectedProduct)?.purchaseUnit ? products.find(p => p.id === selectedProduct)?.purchaseUnit : 'Unit'})
+                        Qté ({isCreatingNew ? newUnit : (products.find(p => p.id === selectedProduct)?.purchaseUnit || products.find(p => p.id === selectedProduct)?.saleUnit || 'Unit')})
                     </div>
                     <input
                         type="number"
+                        step="0.01"
                         value={qty}
                         onChange={(e) => setQty(e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded text-sm text-center font-bold"
@@ -256,16 +324,15 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                     />
                 </div>
 
-                {/* Toggle Unit/Packing */}
-                {selectedProduct && products.find(p => p.id === selectedProduct)?.purchaseUnit && (
-                    <div className="flex items-center pb-2">
-                        <label className="flex items-center cursor-pointer relative">
-                            <input type="checkbox" className="sr-only peer" checked={buyByPacking} onChange={(e) => setBuyByPacking(e.target.checked)} />
-                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00d3fa]"></div>
-                            <span className="ml-2 text-xs font-medium text-gray-600">
-                                Par {products.find(p => p.id === selectedProduct)?.purchaseUnit}
+                {/* Live Conversion Preview */}
+                {!isCreatingNew && products.find(p => p.id === selectedProduct)?.purchaseUnit && products.find(p => p.id === selectedProduct)?.packingQuantity > 1 && qty && (
+                    <div className="flex items-center pb-2 px-3 bg-[#f0f9ff] border border-blue-100 rounded animate-in fade-in slide-in-from-bottom-1">
+                        <span className="text-xs font-bold text-blue-600">
+                            {qty} {products.find(p => p.id === selectedProduct)?.purchaseUnit} × {products.find(p => p.id === selectedProduct)?.packingQuantity} =
+                            <span className="ml-1 text-[#00d3fa]">
+                                {(parseFloat(qty) * products.find(p => p.id === selectedProduct)?.packingQuantity).toFixed(1)} {products.find(p => p.id === selectedProduct)?.saleUnit === "BOTTLE" ? "Bout." : "Unité"}
                             </span>
-                        </label>
+                        </span>
                     </div>
                 )}
 
@@ -311,8 +378,10 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                                     <td className="p-3 text-center text-xs text-gray-400">{item.location}</td>
                                     <td className="p-3 text-right">
                                         <div className="font-bold">{item.displayQty} {item.displayUnit}</div>
-                                        {item.quantity !== item.displayQty && (
-                                            <div className="text-[10px] text-gray-400">= {item.quantity} unités stock</div>
+                                        {item.packingQuantity > 1 && (
+                                            <div className="text-[10px] text-blue-500 font-medium">
+                                                Formula: {item.displayQty} × {item.packingQuantity} = {item.quantity} {item.saleUnit === "BOTTLE" ? "Bout." : "Unit"}
+                                            </div>
                                         )}
                                     </td>
                                     <td className="p-3 text-right text-gray-500">

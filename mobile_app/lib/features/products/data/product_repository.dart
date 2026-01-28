@@ -13,7 +13,10 @@ class ProductRepository {
 
   Future<List<Product>> getProducts() async {
     try {
-      final response = await _dio.get(ApiConstants.products);
+      final response = await _dio.get(
+        ApiConstants.products,
+        queryParameters: {'vendable': 'true', 'active': 'true'},
+      );
 
       // API returns { success: true, data: [...] } or just [...]
       // Based on typical Next.js API route pattern in this project:

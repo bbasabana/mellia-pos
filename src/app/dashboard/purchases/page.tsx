@@ -1,7 +1,7 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DollarSign, Plus, Coins, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PurchaseHistoryList } from "@/components/purchases/PurchaseHistoryList";
@@ -10,8 +10,23 @@ import { Modal } from "@/components/ui/Modal";
 
 export default function PurchasesPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [stats, setStats] = useState<any>(null);
 
-    // ... (rest of component)
+    const fetchData = async () => {
+        try {
+            const res = await fetch("/api/investments");
+            const data = await res.json();
+            if (data.success) {
+                setStats(data.data.stats);
+            }
+        } catch (error) {
+            console.error("Error fetching investment stats:", error);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     return (
         <DashboardLayout>
@@ -21,9 +36,9 @@ export default function PurchasesPage() {
                     <div>
                         <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                             <Coins className="text-[#00d3fa]" />
-                            Achats & Appros (Module 4)
+                            Gestion des Achats & Investissements
                         </h1>
-                        <p className="text-sm text-gray-500">Gérez les achats, dépenses et l&apos;alimentation du stock.</p>
+                        <p className="text-sm text-gray-500">Flux d&apos;approvisionnement intelligent (Produits & Consommables)</p>
                     </div>
                 </div>
 
@@ -32,16 +47,31 @@ export default function PurchasesPage() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <button
                             onClick={() => setIsFormOpen(true)}
-                            className="bg-[#71de00] text-white p-4 rounded-sm shadow-sm hover:opacity-90 transition-all flex flex-col items-center justify-center gap-2"
+                            className="bg-[#000] text-white p-4 rounded-sm shadow-sm hover:bg-gray-800 transition-all flex flex-col items-center justify-center gap-2"
                         >
                             <Plus size={32} />
-                            <span className="font-bold">Nouvel Achat / Invest.</span>
-                            <span className="text-[10px] uppercase opacity-80">(CDF ou USD)</span>
+                            <span className="font-bold">Nouvel Achat</span>
+                            <span className="text-[10px] uppercase opacity-80">Produit ou Fourniture</span>
                         </button>
 
-                        <KpiCard title="Investi ce mois" value="0 $" icon={<DollarSign />} color="text-blue-500 bg-blue-50" />
-                        <KpiCard title="Dépenses Sèches" value="0 $" icon={<Coins />} color="text-orange-500 bg-orange-50" />
-                        <KpiCard title="ROI Prévisionnel" value="+0 %" icon={<TrendingUp />} color="text-green-500 bg-green-50" />
+                        <KpiCard
+                            title="Total Investi (Mois)"
+                            value={`${(stats?.monthTotal || 0).toLocaleString()} $`}
+                            icon={<DollarSign />}
+                            color="text-blue-500 bg-blue-50"
+                        />
+                        <KpiCard
+                            title="Stock Revendable"
+                            value={`${(stats?.monthVendable || 0).toLocaleString()} $`}
+                            icon={<TrendingUp />}
+                            color="text-green-500 bg-green-50"
+                        />
+                        <KpiCard
+                            title="Charges (Consommables)"
+                            value={`${(stats?.monthNonVendable || 0).toLocaleString()} $`}
+                            icon={<Coins />}
+                            color="text-orange-500 bg-orange-50"
+                        />
                     </div>
 
                     {/* RECENT PURCHASES LIST */}

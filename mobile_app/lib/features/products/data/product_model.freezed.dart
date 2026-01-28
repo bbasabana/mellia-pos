@@ -19,6 +19,9 @@ mixin _$Product {
  String? get imageUrl; String? get description;// Category (can be null if not set)
  String? get beverageCategory; String? get foodCategory;// Sizes & Units
  String get size; String get saleUnit;// BOTTLE, PLATE...
+// Conditionnement d'achat
+ String? get purchaseUnit;// Ex: "Casier", "Carton"
+ int get packingQuantity;// Ex: 20, 24
 // Status
  bool get active; bool get vendable;// Virtual Fields (computed by API usually, or frontend logic)
 // The API /api/products returns `prices` array. We will map it.
@@ -38,16 +41,16 @@ $ProductCopyWith<Product> get copyWith => _$ProductCopyWithImpl<Product>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Product&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.description, description) || other.description == description)&&(identical(other.beverageCategory, beverageCategory) || other.beverageCategory == beverageCategory)&&(identical(other.foodCategory, foodCategory) || other.foodCategory == foodCategory)&&(identical(other.size, size) || other.size == size)&&(identical(other.saleUnit, saleUnit) || other.saleUnit == saleUnit)&&(identical(other.active, active) || other.active == active)&&(identical(other.vendable, vendable) || other.vendable == vendable)&&const DeepCollectionEquality().equals(other.prices, prices)&&(identical(other.priceUsd, priceUsd) || other.priceUsd == priceUsd)&&(identical(other.priceCdf, priceCdf) || other.priceCdf == priceCdf)&&const DeepCollectionEquality().equals(other.stockItems, stockItems));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Product&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.description, description) || other.description == description)&&(identical(other.beverageCategory, beverageCategory) || other.beverageCategory == beverageCategory)&&(identical(other.foodCategory, foodCategory) || other.foodCategory == foodCategory)&&(identical(other.size, size) || other.size == size)&&(identical(other.saleUnit, saleUnit) || other.saleUnit == saleUnit)&&(identical(other.purchaseUnit, purchaseUnit) || other.purchaseUnit == purchaseUnit)&&(identical(other.packingQuantity, packingQuantity) || other.packingQuantity == packingQuantity)&&(identical(other.active, active) || other.active == active)&&(identical(other.vendable, vendable) || other.vendable == vendable)&&const DeepCollectionEquality().equals(other.prices, prices)&&(identical(other.priceUsd, priceUsd) || other.priceUsd == priceUsd)&&(identical(other.priceCdf, priceCdf) || other.priceCdf == priceCdf)&&const DeepCollectionEquality().equals(other.stockItems, stockItems));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,type,imageUrl,description,beverageCategory,foodCategory,size,saleUnit,active,vendable,const DeepCollectionEquality().hash(prices),priceUsd,priceCdf,const DeepCollectionEquality().hash(stockItems));
+int get hashCode => Object.hash(runtimeType,id,name,type,imageUrl,description,beverageCategory,foodCategory,size,saleUnit,purchaseUnit,packingQuantity,active,vendable,const DeepCollectionEquality().hash(prices),priceUsd,priceCdf,const DeepCollectionEquality().hash(stockItems));
 
 @override
 String toString() {
-  return 'Product(id: $id, name: $name, type: $type, imageUrl: $imageUrl, description: $description, beverageCategory: $beverageCategory, foodCategory: $foodCategory, size: $size, saleUnit: $saleUnit, active: $active, vendable: $vendable, prices: $prices, priceUsd: $priceUsd, priceCdf: $priceCdf, stockItems: $stockItems)';
+  return 'Product(id: $id, name: $name, type: $type, imageUrl: $imageUrl, description: $description, beverageCategory: $beverageCategory, foodCategory: $foodCategory, size: $size, saleUnit: $saleUnit, purchaseUnit: $purchaseUnit, packingQuantity: $packingQuantity, active: $active, vendable: $vendable, prices: $prices, priceUsd: $priceUsd, priceCdf: $priceCdf, stockItems: $stockItems)';
 }
 
 
@@ -58,7 +61,7 @@ abstract mixin class $ProductCopyWith<$Res>  {
   factory $ProductCopyWith(Product value, $Res Function(Product) _then) = _$ProductCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, String type, String? imageUrl, String? description, String? beverageCategory, String? foodCategory, String size, String saleUnit, bool active, bool vendable, List<ProductPrice> prices,@JsonKey(fromJson: toDouble) double? priceUsd,@JsonKey(fromJson: toDouble) double? priceCdf, List<StockItem> stockItems
+ String id, String name, String type, String? imageUrl, String? description, String? beverageCategory, String? foodCategory, String size, String saleUnit, String? purchaseUnit, int packingQuantity, bool active, bool vendable, List<ProductPrice> prices,@JsonKey(fromJson: toDouble) double? priceUsd,@JsonKey(fromJson: toDouble) double? priceCdf, List<StockItem> stockItems
 });
 
 
@@ -75,7 +78,7 @@ class _$ProductCopyWithImpl<$Res>
 
 /// Create a copy of Product
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? imageUrl = freezed,Object? description = freezed,Object? beverageCategory = freezed,Object? foodCategory = freezed,Object? size = null,Object? saleUnit = null,Object? active = null,Object? vendable = null,Object? prices = null,Object? priceUsd = freezed,Object? priceCdf = freezed,Object? stockItems = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? imageUrl = freezed,Object? description = freezed,Object? beverageCategory = freezed,Object? foodCategory = freezed,Object? size = null,Object? saleUnit = null,Object? purchaseUnit = freezed,Object? packingQuantity = null,Object? active = null,Object? vendable = null,Object? prices = null,Object? priceUsd = freezed,Object? priceCdf = freezed,Object? stockItems = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -86,7 +89,9 @@ as String?,beverageCategory: freezed == beverageCategory ? _self.beverageCategor
 as String?,foodCategory: freezed == foodCategory ? _self.foodCategory : foodCategory // ignore: cast_nullable_to_non_nullable
 as String?,size: null == size ? _self.size : size // ignore: cast_nullable_to_non_nullable
 as String,saleUnit: null == saleUnit ? _self.saleUnit : saleUnit // ignore: cast_nullable_to_non_nullable
-as String,active: null == active ? _self.active : active // ignore: cast_nullable_to_non_nullable
+as String,purchaseUnit: freezed == purchaseUnit ? _self.purchaseUnit : purchaseUnit // ignore: cast_nullable_to_non_nullable
+as String?,packingQuantity: null == packingQuantity ? _self.packingQuantity : packingQuantity // ignore: cast_nullable_to_non_nullable
+as int,active: null == active ? _self.active : active // ignore: cast_nullable_to_non_nullable
 as bool,vendable: null == vendable ? _self.vendable : vendable // ignore: cast_nullable_to_non_nullable
 as bool,prices: null == prices ? _self.prices : prices // ignore: cast_nullable_to_non_nullable
 as List<ProductPrice>,priceUsd: freezed == priceUsd ? _self.priceUsd : priceUsd // ignore: cast_nullable_to_non_nullable
@@ -177,10 +182,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  String? purchaseUnit,  int packingQuantity,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Product() when $default != null:
-return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
+return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.purchaseUnit,_that.packingQuantity,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
   return orElse();
 
 }
@@ -198,10 +203,10 @@ return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  String? purchaseUnit,  int packingQuantity,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)  $default,) {final _that = this;
 switch (_that) {
 case _Product():
-return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
+return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.purchaseUnit,_that.packingQuantity,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -218,10 +223,10 @@ return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String type,  String? imageUrl,  String? description,  String? beverageCategory,  String? foodCategory,  String size,  String saleUnit,  String? purchaseUnit,  int packingQuantity,  bool active,  bool vendable,  List<ProductPrice> prices, @JsonKey(fromJson: toDouble)  double? priceUsd, @JsonKey(fromJson: toDouble)  double? priceCdf,  List<StockItem> stockItems)?  $default,) {final _that = this;
 switch (_that) {
 case _Product() when $default != null:
-return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
+return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,_that.beverageCategory,_that.foodCategory,_that.size,_that.saleUnit,_that.purchaseUnit,_that.packingQuantity,_that.active,_that.vendable,_that.prices,_that.priceUsd,_that.priceCdf,_that.stockItems);case _:
   return null;
 
 }
@@ -233,7 +238,7 @@ return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,
 @JsonSerializable()
 
 class _Product extends Product {
-  const _Product({required this.id, required this.name, required this.type, this.imageUrl, this.description, this.beverageCategory, this.foodCategory, this.size = 'STANDARD', required this.saleUnit, this.active = true, this.vendable = true, final  List<ProductPrice> prices = const [], @JsonKey(fromJson: toDouble) this.priceUsd, @JsonKey(fromJson: toDouble) this.priceCdf, final  List<StockItem> stockItems = const []}): _prices = prices,_stockItems = stockItems,super._();
+  const _Product({required this.id, required this.name, required this.type, this.imageUrl, this.description, this.beverageCategory, this.foodCategory, this.size = 'STANDARD', required this.saleUnit, this.purchaseUnit, this.packingQuantity = 1, this.active = true, this.vendable = true, final  List<ProductPrice> prices = const [], @JsonKey(fromJson: toDouble) this.priceUsd, @JsonKey(fromJson: toDouble) this.priceCdf, final  List<StockItem> stockItems = const []}): _prices = prices,_stockItems = stockItems,super._();
   factory _Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);
 
 @override final  String id;
@@ -249,6 +254,11 @@ class _Product extends Product {
 @override@JsonKey() final  String size;
 @override final  String saleUnit;
 // BOTTLE, PLATE...
+// Conditionnement d'achat
+@override final  String? purchaseUnit;
+// Ex: "Casier", "Carton"
+@override@JsonKey() final  int packingQuantity;
+// Ex: 20, 24
 // Status
 @override@JsonKey() final  bool active;
 @override@JsonKey() final  bool vendable;
@@ -291,16 +301,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Product&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.description, description) || other.description == description)&&(identical(other.beverageCategory, beverageCategory) || other.beverageCategory == beverageCategory)&&(identical(other.foodCategory, foodCategory) || other.foodCategory == foodCategory)&&(identical(other.size, size) || other.size == size)&&(identical(other.saleUnit, saleUnit) || other.saleUnit == saleUnit)&&(identical(other.active, active) || other.active == active)&&(identical(other.vendable, vendable) || other.vendable == vendable)&&const DeepCollectionEquality().equals(other._prices, _prices)&&(identical(other.priceUsd, priceUsd) || other.priceUsd == priceUsd)&&(identical(other.priceCdf, priceCdf) || other.priceCdf == priceCdf)&&const DeepCollectionEquality().equals(other._stockItems, _stockItems));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Product&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.description, description) || other.description == description)&&(identical(other.beverageCategory, beverageCategory) || other.beverageCategory == beverageCategory)&&(identical(other.foodCategory, foodCategory) || other.foodCategory == foodCategory)&&(identical(other.size, size) || other.size == size)&&(identical(other.saleUnit, saleUnit) || other.saleUnit == saleUnit)&&(identical(other.purchaseUnit, purchaseUnit) || other.purchaseUnit == purchaseUnit)&&(identical(other.packingQuantity, packingQuantity) || other.packingQuantity == packingQuantity)&&(identical(other.active, active) || other.active == active)&&(identical(other.vendable, vendable) || other.vendable == vendable)&&const DeepCollectionEquality().equals(other._prices, _prices)&&(identical(other.priceUsd, priceUsd) || other.priceUsd == priceUsd)&&(identical(other.priceCdf, priceCdf) || other.priceCdf == priceCdf)&&const DeepCollectionEquality().equals(other._stockItems, _stockItems));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,type,imageUrl,description,beverageCategory,foodCategory,size,saleUnit,active,vendable,const DeepCollectionEquality().hash(_prices),priceUsd,priceCdf,const DeepCollectionEquality().hash(_stockItems));
+int get hashCode => Object.hash(runtimeType,id,name,type,imageUrl,description,beverageCategory,foodCategory,size,saleUnit,purchaseUnit,packingQuantity,active,vendable,const DeepCollectionEquality().hash(_prices),priceUsd,priceCdf,const DeepCollectionEquality().hash(_stockItems));
 
 @override
 String toString() {
-  return 'Product(id: $id, name: $name, type: $type, imageUrl: $imageUrl, description: $description, beverageCategory: $beverageCategory, foodCategory: $foodCategory, size: $size, saleUnit: $saleUnit, active: $active, vendable: $vendable, prices: $prices, priceUsd: $priceUsd, priceCdf: $priceCdf, stockItems: $stockItems)';
+  return 'Product(id: $id, name: $name, type: $type, imageUrl: $imageUrl, description: $description, beverageCategory: $beverageCategory, foodCategory: $foodCategory, size: $size, saleUnit: $saleUnit, purchaseUnit: $purchaseUnit, packingQuantity: $packingQuantity, active: $active, vendable: $vendable, prices: $prices, priceUsd: $priceUsd, priceCdf: $priceCdf, stockItems: $stockItems)';
 }
 
 
@@ -311,7 +321,7 @@ abstract mixin class _$ProductCopyWith<$Res> implements $ProductCopyWith<$Res> {
   factory _$ProductCopyWith(_Product value, $Res Function(_Product) _then) = __$ProductCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, String type, String? imageUrl, String? description, String? beverageCategory, String? foodCategory, String size, String saleUnit, bool active, bool vendable, List<ProductPrice> prices,@JsonKey(fromJson: toDouble) double? priceUsd,@JsonKey(fromJson: toDouble) double? priceCdf, List<StockItem> stockItems
+ String id, String name, String type, String? imageUrl, String? description, String? beverageCategory, String? foodCategory, String size, String saleUnit, String? purchaseUnit, int packingQuantity, bool active, bool vendable, List<ProductPrice> prices,@JsonKey(fromJson: toDouble) double? priceUsd,@JsonKey(fromJson: toDouble) double? priceCdf, List<StockItem> stockItems
 });
 
 
@@ -328,7 +338,7 @@ class __$ProductCopyWithImpl<$Res>
 
 /// Create a copy of Product
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? imageUrl = freezed,Object? description = freezed,Object? beverageCategory = freezed,Object? foodCategory = freezed,Object? size = null,Object? saleUnit = null,Object? active = null,Object? vendable = null,Object? prices = null,Object? priceUsd = freezed,Object? priceCdf = freezed,Object? stockItems = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? imageUrl = freezed,Object? description = freezed,Object? beverageCategory = freezed,Object? foodCategory = freezed,Object? size = null,Object? saleUnit = null,Object? purchaseUnit = freezed,Object? packingQuantity = null,Object? active = null,Object? vendable = null,Object? prices = null,Object? priceUsd = freezed,Object? priceCdf = freezed,Object? stockItems = null,}) {
   return _then(_Product(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -339,7 +349,9 @@ as String?,beverageCategory: freezed == beverageCategory ? _self.beverageCategor
 as String?,foodCategory: freezed == foodCategory ? _self.foodCategory : foodCategory // ignore: cast_nullable_to_non_nullable
 as String?,size: null == size ? _self.size : size // ignore: cast_nullable_to_non_nullable
 as String,saleUnit: null == saleUnit ? _self.saleUnit : saleUnit // ignore: cast_nullable_to_non_nullable
-as String,active: null == active ? _self.active : active // ignore: cast_nullable_to_non_nullable
+as String,purchaseUnit: freezed == purchaseUnit ? _self.purchaseUnit : purchaseUnit // ignore: cast_nullable_to_non_nullable
+as String?,packingQuantity: null == packingQuantity ? _self.packingQuantity : packingQuantity // ignore: cast_nullable_to_non_nullable
+as int,active: null == active ? _self.active : active // ignore: cast_nullable_to_non_nullable
 as bool,vendable: null == vendable ? _self.vendable : vendable // ignore: cast_nullable_to_non_nullable
 as bool,prices: null == prices ? _self._prices : prices // ignore: cast_nullable_to_non_nullable
 as List<ProductPrice>,priceUsd: freezed == priceUsd ? _self.priceUsd : priceUsd // ignore: cast_nullable_to_non_nullable

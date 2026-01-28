@@ -568,8 +568,8 @@ const ProductGrid = () => {
             </div>
 
             {/* Product Grid */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+            <div className="flex-1 overflow-y-auto p-3 md:p-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3">
                     {filtered.map((product) => {
                         const stock = getProductStock(product);
                         const isOutOfStock = stock <= 0;
@@ -580,7 +580,7 @@ const ProductGrid = () => {
                                 key={product.id}
                                 onClick={() => handleProductClick(product)}
                                 disabled={isOutOfStock}
-                                className={`flex flex-col items-center p-4 bg-white border border-gray-200 rounded-sm shadow-sm transition-all relative overflow-hidden group text-left
+                                className={`flex flex-col items-center p-3 bg-white border border-gray-200 rounded-sm shadow-sm transition-all relative overflow-hidden group text-left
                                     ${isOutOfStock ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:shadow-lg hover:border-[#00d3fa] active:scale-[0.98]'}
                                 `}
                             >
@@ -669,7 +669,7 @@ export default function PosPage() {
                     {/* FAB for Mobile Cart */}
                     <button
                         onClick={() => setIsMobileCartOpen(true)}
-                        className="lg:hidden absolute bottom-6 right-6 w-14 h-14 bg-[#000] text-white rounded-full shadow-xl flex items-center justify-center z-40 transition-transform active:scale-95"
+                        className="md:hidden absolute bottom-6 right-6 w-14 h-14 bg-[#000] text-white rounded-full shadow-xl flex items-center justify-center z-40 transition-transform active:scale-95"
                     >
                         <ShoppingCart size={24} />
                         {cart.length > 0 && (
@@ -680,8 +680,8 @@ export default function PosPage() {
                     </button>
                 </div>
 
-                {/* Right: Cart (Responsive: Hidden on small screens, sidebar on large) */}
-                <div className="hidden lg:flex w-[350px] xl:w-[380px] h-full shrink-0 z-10 relative border-l border-gray-200">
+                {/* Right: Cart (Responsive: Hidden on small screens, sidebar on tablets/large) */}
+                <div className="hidden md:flex md:w-[320px] lg:w-[350px] xl:w-[380px] h-full shrink-0 z-10 relative border-l border-gray-200">
                     <Cart setPrintSale={setPrintSale} />
                 </div>
 
@@ -692,9 +692,9 @@ export default function PosPage() {
                     </div>
                 </div>
 
-                {/* Mobile: Drawer/Overlay */}
+                {/* Mobile: Drawer/Overlay - Hidden from md onwards since cart is visible */}
                 {isMobileCartOpen && (
-                    <div className="lg:hidden fixed inset-0 z-50 bg-white animate-in slide-in-from-right duration-200 flex flex-col">
+                    <div className="md:hidden fixed inset-0 z-50 bg-white animate-in slide-in-from-right duration-200 flex flex-col">
                         <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
                             <span className="font-bold text-sm text-gray-700 pl-2">Panier & Résumé</span>
                             <button

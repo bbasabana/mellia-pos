@@ -4,21 +4,20 @@
  */
 
 .pos-dashboard {
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 /* === WELCOME SECTION - SIMPLIFIED === */
 .dashboard-welcome {
   margin-bottom: 2rem;
-  
+
   h2 {
     font-size: 1.5rem;
     font-weight: 600;
     color: #111827;
     margin-bottom: 0.25rem;
   }
-  
+
   p {
     font-size: 0.9375rem;
     color: #6b7280;
@@ -31,11 +30,11 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
   margin-bottom: 2rem;
-  
+
   @media (max-width: 1200px) {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
@@ -47,7 +46,7 @@
   padding: 1.5rem;
   border: 1px solid #e5e7eb;
   transition: border-color 0.2s ease;
-  
+
   &:hover {
     border-color: #2563eb;
   }
@@ -67,22 +66,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  
+
   &.icon-primary {
     background-color: #dbeafe;
     color: #2563eb;
   }
-  
+
   &.icon-success {
     background-color: #d1fae5;
     color: #059669;
   }
-  
+
   &.icon-warning {
     background-color: #fef3c7;
     color: #d97706;
   }
-  
+
   &.icon-danger {
     background-color: #fee2e2;
     color: #dc2626;
@@ -95,11 +94,11 @@
   gap: 0.25rem;
   font-size: 0.875rem;
   font-weight: 600;
-  
+
   &.trend-up {
     color: #059669;
   }
-  
+
   &.trend-down {
     color: #dc2626;
   }
@@ -131,11 +130,11 @@
   grid-template-columns: repeat(6, 1fr);
   gap: 1rem;
   margin-bottom: 2rem;
-  
+
   @media (max-width: 1200px) {
     grid-template-columns: repeat(3, 1fr);
   }
-  
+
   @media (max-width: 768px) {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -152,25 +151,25 @@
   gap: 0.75rem;
   text-decoration: none;
   transition: all 0.2s ease;
-  
+
   &:hover {
     border-color: #2563eb;
     background-color: #f9fafb;
   }
-  
+
   &.action-primary {
     background-color: #2563eb;
     border-color: #2563eb;
-    
+
     .action-icon {
       background-color: rgba(255, 255, 255, 0.2);
       color: #ffffff;
     }
-    
+
     .action-label {
       color: #ffffff;
     }
-    
+
     &:hover {
       background-color: #1d4ed8;
     }
@@ -201,7 +200,7 @@
   border-radius: 8px;
   padding: 1.5rem;
   border: 1px solid #e5e7eb;
-  
+
   h3 {
     font-size: 1.125rem;
     font-weight: 600;
@@ -222,11 +221,11 @@
   gap: 1rem;
   padding: 1rem 0;
   border-bottom: 1px solid #f3f4f6;
-  
+
   &:last-child {
     border-bottom: none;
   }
-  
+
   &:hover {
     background-color: #f9fafb;
     margin: 0 -0.5rem;
@@ -271,38 +270,68 @@
   white-space: nowrap;
 }
 
+/* === POS APP FEEL OPTIMIZATIONS === */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+}
+
+.pos-dense-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+
 /* === RESPONSIVE === */
 @media (max-width: 768px) {
   .pos-dashboard {
     padding: 0;
   }
-  
+
   .dashboard-welcome {
     margin-bottom: 1.5rem;
-    
+
     h2 {
       font-size: 1.25rem;
     }
   }
-  
+
   .stats-grid {
     gap: 1rem;
     margin-bottom: 1.5rem;
   }
-  
+
   .stat-card {
     padding: 1.25rem;
   }
-  
+
   .quick-actions {
     gap: 0.75rem;
     margin-bottom: 1.5rem;
   }
-  
+
   .action-btn {
     padding: 1rem 0.75rem;
   }
-  
+
   .recent-activity {
     padding: 1.25rem;
   }

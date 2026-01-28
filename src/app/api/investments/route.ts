@@ -17,14 +17,18 @@ export async function GET() {
             include: { user: { select: { name: true } } }
         });
 
-        // 2. Calculate Aggregates (Today, Week, Month)
-        // Check performance if this gets heavy? For now it's fine.
+        // 2. Calculate Aggregates (Month)
         const now = new Date();
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        const todaysInvestments = await prisma.investment.aggregate({
-            where: { date: { gte: startOfDay } },
-            _sum: { totalAmount: true, expectedProfit: true }
+        const monthlyInvestments = await prisma.investment.aggregate({
+            where: { date: { gte: startOfMonth } },
+            _sum: {
+                totalAmount: true,
+                expectedProfit: true,
+                vendableAmount: true,
+                nonVendableAmount: true
+            }
         });
 
         return NextResponse.json({
@@ -32,8 +36,10 @@ export async function GET() {
             data: {
                 history: investments,
                 stats: {
-                    todayTotal: todaysInvestments._sum.totalAmount || 0,
-                    todayExpectedProfit: todaysInvestments._sum.expectedProfit || 0
+                    monthTotal: monthlyInvestments._sum.totalAmount || 0,
+                    monthVendable: monthlyInvestments._sum.vendableAmount || 0,
+                    monthNonVendable: monthlyInvestments._sum.nonVendableAmount || 0,
+                    monthExpectedProfit: monthlyInvestments._sum.expectedProfit || 0
                 }
             }
         });
@@ -65,40 +71,68 @@ export async function POST(req: Request) {
         // Transaction: Create Investment + Stock Movements + Update StockItems
         const result = await prisma.$transaction(async (tx) => {
             let vendableTotal = 0;
-            // First, calculate totals
-            // Simplified logic: We assume the UI sends correct totals or we calculate them here.
-            // Let's iterate items to calculate split.
+            let finalItems = [];
 
+            // 1. Pre-process items (create new products if needed)
             for (const item of items) {
-                if (item.isVendable) {
+                let actualProductId = item.productId;
+                let isVendable = item.isVendable;
+
+                if (item.isNew) {
+                    const newProduct = await tx.product.create({
+                        data: {
+                            name: item.productName,
+                            type: "NON_VENDABLE",
+                            active: true,
+                            vendable: false,
+                            saleUnit: item.newUnit || "PIECE",
+                            size: "STANDARD",
+                        }
+                    });
+                    actualProductId = newProduct.id;
+                    isVendable = false;
+
+                    // Create cost record for the new product
+                    await tx.productCost.create({
+                        data: {
+                            productId: actualProductId,
+                            unitCostUsd: item.cost,
+                            unitCostCdf: item.cost * (parseFloat(body.exchangeRate) || 2850),
+                            forUnit: item.newUnit || "PIECE"
+                        }
+                    });
+                }
+
+                if (isVendable) {
                     vendableTotal += (item.cost * item.quantity);
                 }
+
+                finalItems.push({
+                    ...item,
+                    productId: actualProductId,
+                    isVendable
+                });
             }
 
             const nonVendableTotal = Number(totalAmount) - vendableTotal;
 
-            // 1. Create Investment Record
+            // 2. Create Investment Record
             const investment = await tx.investment.create({
                 data: {
                     totalAmount: totalAmount,
                     source: source as FundSource,
                     vendableAmount: vendableTotal,
                     nonVendableAmount: nonVendableTotal,
-                    // TODO: Calculate real expected revenue based on prices. 
-                    // For now, we set 0 or rely on frontend? Ideally backend.
-                    expectedRevenue: 0, // Placeholder
-                    expectedProfit: 0,  // Placeholder
+                    expectedRevenue: 0,
+                    expectedProfit: 0,
                     description,
                     userId: session.user.id
                 }
             });
 
-            // 2. Process Items
-            for (const item of items) {
-                // Decide Location based on Type/Category?
-                // PRD says: Dry -> Economat, Drinks -> Depot usually.
-                // We'll require location in the payload or default to DEPOT.
-                const targetLocation = item.location || "DEPOT";
+            // 3. Process Movements & Stock
+            for (const item of finalItems) {
+                const targetLocation = (item.location as StockLocation) || "DEPOT";
 
                 // A. Create Stock Movement (IN)
                 await tx.stockMovement.create({
@@ -117,11 +151,11 @@ export async function POST(req: Request) {
                 // B. Update Stock Item
                 await tx.stockItem.upsert({
                     where: { productId_location: { productId: item.productId, location: targetLocation } },
-                    update: { quantity: { increment: item.quantity } },
+                    update: { quantity: { increment: Number(item.quantity) } },
                     create: {
                         productId: item.productId,
                         location: targetLocation,
-                        quantity: item.quantity
+                        quantity: Number(item.quantity)
                     }
                 });
             }

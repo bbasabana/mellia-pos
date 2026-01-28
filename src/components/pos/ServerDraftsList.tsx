@@ -124,7 +124,7 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
                     <p className="text-xs">Aucun brouillon en cours</p>
                 </div>
             ) : (
-                <div className="space-y-2 overflow-y-auto max-h-[300px] px-1 scrollbar-thin scrollbar-thumb-gray-200">
+                <div className="space-y-2 overflow-y-auto max-h-[40vh] px-1 scrollbar-thin scrollbar-thumb-gray-200">
                     {drafts.map((draft) => {
                         const itemCount = draft.items.reduce((sum: number, item: any) => sum + Number(item.quantity), 0);
                         const createdDate = new Date(draft.createdAt);

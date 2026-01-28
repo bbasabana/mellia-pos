@@ -113,6 +113,10 @@ function ProductsPageContent() {
 
   // Filtered products
   const filteredProducts = products.filter((product) => {
+    // BUSINESS DECISION: Default list only shows VENDABLE products
+    if (!product.vendable && !typeFilter) {
+      return false;
+    }
     if (search && !product.name.toLowerCase().includes(search.toLowerCase())) {
       return false;
     }

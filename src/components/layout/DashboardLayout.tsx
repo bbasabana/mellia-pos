@@ -128,6 +128,13 @@ function DashboardLayout({ children, disablePadding = false }: DashboardLayoutPr
   const { data: session } = useSession();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Auto-collapse sidebar in POS mode on landscape/tablets
+  useEffect(() => {
+    if (disablePadding && window.innerWidth < 1280) {
+      setSidebarOpen(false);
+    }
+  }, [disablePadding]);
+
 
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
@@ -216,7 +223,8 @@ function DashboardLayout({ children, disablePadding = false }: DashboardLayoutPr
       <aside
         className={cn(
           "fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 z-50 flex flex-col transition-transform duration-300 transform lg:translate-x-0 lg:static lg:inset-0",
-          sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+          sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full",
+          disablePadding && "lg:hidden xl:flex xl:static" // Hide on large, show only on extra large in POS
         )}
       >
         <div className="px-6 py-8 border-b border-gray-100 flex flex-col items-center">
@@ -266,7 +274,10 @@ function DashboardLayout({ children, disablePadding = false }: DashboardLayoutPr
         <header className="h-[72px] bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0 z-10">
           <div className="flex items-center gap-4">
             <button
-              className="p-2 -ml-2 rounded-sm text-gray-500 hover:bg-gray-100 lg:hidden"
+              className={cn(
+                "p-2 -ml-2 rounded-sm text-gray-500 hover:bg-gray-100",
+                disablePadding ? "flex" : "lg:hidden" // Always show toggle in POS mode if sidebar is hidden
+              )}
               onClick={toggleSidebar}
               aria-label="Toggle menu"
             >
