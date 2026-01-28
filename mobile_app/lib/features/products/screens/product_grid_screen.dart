@@ -122,19 +122,26 @@ class _ProductGridContentState extends ConsumerState<_ProductGridContent> {
                   ? 3
                   : 2;
 
-              return GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: 0.8,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final product = filtered[index];
-                  return _ProductCard(product: product);
+              return RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(productsProvider);
+                  await ref.read(productsProvider.future);
                 },
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    childAspectRatio: 0.8,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final product = filtered[index];
+                    return _ProductCard(product: product);
+                  },
+                ),
               );
             },
           ),

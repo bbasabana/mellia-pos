@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:mellia_pos_mobile/features/auth/providers/auth_provider.dart';
 import 'package:mellia_pos_mobile/features/cart/cart_provider.dart';
 import 'package:mellia_pos_mobile/features/cart/widgets/cart_widget.dart';
 import 'package:mellia_pos_mobile/features/products/screens/product_grid_screen.dart';
+import 'package:mellia_pos_mobile/features/products/data/product_repository.dart';
 import 'package:mellia_pos_mobile/core/constants/app_assets.dart';
 import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
 import 'package:mellia_pos_mobile/core/services/printer_service.dart';
@@ -18,11 +20,23 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
     // Auto-detect printer and test print on app startup
     _autoConfigPrinter();
+    // Setup background auto-refresh every 3 minutes
+    _refreshTimer = Timer.periodic(const Duration(minutes: 3), (timer) {
+      ref.invalidate(productsProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _autoConfigPrinter() async {
@@ -78,116 +92,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
             ],
           ),
-          drawer: Drawer(
-            child: Column(
-              children: [
-                UserAccountsDrawerHeader(
-                  accountName: Text(user?.name ?? "Utilisateur"),
-                  accountEmail: Text(user?.email ?? ""),
-                  decoration: const BoxDecoration(color: Color(0xFF1E293B)),
-                  currentAccountPicture: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      user?.name?.substring(0, 1).toUpperCase() ?? "U",
-                      style: const TextStyle(
-                        color: Color(0xFF1E293B),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(
-                    Icons.shopping_basket_outlined,
-                    color: AppTheme.primaryBlue,
-                  ),
-                  title: const Text("Caisse"),
-                  onTap: () => Navigator.pop(context),
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.hourglass_bottom_rounded,
-                    color: Colors.orange,
-                  ),
-                  title: const Text("Commandes en attente"),
-                  onTap: () => context.push('/drafts'),
-                ),
-                if (user?.role == 'ADMIN' ||
-                    user?.role == 'MANAGER' ||
-                    user?.role == 'KITCHEN')
-                  ListTile(
-                    leading: const Icon(
-                      Icons.restaurant_menu_rounded,
-                      color: Color(0xFF10B981),
-                    ),
-                    title: const Text("Cuisine"),
-                    onTap: () => context.push('/kitchen'),
-                  ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.receipt_long_rounded,
-                    color: Colors.blueGrey,
-                  ),
-                  title: const Text("Transactions"),
-                  onTap: () => context.push('/transactions'),
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.settings_outlined,
-                    color: Colors.grey,
-                  ),
-                  title: const Text("Paramètres"),
-                  onTap: () => context.push('/settings'),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text(
-                    "Déconnexion",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text("Déconnexion"),
-                        content: const Text(
-                          "Êtes-vous sûr de vouloir vous déconnecter ?",
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text("Annuler"),
-                          ),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              ref.read(authNotifierProvider.notifier).logout();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                            ),
-                            child: const Text("Déconnecter"),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
+          drawer: _buildPremiumDrawer(context, user),
           body: isTablet
-              ? const Row(
+              ? Row(
                   children: [
-                    Expanded(flex: 3, child: ProductGridScreen()),
-                    VerticalDivider(width: 1),
-                    Expanded(flex: 1, child: CartWidget()),
+                    _buildFixedSidebar(context, user),
+                    const Expanded(flex: 3, child: ProductGridScreen()),
+                    const VerticalDivider(width: 1, color: Colors.black12),
+                    const Expanded(flex: 1, child: CartWidget()),
                   ],
                 )
               : const ProductGridScreen(),
@@ -219,6 +131,188 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
         return scaffold;
       },
+    );
+  }
+
+  Widget _buildFixedSidebar(BuildContext context, UserState? user) {
+    return Container(
+      width: 280,
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E293B),
+        border: Border(right: BorderSide(color: Colors.black12)),
+      ),
+      child: _buildNavigationList(context, user, isTablet: true),
+    );
+  }
+
+  Widget _buildPremiumDrawer(BuildContext context, UserState? user) {
+    return Drawer(
+      backgroundColor: const Color(0xFF1E293B),
+      child: _buildNavigationList(context, user, isTablet: false),
+    );
+  }
+
+  Widget _buildNavigationList(
+    BuildContext context,
+    UserState? user, {
+    required bool isTablet,
+  }) {
+    return Column(
+      children: [
+        if (!isTablet)
+          UserAccountsDrawerHeader(
+            accountName: Text(user?.name ?? "Utilisateur"),
+            accountEmail: Text(user?.email ?? ""),
+            decoration: const BoxDecoration(color: Color(0xFF0F172A)),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Text(
+                user?.name?.substring(0, 1).toUpperCase() ?? "U",
+                style: const TextStyle(
+                  color: Color(0xFF1E293B),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.fromLTRB(24, 64, 24, 32),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white.withOpacity(0.1),
+                  child: Text(
+                    user?.name?.substring(0, 1).toUpperCase() ?? "U",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user?.name ?? "Utilisateur",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        user?.role ?? "Session",
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        _buildNavEntry(
+          icon: Icons.store_rounded,
+          label: "Caisse Principal",
+          color: Colors.blueAccent,
+          onTap: () {
+            if (!isTablet) Navigator.pop(context);
+          },
+        ),
+        _buildNavEntry(
+          icon: Icons.hourglass_bottom_rounded,
+          label: "Brouillons / Attente",
+          color: Colors.orange,
+          onTap: () => context.push('/drafts'),
+        ),
+        if (user?.role == 'ADMIN' ||
+            user?.role == 'MANAGER' ||
+            user?.role == 'KITCHEN')
+          _buildNavEntry(
+            icon: Icons.restaurant_menu_rounded,
+            label: "Cuisine (KDS)",
+            color: const Color(0xFF10B981),
+            onTap: () => context.push('/kitchen'),
+          ),
+        _buildNavEntry(
+          icon: Icons.receipt_long_rounded,
+          label: "Historique Ventes",
+          color: Colors.purpleAccent,
+          onTap: () => context.push('/transactions'),
+        ),
+        _buildNavEntry(
+          icon: Icons.settings_rounded,
+          label: "Paramètres App",
+          color: Colors.grey,
+          onTap: () => context.push('/settings'),
+        ),
+        const Spacer(),
+        const Divider(color: Colors.white10, indent: 24, endIndent: 24),
+        _buildNavEntry(
+          icon: Icons.logout_rounded,
+          label: "Déconnexion",
+          color: Colors.redAccent,
+          onTap: () => _showLogoutDialog(context),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildNavEntry({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: Icon(icon, color: color, size: 22),
+        title: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onTap: onTap,
+        dense: true,
+        hoverColor: Colors.white10,
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Déconnexion"),
+        content: const Text("Voulez-vous vraiment vous déconnecter ?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(authNotifierProvider.notifier).logout();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("Déconnecter"),
+          ),
+        ],
+      ),
     );
   }
 }
