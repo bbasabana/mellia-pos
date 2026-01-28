@@ -105,6 +105,7 @@ export async function POST(req: Request) {
                 let actualProductId = item.productId;
                 let isVendable = item.isVendable;
 
+                // Determine if really vendable (must not be new, and must be marked vendable)
                 if (item.isNew) {
                     const newProduct = await tx.product.create({
                         data: {
@@ -139,18 +140,28 @@ export async function POST(req: Request) {
                         include: { space: true }
                     });
 
-                    // 1. STANDARD/TERRASSE PRICE
-                    const standardPriceEntry = prices.find(p =>
-                        ['TERRASSE', 'SALLE', 'STANDARD'].includes(p.space.name.toUpperCase())
-                    ) || prices[0];
-                    const standardPrice = standardPriceEntry ? Number(standardPriceEntry.priceUsd) : 0;
+                    // 1. STANDARD/TERRASSE PRICE logic (Strict)
+                    // Priority: TERRASSE > SALLE > STANDARD > Default (First founded if no VIP)
+                    const standardPriceEntry = prices.find(p => {
+                        const name = p.space.name.toUpperCase();
+                        return name === 'TERRASSE' || name === 'SALLE' || name === 'STANDARD';
+                    });
+
+                    // If no specific standard price found, use the first available price THAT IS NOT VIP
+                    const fallbackPrice = prices.find(p => !p.space.name.toUpperCase().includes('VIP'));
+
+                    const standardPrice = standardPriceEntry
+                        ? Number(standardPriceEntry.priceUsd)
+                        : (fallbackPrice ? Number(fallbackPrice.priceUsd) : 0);
+
                     expectedRevenue += (standardPrice * item.quantity);
 
-                    // 2. VIP PRICE
-                    const vipPriceEntry = prices.find(p =>
-                        p.space.name.toUpperCase().includes('VIP')
-                    ) || standardPriceEntry;
+                    // 2. VIP PRICE logic (Strict)
+                    const vipPriceEntry = prices.find(p => p.space.name.toUpperCase().includes('VIP'));
+
+                    // If VIP price exists, use it. If NOT, it falls back to standard price (assuming same price if not defined)
                     const vipPrice = vipPriceEntry ? Number(vipPriceEntry.priceUsd) : standardPrice;
+
                     expectedRevenueVip += (vipPrice * item.quantity);
                 }
 
@@ -162,6 +173,7 @@ export async function POST(req: Request) {
             }
 
             const nonVendableTotal = Number(totalAmount) - vendableTotal;
+            // Profit = Revenue - Cost of Vendable Goods (Strictly excluding charges)
             const expectedProfit = expectedRevenue - vendableTotal;
             const expectedProfitVip = expectedRevenueVip - vendableTotal;
 
@@ -266,6 +278,7 @@ export async function PUT(req: Request) {
                 let actualProductId = item.productId;
                 let isVendable = item.isVendable;
 
+                // Determine if really vendable (must not be new, and must be marked vendable)
                 // Handle isNew in Edit? (Ideally products already created, but for safety)
                 if (item.isNew && !actualProductId.startsWith("cl")) {
                     const newProduct = await tx.product.create({
@@ -289,12 +302,28 @@ export async function PUT(req: Request) {
                         include: { space: true }
                     });
 
-                    const standardPriceEntry = prices.find(p => ['TERRASSE', 'SALLE', 'STANDARD'].includes(p.space.name.toUpperCase())) || prices[0];
-                    const standardPrice = standardPriceEntry ? Number(standardPriceEntry.priceUsd) : 0;
+                    // 1. STANDARD/TERRASSE PRICE logic (Strict)
+                    // Priority: TERRASSE > SALLE > STANDARD > Default (First founded if no VIP)
+                    const standardPriceEntry = prices.find(p => {
+                        const name = p.space.name.toUpperCase();
+                        return name === 'TERRASSE' || name === 'SALLE' || name === 'STANDARD';
+                    });
+
+                    // If no specific standard price found, use the first available price THAT IS NOT VIP
+                    const fallbackPrice = prices.find(p => !p.space.name.toUpperCase().includes('VIP'));
+
+                    const standardPrice = standardPriceEntry
+                        ? Number(standardPriceEntry.priceUsd)
+                        : (fallbackPrice ? Number(fallbackPrice.priceUsd) : 0);
+
                     expectedRevenue += (standardPrice * item.quantity);
 
-                    const vipPriceEntry = prices.find(p => p.space.name.toUpperCase().includes('VIP')) || standardPriceEntry;
+                    // 2. VIP PRICE logic (Strict)
+                    const vipPriceEntry = prices.find(p => p.space.name.toUpperCase().includes('VIP'));
+
+                    // If VIP price exists, use it. If NOT, it falls back to standard price (assuming same price if not defined)
                     const vipPrice = vipPriceEntry ? Number(vipPriceEntry.priceUsd) : standardPrice;
+
                     expectedRevenueVip += (vipPrice * item.quantity);
                 }
 
