@@ -25,7 +25,9 @@ export async function GET(req: Request) {
                                     name: true,
                                     saleUnit: true,
                                     purchaseUnit: true,
-                                    packingQuantity: true
+                                    packingQuantity: true,
+                                    vendable: true,
+                                    type: true
                                 }
                             }
                         }
