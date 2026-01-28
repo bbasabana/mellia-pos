@@ -176,8 +176,8 @@ export async function POST(req: Request) {
                     nonVendableAmount: nonVendableTotal,
                     expectedRevenue: expectedRevenue,
                     expectedProfit: expectedProfit,
-                    expectedRevenueVip: expectedRevenueVip,
-                    expectedProfitVip: expectedProfitVip,
+                    // expectedRevenueVip: expectedRevenueVip,
+                    // expectedProfitVip: expectedProfitVip,
                     description,
                     userId: session.user.id
                 }
@@ -317,8 +317,8 @@ export async function PUT(req: Request) {
                     nonVendableAmount: nonVendableTotal,
                     expectedRevenue,
                     expectedProfit,
-                    expectedRevenueVip,
-                    expectedProfitVip,
+                    // expectedRevenueVip,
+                    // expectedProfitVip,
                     description,
                     userId: session.user.id
                 }
