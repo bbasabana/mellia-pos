@@ -68,3 +68,46 @@ export async function GET(req: NextRequest) {
         );
     }
 }
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || session.user.role !== "ADMIN") {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get("id");
+        const ids = searchParams.get("ids")?.split(",");
+
+        if (!id && (!ids || ids.length === 0)) {
+            return new NextResponse("Missing IDs", { status: 400 });
+        }
+
+        const deleteIds = id ? [id] : ids!;
+
+        await prisma.financialTransaction.deleteMany({
+            where: {
+                id: { in: deleteIds }
+            }
+        });
+
+        // Optional: Create audit log
+        await prisma.auditLog.create({
+            data: {
+                userId: session.user.id,
+                action: "DELETE_FINANCIAL_TRANSACTIONS",
+                entity: "FinancialTransaction",
+                metadata: { deletedCount: deleteIds.length, ids: deleteIds }
+            }
+        });
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error("Error deleting financial transactions:", error);
+        return NextResponse.json(
+            { success: false, error: error.message },
+            { status: 500 }
+        );
+    }
+}

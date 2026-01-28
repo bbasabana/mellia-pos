@@ -6,7 +6,11 @@ import 'package:mellia_pos_mobile/features/auth/providers/auth_provider.dart';
 import 'package:mellia_pos_mobile/features/auth/screens/login_screen.dart';
 import 'package:mellia_pos_mobile/features/kitchen/screens/kitchen_screen.dart';
 import 'package:mellia_pos_mobile/features/sales/screens/dashboard_screen.dart';
+import 'package:mellia_pos_mobile/features/sales/screens/transactions_screen.dart';
+import 'package:mellia_pos_mobile/features/cart/screens/drafts_screen.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import 'package:mellia_pos_mobile/features/settings/screens/settings_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -58,6 +62,18 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(
         path: '/kitchen',
         builder: (context, state) => const KitchenScreen(),
+      ),
+      GoRoute(
+        path: '/drafts',
+        builder: (context, state) => const DraftsScreen(),
+      ),
+      GoRoute(
+        path: '/transactions',
+        builder: (context, state) => const TransactionsScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );

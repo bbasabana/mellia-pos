@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { deductStock } from "@/lib/stock-service";
 
 export async function POST(req: Request) {
     try {
@@ -53,19 +54,15 @@ export async function POST(req: Request) {
                 // Determine Location based on Type
                 const location = product.type === "BEVERAGE" ? "FRIGO" : "CUISINE";
 
-                // Check Stock (Only if COMPLETED)
+                // Check Stock (Only if COMPLETED) - sum of all locations
                 if (status === "COMPLETED") {
-                    const stockItem = await tx.stockItem.findUnique({
-                        where: {
-                            productId_location: {
-                                productId: product.id,
-                                location: location as any,
-                            }
-                        }
+                    const stockItems = await tx.stockItem.findMany({
+                        where: { productId: product.id }
                     });
+                    const totalAvailable = stockItems.reduce((acc: number, si: any) => acc + Number(si.quantity), 0);
 
-                    if (!stockItem || stockItem.quantity.toNumber() < item.quantity) {
-                        throw new Error(`Stock insuffisant pour ${product.name} (Dispo: ${stockItem?.quantity || 0})`);
+                    if (totalAvailable < item.quantity) {
+                        throw new Error(`Stock insuffisant pour ${product.name} (Dispo total: ${totalAvailable})`);
                     }
                 }
 
@@ -178,55 +175,37 @@ export async function POST(req: Request) {
             // 4. Update Stock & Create Movements (Only if COMPLETED)
             if (status === "COMPLETED") {
                 for (const i of saleItemsData) {
-                    // Decrease Stock
-                    await tx.stockItem.update({
-                        where: {
-                            productId_location: {
-                                productId: i.product.id,
-                                location: i.location as any
-                            }
-                        },
+                    await deductStock(
+                        tx,
+                        i.product.id,
+                        i.quantity,
+                        i.product.type,
+                        sale.ticketNum,
+                        session.user.id
+                    );
+                }
+            }
+
+            // 5. Update Client Points
+            if (clientId) {
+                const pointsChange = pointsEarned - pointsUsed;
+                if (pointsChange !== 0) {
+                    await tx.client.update({
+                        where: { id: clientId },
                         data: {
-                            quantity: { decrement: i.quantity }
+                            points: { increment: pointsChange }
                         }
                     });
 
-                    // Create Movement (OUT)
-                    await tx.stockMovement.create({
+                    await tx.loyaltyTransaction.create({
                         data: {
-                            productId: i.product.id,
-                            type: "OUT",
-                            quantity: i.quantity,
-                            fromLocation: i.location as any,
-                            reason: `Vente #${sale.ticketNum}`,
-                            userId: session.user.id,
-                            costValue: i.unitCost * i.quantity,
+                            clientId,
+                            amount: pointsChange,
+                            saleId: sale.id,
+                            reason: `Vente ${sale.ticketNum}`,
                             ...(saleDate && { createdAt: saleDate }) // Match sale date
                         }
                     });
-                }
-
-                // 5. Update Client Points
-                if (clientId) {
-                    const pointsChange = pointsEarned - pointsUsed;
-                    if (pointsChange !== 0) {
-                        await tx.client.update({
-                            where: { id: clientId },
-                            data: {
-                                points: { increment: pointsChange }
-                            }
-                        });
-
-                        await tx.loyaltyTransaction.create({
-                            data: {
-                                clientId,
-                                amount: pointsChange,
-                                saleId: sale.id,
-                                reason: `Vente ${sale.ticketNum}`,
-                                ...(saleDate && { createdAt: saleDate }) // Match sale date
-                            }
-                        });
-                    }
                 }
             }
 
@@ -237,7 +216,6 @@ export async function POST(req: Request) {
         });
 
         return NextResponse.json(result);
-
     } catch (error: any) {
         console.error("[SALES_POST]", error);
         return NextResponse.json(

@@ -43,6 +43,12 @@ abstract class Product with _$Product {
     @Default([]) List<StockItem> stockItems,
   }) = _Product;
 
+  const Product._();
+
+  double get totalStock =>
+      stockItems.fold(0.0, (sum, item) => sum + item.quantity);
+  bool get isOutOfStock => totalStock <= 0;
+
   factory Product.fromJson(Map<String, dynamic> json) =>
       _$ProductFromJson(json);
 }

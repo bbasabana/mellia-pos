@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     TrendingUp,
     Search,
@@ -13,11 +13,14 @@ import {
     Calendar,
     ChevronLeft,
     ChevronRight,
-    ArrowUpRight
+    ArrowUpRight,
+    Trash2
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { showToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
+import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
+import { useSession } from "next-auth/react";
 
 export default function FinancialTransactionsPage() {
     const [transactions, setTransactions] = useState<any[]>([]);
@@ -26,12 +29,20 @@ export default function FinancialTransactionsPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
 
+    const { data: session } = useSession();
+    const isAdmin = session?.user?.role === "ADMIN";
+
+    // Selection
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     // Filters
     const [method, setMethod] = useState("");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = useCallback(async () => {
         setLoading(true);
         try {
             let url = `/api/financial-transactions?page=${page}&limit=20`;
@@ -51,11 +62,48 @@ export default function FinancialTransactionsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [page, method, startDate, endDate]);
 
     useEffect(() => {
         fetchTransactions();
-    }, [page, method, startDate, endDate]);
+        setSelectedIds([]); // Reset selection on page/filter change
+    }, [fetchTransactions]);
+
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            setSelectedIds(transactions.map(t => t.id));
+        } else {
+            setSelectedIds([]);
+        }
+    };
+
+    const handleSelectOne = (id: string) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        try {
+            const res = await fetch(`/api/financial-transactions?ids=${selectedIds.join(",")}`, {
+                method: 'DELETE',
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast("Transactions supprimées avec succès", "success");
+                setSelectedIds([]);
+                setIsDeleteModalOpen(false);
+                fetchTransactions();
+            } else {
+                throw new Error(json.error || "Erreur lors de la suppression");
+            }
+        } catch (error: any) {
+            showToast(error.message, "error");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     const getMethodIcon = (method: string) => {
         switch (method) {
@@ -90,12 +138,23 @@ export default function FinancialTransactionsPage() {
                             La vérité financière : tous les paiements encaissés
                         </p>
                     </div>
-                    <button
-                        onClick={fetchTransactions}
-                        className="p-2.5 bg-white border border-gray-200 rounded-sm hover:bg-gray-50 transition-all text-gray-600 shadow-sm"
-                    >
-                        <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {isAdmin && selectedIds.length > 0 && (
+                            <button
+                                onClick={() => setIsDeleteModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-sm hover:bg-red-700 transition-all shadow-sm"
+                            >
+                                <Trash2 size={16} />
+                                Supprimer ({selectedIds.length})
+                            </button>
+                        )}
+                        <button
+                            onClick={fetchTransactions}
+                            className="p-2.5 bg-white border border-gray-200 rounded-sm hover:bg-gray-50 transition-all text-gray-600 shadow-sm"
+                        >
+                            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Filters */}
@@ -137,6 +196,16 @@ export default function FinancialTransactionsPage() {
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-gray-50/50 sticky top-0 z-10 border-b border-gray-100">
                                 <tr>
+                                    {isAdmin && (
+                                        <th className="px-6 py-4 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={transactions.length > 0 && selectedIds.length === transactions.length}
+                                                onChange={handleSelectAll}
+                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Date & Heure</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Vente</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-wider">Agent</th>
@@ -160,7 +229,20 @@ export default function FinancialTransactionsPage() {
                                     </tr>
                                 ) : (
                                     transactions.map((t) => (
-                                        <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
+                                        <tr key={t.id} className={cn(
+                                            "hover:bg-gray-50/50 transition-colors",
+                                            selectedIds.includes(t.id) && "bg-blue-50/30"
+                                        )}>
+                                            {isAdmin && (
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.includes(t.id)}
+                                                        onChange={() => handleSelectOne(t.id)}
+                                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-2 text-xs text-gray-600 font-bold">
                                                     <Clock size={14} className="text-gray-400" />
@@ -246,6 +328,15 @@ export default function FinancialTransactionsPage() {
                     )}
                 </div>
             </div>
+
+            <ConfirmDeleteModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={handleDelete}
+                isLoading={isDeleting}
+                title="Supprimer les transactions"
+                message={`Êtes-vous sûr de vouloir supprimer ${selectedIds.length} transaction(s) ? Cette action est irréversible.`}
+            />
         </DashboardLayout>
     );
 }

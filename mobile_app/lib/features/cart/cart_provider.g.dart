@@ -3,10 +3,28 @@
 part of 'cart_provider.dart';
 
 // **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+_DeliveryInfo _$DeliveryInfoFromJson(Map<String, dynamic> json) =>
+    _DeliveryInfo(
+      address: json['address'] as String,
+      phone: json['phone'] as String,
+      instructions: json['instructions'] as String?,
+    );
+
+Map<String, dynamic> _$DeliveryInfoToJson(_DeliveryInfo instance) =>
+    <String, dynamic>{
+      'address': instance.address,
+      'phone': instance.phone,
+      'instructions': instance.instructions,
+    };
+
+// **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$cartNotifierHash() => r'4e913b5edd29fd8226485ab2aa1b12dbe547ad3a';
+String _$cartNotifierHash() => r'cd522515b9cac47df8c2870e6cd18e494652e88d';
 
 /// See also [CartNotifier].
 @ProviderFor(CartNotifier)

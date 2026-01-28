@@ -2,6 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:mellia_pos_mobile/features/products/data/product_model.dart';
 import 'package:mellia_pos_mobile/features/clients/data/client_model.dart';
+import 'package:mellia_pos_mobile/features/sales/data/sales_repository.dart';
 
 part 'cart_provider.freezed.dart';
 part 'cart_provider.g.dart';
@@ -22,10 +23,26 @@ abstract class CartItem with _$CartItem {
 }
 
 @freezed
+abstract class DeliveryInfo with _$DeliveryInfo {
+  const factory DeliveryInfo({
+    required String address,
+    required String phone,
+    String? instructions,
+  }) = _DeliveryInfo;
+
+  factory DeliveryInfo.fromJson(Map<String, dynamic> json) =>
+      _$DeliveryInfoFromJson(json);
+}
+
+@freezed
 abstract class CartState with _$CartState {
   const factory CartState({
     @Default({}) Map<String, CartItem> items,
     Client? selectedClient,
+    @Default(false) bool isLoading,
+    String? activeDraftId,
+    @Default("DINE_IN") String orderType, // DINE_IN, TAKEAWAY, DELIVERY
+    DeliveryInfo? deliveryInfo,
   }) = _CartState;
 
   const CartState._();
@@ -46,6 +63,17 @@ class CartNotifier extends _$CartNotifier {
 
   void setClient(Client? client) {
     state = state.copyWith(selectedClient: client);
+  }
+
+  void setOrderType(String type) {
+    state = state.copyWith(orderType: type);
+    if (type != 'DELIVERY') {
+      state = state.copyWith(deliveryInfo: null);
+    }
+  }
+
+  void setDeliveryInfo(DeliveryInfo info) {
+    state = state.copyWith(deliveryInfo: info, orderType: 'DELIVERY');
   }
 
   void addItem(Product product) {
@@ -91,6 +119,41 @@ class CartNotifier extends _$CartNotifier {
           productId: state.items[productId]!.copyWith(quantity: currentQty - 1),
         },
       );
+    }
+  }
+
+  void restoreCart(CartState savedState) {
+    state = savedState;
+  }
+
+  Future<void> saveDraft() async {
+    if (state.items.isEmpty) return;
+
+    state = state.copyWith(isLoading: true);
+    try {
+      final repo = await ref.read(salesRepositoryProvider.future);
+
+      if (state.activeDraftId != null) {
+        // Update existing draft
+        await repo.updateSale(
+          id: state.activeDraftId!,
+          items: state.items.values.toList(),
+        );
+      } else {
+        // Create new draft
+        final result = await repo.createSale(
+          items: state.items.values.toList(),
+          paymentMethod: "CASH", // Default for draft
+          clientId: state.selectedClient?.id,
+          orderType: state.orderType,
+          status: "DRAFT",
+        );
+        state = state.copyWith(activeDraftId: result['id']);
+      }
+    } catch (e) {
+      // Handle error (e.g. notify user)
+    } finally {
+      state = state.copyWith(isLoading: false);
     }
   }
 

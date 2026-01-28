@@ -31,18 +31,80 @@ class PrinterService extends _$PrinterService {
     }
   }
 
+  Future<String?> autoConnectAndTest() async {
+    try {
+      final devices = await getBondedDevices();
+      if (devices.isEmpty) return "Aucune imprimante jumelée";
+
+      // Common names for internal/standard POS printers
+      final commonNames = [
+        'inner',
+        'pos',
+        'printer',
+        'sunmi',
+        'imin',
+        'mpt',
+        'xp-',
+        'bluetooth',
+      ];
+      BluetoothInfo? target;
+
+      for (var d in devices) {
+        final name = d.name.toLowerCase();
+        if (commonNames.any((cn) => name.contains(cn))) {
+          target = d;
+          break;
+        }
+      }
+
+      // If no obvious name, take the first one
+      target ??= devices.first;
+
+      final connected = await connect(target);
+      if (!connected) return "Échec de connexion à ${target.name}";
+
+      // Test Print
+      await printTicket(
+        saleData: {
+          'ticketNum': 'TEST-001',
+          'createdAt': DateTime.now().toIso8601String(),
+          'totalNet': 0.0,
+          'totalCdf': 0.0,
+          'items': [
+            {
+              'product': {'name': 'TEST IMPRESSION'},
+              'quantity': 1,
+              'unitPrice': 0.0,
+              'unitPriceCdf': 0,
+            },
+          ],
+        },
+        cashierName: "Système",
+      );
+
+      return "Connecté et Test imprimé: ${target.name}";
+    } catch (e) {
+      return "Erreur auto-connect: $e";
+    }
+  }
+
   Future<void> printTicket({
-    required String ticketNum,
-    required List<dynamic> items, // CartItems
-    required double totalUsd,
-    required double totalCdf,
-    String? clientName,
-    DateTime? date,
+    required Map<String, dynamic> saleData,
+    String? cashierName,
   }) async {
     final bool? isConnected = await PrintBluetoothThermal.connectionStatus;
     if (isConnected != true) {
       throw Exception("Imprimante non connectée");
     }
+
+    final ticketNum = saleData['ticketNum'] ?? "N/A";
+    final items = saleData['items'] as List? ?? [];
+    final totalUsd =
+        double.tryParse(saleData['totalNet']?.toString() ?? "0") ?? 0.0;
+    final totalCdf =
+        double.tryParse(saleData['totalCdf']?.toString() ?? "0") ?? 0.0;
+    final clientName = saleData['client']?['name'] ?? "Passant";
+    final createdAtStr = saleData['createdAt'] ?? "";
 
     // Generate ESC/POS Bytes
     final profile = await CapabilityProfile.load();
@@ -52,7 +114,7 @@ class PrinterService extends _$PrinterService {
 
     // Header
     bytes += generator.text(
-      "MELLIA POS",
+      "MELLIA RESTO",
       styles: const PosStyles(
         align: PosAlign.center,
         height: PosTextSize.size2,
@@ -61,43 +123,52 @@ class PrinterService extends _$PrinterService {
       ),
     );
     bytes += generator.text(
-      "Restaurant & Bar",
+      "10, Bypass, Mont-ngafula, Kinshasa",
       styles: const PosStyles(align: PosAlign.center),
     );
     bytes += generator.hr();
 
     // Info
-    bytes += generator.text("Ticket: $ticketNum");
-    bytes += generator.text("Date: ${date ?? DateTime.now()}");
-    if (clientName != null) {
-      bytes += generator.text("Client: $clientName");
+    bytes += generator.text("Ticket: #$ticketNum");
+    bytes += generator.text("Date: $createdAtStr");
+    if (cashierName != null) {
+      bytes += generator.text("Caissier: $cashierName");
     }
+    bytes += generator.text("Client: $clientName");
     bytes += generator.hr();
 
     // Items
     bytes += generator.row([
-      PosColumn(text: 'Qte', width: 2),
+      PosColumn(text: 'Qt', width: 2),
       PosColumn(text: 'Article', width: 7),
       PosColumn(
-        text: 'Prix',
+        text: 'Total',
         width: 3,
         styles: const PosStyles(align: PosAlign.right),
       ),
     ]);
 
     for (final item in items) {
-      // Adapt usage depending on if passed CartItem or direct object
-      final name = item.product.name;
-      final qty = item.quantity.toString();
-      final price = item.totalCdf
+      final product = item['product'] ?? {};
+      final name = product['name'] ?? "Inconnu";
+      final qty = (double.tryParse(item['quantity'].toString()) ?? 1.0)
           .toInt()
-          .toString(); // Printing in CDF usuallly tailored for locals
+          .toString();
+      final priceCdf =
+          double.tryParse(item['unitPriceCdf']?.toString() ?? "0") ?? 0.0;
+      final totalRowCdf = (int.tryParse(qty) ?? 1) * priceCdf;
 
       bytes += generator.row([
         PosColumn(text: qty, width: 2),
-        PosColumn(text: name, width: 7),
         PosColumn(
-          text: price,
+          text: name.toString().substring(
+            0,
+            name.toString().length > 15 ? 15 : name.toString().length,
+          ),
+          width: 7,
+        ),
+        PosColumn(
+          text: totalRowCdf.toInt().toString(),
           width: 3,
           styles: const PosStyles(align: PosAlign.right),
         ),
@@ -116,14 +187,18 @@ class PrinterService extends _$PrinterService {
       ),
     );
     bytes += generator.text(
-      "USD: \$${totalUsd.toStringAsFixed(2)}",
-      styles: const PosStyles(align: PosAlign.right),
+      "TOTAL USD: \$${totalUsd.toStringAsFixed(2)}",
+      styles: const PosStyles(align: PosAlign.right, bold: true),
     );
 
     bytes += generator.hr();
     bytes += generator.text(
       "Merci de votre visite !",
       styles: const PosStyles(align: PosAlign.center, bold: true),
+    );
+    bytes += generator.text(
+      "Mangez comme chez vous",
+      styles: const PosStyles(align: PosAlign.center),
     );
     bytes += generator.feed(2);
     bytes += generator.cut();

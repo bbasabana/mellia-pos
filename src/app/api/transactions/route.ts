@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { deductStock, restoreStock } from "@/lib/stock-service";
 
 export async function GET(req: NextRequest) {
     try {
@@ -129,46 +130,26 @@ export async function PUT(req: NextRequest) {
                         // If already COMPLETED, handle stock adjustments immediately
                         if (!isDraft && diff !== 0) {
                             const product = await tx.product.findUnique({ where: { id: item.productId } });
-                            const location = product?.type === "BEVERAGE" ? "FRIGO" : "CUISINE";
-
-                            if (diff > 0) { // Bought MORE
-                                const stockItem = await tx.stockItem.findUnique({
-                                    where: { productId_location: { productId: item.productId, location: location as any } }
-                                });
-                                if (!stockItem || Number(stockItem.quantity) < diff) {
-                                    throw new Error(`Stock insuffisant pour ${product?.name}`);
+                            if (product) {
+                                if (diff > 0) { // Bought MORE
+                                    await deductStock(
+                                        tx,
+                                        item.productId,
+                                        diff,
+                                        product.type,
+                                        sale.ticketNum,
+                                        (session.user as any).id
+                                    );
+                                } else { // Bought LESS
+                                    await restoreStock(
+                                        tx,
+                                        item.productId,
+                                        Math.abs(diff),
+                                        product.type,
+                                        sale.ticketNum,
+                                        (session.user as any).id
+                                    );
                                 }
-                                await tx.stockItem.update({
-                                    where: { productId_location: { productId: item.productId, location: location as any } },
-                                    data: { quantity: { decrement: diff } }
-                                });
-                                // OUT movement implied
-                                await tx.stockMovement.create({
-                                    data: {
-                                        productId: item.productId,
-                                        type: "ADJUSTMENT",
-                                        quantity: new Prisma.Decimal(diff),
-                                        fromLocation: location as any,
-                                        reason: `Modif Vente #${sale.ticketNum}`,
-                                        userId: (session.user as any).id
-                                    }
-                                });
-                            } else { // Bought LESS
-                                await tx.stockItem.update({
-                                    where: { productId_location: { productId: item.productId, location: location as any } },
-                                    data: { quantity: { increment: Math.abs(diff) } }
-                                });
-                                // IN movement implied
-                                await tx.stockMovement.create({
-                                    data: {
-                                        productId: item.productId,
-                                        type: "ADJUSTMENT",
-                                        quantity: new Prisma.Decimal(Math.abs(diff)),
-                                        toLocation: location as any,
-                                        reason: `Modif Vente #${sale.ticketNum}`,
-                                        userId: (session.user as any).id
-                                    }
-                                });
                             }
                         }
 
@@ -189,31 +170,16 @@ export async function PUT(req: NextRequest) {
                         // If COMPLETED, we need to check/deduct stock
                         if (!isDraft) {
                             const product = await tx.product.findUnique({ where: { id: item.productId } });
-                            const location = product?.type === "BEVERAGE" ? "FRIGO" : "CUISINE";
-
-                            // Check stock
-                            const stockItem = await tx.stockItem.findUnique({
-                                where: { productId_location: { productId: item.productId, location: location as any } }
-                            });
-                            if (!stockItem || Number(stockItem.quantity) < quantity) {
-                                throw new Error(`Stock insuffisant pour ${product?.name}`);
+                            if (product) {
+                                await deductStock(
+                                    tx,
+                                    item.productId,
+                                    quantity,
+                                    product.type,
+                                    sale.ticketNum,
+                                    session.user.id
+                                );
                             }
-                            // Deduct
-                            await tx.stockItem.update({
-                                where: { productId_location: { productId: item.productId, location: location as any } },
-                                data: { quantity: { decrement: quantity } }
-                            });
-                            // Movement
-                            await tx.stockMovement.create({
-                                data: {
-                                    productId: item.productId,
-                                    type: "OUT",
-                                    quantity: new Prisma.Decimal(quantity),
-                                    fromLocation: location as any,
-                                    reason: `Ajout Vente #${sale.ticketNum}`,
-                                    userId: session.user.id
-                                }
-                            });
                         }
 
                         await tx.saleItem.create({
@@ -240,21 +206,16 @@ export async function PUT(req: NextRequest) {
                     if (!isDraft) {
                         // Restore stock if it was COMPLETED
                         const product = await tx.product.findUnique({ where: { id: item.productId } });
-                        const location = product?.type === "BEVERAGE" ? "FRIGO" : "CUISINE";
-                        await tx.stockItem.update({
-                            where: { productId_location: { productId: item.productId, location: location as any } },
-                            data: { quantity: { increment: item.quantity } }
-                        });
-                        await tx.stockMovement.create({
-                            data: {
-                                productId: item.productId,
-                                type: "ADJUSTMENT",
-                                quantity: item.quantity,
-                                toLocation: location as any,
-                                reason: `Retrait Vente #${sale.ticketNum}`,
-                                userId: session.user.id
-                            }
-                        });
+                        if (product) {
+                            await restoreStock(
+                                tx,
+                                item.productId,
+                                Number(item.quantity),
+                                product.type,
+                                sale.ticketNum,
+                                session.user.id
+                            );
+                        }
                     }
                     await tx.saleItem.delete({ where: { id: item.id } });
                 }
@@ -270,37 +231,16 @@ export async function PUT(req: NextRequest) {
 
                 for (const item of updatedSale?.items || []) {
                     const product = await tx.product.findUnique({ where: { id: item.productId }, include: { costs: true } });
-                    const location = product?.type === "BEVERAGE" ? "FRIGO" : "CUISINE";
-
-                    // Check Stock
-                    const stockItem = await tx.stockItem.findUnique({
-                        where: { productId_location: { productId: item.productId, location: location as any } }
-                    });
-                    if (!stockItem || Number(stockItem.quantity) < Number(item.quantity)) {
-                        throw new Error(`Stock insuffisant pour ${product?.name} lors de la validation`);
+                    if (product) {
+                        await deductStock(
+                            tx,
+                            item.productId,
+                            Number(item.quantity),
+                            product.type,
+                            sale.ticketNum,
+                            session.user.id
+                        );
                     }
-
-                    // Deduct
-                    await tx.stockItem.update({
-                        where: { productId_location: { productId: item.productId, location: location as any } },
-                        data: { quantity: { decrement: item.quantity } }
-                    });
-
-                    // Movement
-                    const costEntry = product?.costs.find(c => c.forUnit === product.saleUnit) || product?.costs[0];
-                    const unitCost = costEntry ? Number(costEntry.unitCostUsd) : 0;
-
-                    await tx.stockMovement.create({
-                        data: {
-                            productId: item.productId,
-                            type: "OUT",
-                            quantity: item.quantity,
-                            fromLocation: location as any,
-                            reason: `Validation Vente #${sale.ticketNum}`,
-                            userId: session.user.id,
-                            costValue: unitCost * Number(item.quantity)
-                        }
-                    });
                 }
 
                 // Points Logic
@@ -398,34 +338,17 @@ export async function DELETE(req: NextRequest) {
 
             // 2. Restore Stock
             for (const item of sale.items) {
-                // Determine location logic (same as create)
                 const product = await tx.product.findUnique({ where: { id: item.productId } });
-                const location = product?.type === "BEVERAGE" ? "FRIGO" : "CUISINE";
-
-                // Increment Stock
-                await tx.stockItem.update({
-                    where: {
-                        productId_location: {
-                            productId: item.productId,
-                            location: location as any
-                        }
-                    },
-                    data: {
-                        quantity: { increment: item.quantity }
-                    }
-                });
-
-                // Create Adjustment Movement
-                await tx.stockMovement.create({
-                    data: {
-                        productId: item.productId,
-                        type: "ADJUSTMENT",
-                        quantity: item.quantity,
-                        toLocation: location as any,
-                        reason: `Annulation Vente #${sale.ticketNum}`,
-                        userId: session.user.id
-                    }
-                });
+                if (product) {
+                    await restoreStock(
+                        tx,
+                        item.productId,
+                        Number(item.quantity),
+                        product.type,
+                        sale.ticketNum,
+                        session.user.id
+                    );
+                }
             }
 
             // 3. Revert Loyalty Points if applicable

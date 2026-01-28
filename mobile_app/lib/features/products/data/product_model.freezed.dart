@@ -232,8 +232,8 @@ return $default(_that.id,_that.name,_that.type,_that.imageUrl,_that.description,
 /// @nodoc
 @JsonSerializable()
 
-class _Product implements Product {
-  const _Product({required this.id, required this.name, required this.type, this.imageUrl, this.description, this.beverageCategory, this.foodCategory, this.size = 'STANDARD', required this.saleUnit, this.active = true, this.vendable = true, final  List<ProductPrice> prices = const [], @JsonKey(fromJson: toDouble) this.priceUsd, @JsonKey(fromJson: toDouble) this.priceCdf, final  List<StockItem> stockItems = const []}): _prices = prices,_stockItems = stockItems;
+class _Product extends Product {
+  const _Product({required this.id, required this.name, required this.type, this.imageUrl, this.description, this.beverageCategory, this.foodCategory, this.size = 'STANDARD', required this.saleUnit, this.active = true, this.vendable = true, final  List<ProductPrice> prices = const [], @JsonKey(fromJson: toDouble) this.priceUsd, @JsonKey(fromJson: toDouble) this.priceCdf, final  List<StockItem> stockItems = const []}): _prices = prices,_stockItems = stockItems,super._();
   factory _Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);
 
 @override final  String id;
