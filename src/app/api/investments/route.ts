@@ -159,6 +159,8 @@ export async function POST(req: Request) {
             const investment = await tx.investment.create({
                 data: {
                     totalAmount: totalAmount,
+                    totalAmountCdf: body.totalAmountCdf || 0,
+                    exchangeRate: body.exchangeRate || 0,
                     source: source as FundSource,
                     vendableAmount: vendableTotal,
                     nonVendableAmount: nonVendableTotal,

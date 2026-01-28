@@ -29,7 +29,7 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
     // On-the-fly NEW product state
     const [isCreatingNew, setIsCreatingNew] = useState(false);
     const [newName, setNewName] = useState("");
-    const [newUnit, setNewUnit] = useState("Unité");
+    const [newUnit, setNewUnit] = useState("PIECE");
     const [priceMode, setPriceMode] = useState<"PER_PACK" | "PER_ITEM">("PER_PACK");
     const [editPackQty, setEditPackQty] = useState("1");
 
@@ -307,11 +307,11 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                                 onChange={(e) => setNewUnit(e.target.value)}
                                 className="w-full p-2 border border-orange-200 rounded text-sm focus:ring-2 focus:ring-orange-100 outline-none"
                             >
-                                <option value="PIECE">Pièce</option>
-                                <option value="KG">Kilo (kg)</option>
-                                <option value="LITRE">Litre (L)</option>
-                                <option value="BOITE">Boîte</option>
-                                <option value="SACHET">Sachet</option>
+                                <option value="PIECE">Pièce (Unité)</option>
+                                <option value="BOTTLE">Bouteille</option>
+                                <option value="PLATE">Plat / Portion</option>
+                                <option value="HALF_PLATE">Demi-portion</option>
+                                <option value="MEASURE">Mesure (Whisky/Spirit.)</option>
                             </select>
                         </div>
                     </div>
