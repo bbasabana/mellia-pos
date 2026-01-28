@@ -489,7 +489,16 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                         <tbody className="divide-y divide-gray-100">
                             {items.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-gray-50/50">
-                                    <td className="p-3 font-medium text-gray-800">{item.productName}</td>
+                                    <td className="p-3 font-medium text-gray-800">
+                                        <div className="flex flex-col">
+                                            <span>{item.productName}</span>
+                                            {!item.isVendable && (
+                                                <span className="text-[9px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded w-fit font-bold mt-0.5 border border-orange-200">
+                                                    CHARGE (NON-VENDABLE)
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="p-3 text-center text-xs text-gray-400">{item.location}</td>
                                     <td className="p-3 text-right">
                                         <div className="font-bold">{item.displayQty} {item.displayUnit}</div>
