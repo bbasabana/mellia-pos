@@ -1,0 +1,119 @@
+"use client";
+
+import { Modal } from "@/components/ui/Modal";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { Package, MapPin, Hash, User, Calendar } from "lucide-react";
+
+interface PurchaseDetailsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    investment: any;
+}
+
+export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDetailsModalProps) {
+    if (!investment) return null;
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Détails de l'Achat #${investment.id.slice(-6)}`} size="xl">
+            <div className="space-y-6">
+                {/* Header Info */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b border-gray-100">
+                    <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Date</p>
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <Calendar size={14} className="text-gray-400" />
+                            {formatDate(new Date(investment.date))}
+                        </div>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Acheteur</p>
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <User size={14} className="text-gray-400" />
+                            {investment.user?.name || "Inconnu"}
+                        </div>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Source</p>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${investment.source === 'OWNER_CAPITAL' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
+                            }`}>
+                            {investment.source === 'OWNER_CAPITAL' ? 'Patron' : 'Caisse'}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Items List */}
+                <div>
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
+                        <Package size={14} />
+                        Produits Achetés
+                    </h4>
+                    <div className="border border-gray-200 rounded overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase">
+                                <tr>
+                                    <th className="px-4 py-2 text-left">Produit</th>
+                                    <th className="px-4 py-2 text-center">Destination</th>
+                                    <th className="px-4 py-2 text-right">Quantité</th>
+                                    <th className="px-4 py-2 text-right">Coût (Val.)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {investment.movements?.map((mov: any) => (
+                                    <tr key={mov.id}>
+                                        <td className="px-4 py-3">
+                                            <div className="font-medium text-gray-800">{mov.product?.name}</div>
+                                            <div className="text-[10px] text-gray-400">ID: {mov.productId.slice(-6)}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <div className="flex items-center justify-center gap-1 text-xs text-gray-600">
+                                                <MapPin size={10} className="text-gray-400" />
+                                                {mov.toLocation}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="font-bold text-gray-800">
+                                                {Number(mov.quantity)} {mov.product?.saleUnit === 'BOTTLE' ? 'Bout.' : (mov.product?.saleUnit || 'Unit')}
+                                            </div>
+                                            {mov.product?.purchaseUnit && mov.product?.packingQuantity > 1 && (
+                                                <div className="text-[10px] text-blue-500">
+                                                    {(Number(mov.quantity) / mov.product.packingQuantity).toFixed(1)} {mov.product.purchaseUnit}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="font-bold text-gray-700">{formatCurrency(Number(mov.costValue))}</div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Summary */}
+                <div className="bg-gray-50 p-4 rounded-sm flex justify-between items-end border border-gray-100">
+                    <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Description / Notes</p>
+                        <p className="text-sm text-gray-700 italic">{investment.description || "Aucune note"}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold">Total Investi</p>
+                        <p className="text-2xl font-black text-[#00d3fa]">{formatCurrency(Number(investment.totalAmount))}</p>
+                    </div>
+                </div>
+
+                {/* ROI Info */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-green-50 border border-green-100 rounded">
+                        <p className="text-[10px] text-green-600 uppercase font-bold mb-1">Revenu Attendu</p>
+                        <p className="text-lg font-bold text-green-700">{formatCurrency(Number(investment.expectedRevenue || 0))}</p>
+                    </div>
+                    <div className="p-3 bg-[#f0f9ff] border border-blue-100 rounded">
+                        <p className="text-[10px] text-blue-600 uppercase font-bold mb-1">Profit Prévu (ROI)</p>
+                        <p className="text-lg font-bold text-[#00d3fa]">{formatCurrency(Number(investment.expectedProfit || 0))}</p>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+}

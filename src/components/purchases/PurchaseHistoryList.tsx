@@ -2,17 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { User, Calendar, DollarSign, Wallet } from "lucide-react";
+import { User, Calendar, DollarSign, Wallet, Eye, Trash2 } from "lucide-react";
+import { PurchaseDetailsModal } from "./PurchaseDetailsModal";
+import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
+import { showToast } from "@/components/ui/Toast";
 
 export function PurchaseHistoryList() {
     const [loading, setLoading] = useState(true);
     const [investments, setInvestments] = useState<any[]>([]);
+
+    // Detail Modal State
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedInvestment, setSelectedInvestment] = useState<any>(null);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
+    const [loadingDetail, setLoadingDetail] = useState(false);
+
+    // Delete Modal State
+    const [idToDelete, setIdToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchHistory();
     }, []);
 
     const fetchHistory = async () => {
+        setLoading(true);
         try {
             const res = await fetch("/api/investments");
             const data = await res.json();
@@ -23,6 +37,47 @@ export function PurchaseHistoryList() {
             console.error(error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleViewDetails = async (id: string) => {
+        setLoadingDetail(true);
+        setSelectedId(id);
+        setIsDetailOpen(true);
+        try {
+            const res = await fetch(`/api/investments?id=${id}`);
+            const json = await res.json();
+            if (json.success) {
+                setSelectedInvestment(json.data);
+            } else {
+                showToast("Erreur lors du chargement des détails", "error");
+                setIsDetailOpen(false);
+            }
+        } catch (error) {
+            showToast("Erreur de connexion", "error");
+            setIsDetailOpen(false);
+        } finally {
+            setLoadingDetail(false);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!idToDelete) return;
+        setIsDeleting(true);
+        try {
+            const res = await fetch(`/api/investments?id=${idToDelete}`, { method: "DELETE" });
+            const json = await res.json();
+            if (json.success) {
+                showToast("Achat supprimé avec succès. Stock inversé.", "success");
+                fetchHistory();
+                setIdToDelete(null);
+            } else {
+                showToast(json.error || "Erreur lors de la suppression", "error");
+            }
+        } catch (error) {
+            showToast("Erreur de connexion", "error");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -42,6 +97,7 @@ export function PurchaseHistoryList() {
                         <th className="px-4 py-3">Source</th>
                         <th className="px-4 py-3 text-right">Montant Investi</th>
                         <th className="px-4 py-3 text-right text-green-600">ROI Attendu</th>
+                        <th className="px-4 py-3 text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -62,8 +118,8 @@ export function PurchaseHistoryList() {
                             </td>
                             <td className="px-4 py-3">
                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase ${inv.source === 'OWNER_CAPITAL'
-                                        ? 'bg-purple-50 text-purple-600'
-                                        : 'bg-orange-50 text-orange-600'
+                                    ? 'bg-purple-50 text-purple-600'
+                                    : 'bg-orange-50 text-orange-600'
                                     }`}>
                                     {inv.source === 'OWNER_CAPITAL' ? <Wallet size={10} /> : <DollarSign size={10} />}
                                     {inv.source === 'OWNER_CAPITAL' ? 'Patron' : 'Caisse'}
@@ -75,10 +131,47 @@ export function PurchaseHistoryList() {
                             <td className="px-4 py-3 text-right font-medium text-[#71de00]">
                                 {inv.expectedProfit > 0 ? `+${formatCurrency(Number(inv.expectedProfit))}` : "-"}
                             </td>
+                            <td className="px-4 py-3 text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                    <button
+                                        onClick={() => handleViewDetails(inv.id)}
+                                        className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+                                        title="Voir détails"
+                                    >
+                                        <Eye size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setIdToDelete(inv.id)}
+                                        className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                                        title="Supprimer"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            {/* MODALS */}
+            <PurchaseDetailsModal
+                isOpen={isDetailOpen}
+                onClose={() => {
+                    setIsDetailOpen(false);
+                    setSelectedInvestment(null);
+                }}
+                investment={selectedInvestment}
+            />
+
+            <ConfirmDeleteModal
+                isOpen={!!idToDelete}
+                onClose={() => setIdToDelete(null)}
+                onConfirm={confirmDelete}
+                title="Supprimer l'Achat"
+                message="Attention: Supprimer cet achat inversera les entrées en stock correspondantes. Voulez-vous continuer ?"
+                isLoading={isDeleting}
+            />
         </div>
     );
 }

@@ -5,10 +5,35 @@ import { authOptions } from "@/lib/auth-options";
 import { FundSource, StockLocation } from "@prisma/client";
 
 // GET: Fetch Investment Stats & History
-export async function GET() {
+export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get("id");
+
+        if (id) {
+            const investment = await prisma.investment.findUnique({
+                where: { id },
+                include: {
+                    user: { select: { name: true } },
+                    movements: {
+                        include: {
+                            product: {
+                                select: {
+                                    name: true,
+                                    saleUnit: true,
+                                    purchaseUnit: true,
+                                    packingQuantity: true
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            return NextResponse.json({ success: true, data: investment });
+        }
 
         // 1. Get recent investments
         const investments = await prisma.investment.findMany({
@@ -71,6 +96,7 @@ export async function POST(req: Request) {
         // Transaction: Create Investment + Stock Movements + Update StockItems
         const result = await prisma.$transaction(async (tx) => {
             let vendableTotal = 0;
+            let expectedRevenue = 0;
             let finalItems = [];
 
             // 1. Pre-process items (create new products if needed)
@@ -105,6 +131,18 @@ export async function POST(req: Request) {
 
                 if (isVendable) {
                     vendableTotal += (item.cost * item.quantity);
+
+                    // ROI Logic: Get selling price
+                    const prices = await tx.productPrice.findMany({
+                        where: { productId: actualProductId }
+                    });
+
+                    // Use highest price found (or default to 0 if none)
+                    const sellingPrice = prices.length > 0
+                        ? Math.max(...prices.map(p => Number(p.priceUsd)))
+                        : 0;
+
+                    expectedRevenue += (sellingPrice * item.quantity);
                 }
 
                 finalItems.push({
@@ -115,6 +153,7 @@ export async function POST(req: Request) {
             }
 
             const nonVendableTotal = Number(totalAmount) - vendableTotal;
+            const expectedProfit = expectedRevenue - vendableTotal;
 
             // 2. Create Investment Record
             const investment = await tx.investment.create({
@@ -123,8 +162,8 @@ export async function POST(req: Request) {
                     source: source as FundSource,
                     vendableAmount: vendableTotal,
                     nonVendableAmount: nonVendableTotal,
-                    expectedRevenue: 0,
-                    expectedProfit: 0,
+                    expectedRevenue: expectedRevenue,
+                    expectedProfit: expectedProfit,
                     description,
                     userId: session.user.id
                 }
@@ -167,6 +206,59 @@ export async function POST(req: Request) {
 
     } catch (error) {
         console.error("Investment POST Error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
+
+// DELETE: Delete Investment + Reverse Stock
+export async function DELETE(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get("id");
+
+        if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Get all movements for this investment
+            const movements = await tx.stockMovement.findMany({
+                where: { investmentId: id }
+            });
+
+            // 2. Reverse stock changes
+            for (const mov of movements) {
+                if (mov.type === "IN" && mov.toLocation) {
+                    await tx.stockItem.updateMany({
+                        where: {
+                            productId: mov.productId,
+                            location: mov.toLocation
+                        },
+                        data: {
+                            quantity: { decrement: mov.quantity }
+                        }
+                    });
+                }
+            }
+
+            // 3. Delete movements
+            await tx.stockMovement.deleteMany({
+                where: { investmentId: id }
+            });
+
+            // 4. Delete investment
+            const deleted = await tx.investment.delete({
+                where: { id }
+            });
+
+            return deleted;
+        });
+
+        return NextResponse.json({ success: true, data: result });
+
+    } catch (error) {
+        console.error("Investment DELETE Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

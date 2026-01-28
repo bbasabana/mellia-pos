@@ -113,10 +113,6 @@ function ProductsPageContent() {
 
   // Filtered products
   const filteredProducts = products.filter((product) => {
-    // BUSINESS DECISION: Default list only shows VENDABLE products
-    if (!product.vendable && !typeFilter) {
-      return false;
-    }
     if (search && !product.name.toLowerCase().includes(search.toLowerCase())) {
       return false;
     }
@@ -254,6 +250,9 @@ function ProductsPageContent() {
                                 {product.beverageCategory || product.foodCategory || ""}
                                 {(product.beverageCategory || product.foodCategory) && " • "}
                                 {product.size === "SMALL" ? "Petit" : product.size === "LARGE" ? "Gros" : ""}
+                                {!product.vendable && (
+                                  <span className="ml-2 bg-yellow-100 text-yellow-700 px-1 rounded-[2px] text-[9px] font-black uppercase">Brouillon</span>
+                                )}
                               </span>
                             </div>
                           </td>
@@ -263,11 +262,11 @@ function ProductsPageContent() {
                                 "text-[10px] font-bold uppercase px-2 py-1 rounded-sm",
                                 product.type === "BEVERAGE" ? "bg-blue-50 text-blue-600" :
                                   product.type === "FOOD" ? "bg-orange-50 text-orange-600" :
-                                    "bg-gray-100 text-gray-600"
+                                    "bg-gray-200 text-gray-500"
                               )}
                             >
                               {product.type === "BEVERAGE" ? "Boisson" :
-                                product.type === "FOOD" ? "Nourriture" : "Autre"}
+                                product.type === "FOOD" ? "Nourriture" : "Consommable / Brouillon"}
                             </span>
                           </td>
                           <td className="px-6 py-4">

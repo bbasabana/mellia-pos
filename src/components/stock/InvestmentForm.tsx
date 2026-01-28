@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Save, DollarSign, Calculator, User, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { showToast } from "@/components/ui/Toast";
 
 const DEFAULT_RATE = 2850; // Taux par défaut (à récupérer du backend idéalement)
 
@@ -163,15 +164,15 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
             });
             const data = await res.json();
             if (data.success) {
-                alert("Achat enregistré ! Stock mis à jour.");
+                showToast("Achat enregistré ! Stock mis à jour.", "success");
                 setItems([]);
                 if (onSuccess) onSuccess();
             } else {
-                alert("Erreur: " + data.error);
+                showToast(data.error || "Erreur lors de l'enregistrement", "error");
             }
         } catch (err) {
             console.error(err);
-            alert("Erreur de connexion");
+            showToast("Erreur de connexion", "error");
         } finally {
             setLoading(false);
         }
