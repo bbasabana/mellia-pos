@@ -143,7 +143,7 @@ export function PurchaseHistoryList({ onEdit }: { onEdit?: (id: string) => void 
                                     {onEdit && (
                                         <button
                                             onClick={() => onEdit(inv.id)}
-                                            className="p-1.5 text-gray-400 hover:text-green-600 transition-colors"
+                                            className="p-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors"
                                             title="Modifier"
                                         >
                                             <Edit size={16} />
