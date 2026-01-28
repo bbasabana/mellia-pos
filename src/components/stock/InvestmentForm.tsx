@@ -29,6 +29,9 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
     const [isCreatingNew, setIsCreatingNew] = useState(false);
     const [newName, setNewName] = useState("");
     const [newUnit, setNewUnit] = useState("Unité");
+    const [priceMode, setPriceMode] = useState<"PER_PACK" | "PER_ITEM">("PER_PACK");
+    const [editPackQty, setEditPackQty] = useState("1");
+
 
     useEffect(() => {
         fetchProducts();
@@ -72,15 +75,20 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
             pName = product?.name;
             sUnit = product?.saleUnit;
             isVendable = product?.type !== "NON_VENDABLE";
-            packQty = product?.packingQuantity || 1;
+            packQty = parseFloat(editPackQty) || product?.packingQuantity || 1;
             pUnit = product?.purchaseUnit;
 
             // BUSINESS LOGIC: Automatic conversion if purchase unit exists
             if (pUnit && packQty > 1) {
                 quantityToAdd = inputQtyVal * packQty;
-                realUnitCost = inputPriceVal / packQty;
+                // Cost per INTERNAL unit (ex: per bottle)
+                realUnitCost = priceMode === "PER_PACK" ? (inputPriceVal / packQty) : inputPriceVal;
+            } else {
+                realUnitCost = inputPriceVal;
             }
         }
+
+        const lineTotal = priceMode === "PER_PACK" ? (inputQtyVal * inputPriceVal) : (inputQtyVal * packQty * inputPriceVal);
 
         const costUsd = currency === "USD" ? realUnitCost : (realUnitCost / rate);
 
@@ -99,7 +107,9 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
 
             // Backend Data
             quantity: quantityToAdd,
-            inputPrice: inputPriceVal,
+            itemPrice: inputPriceVal, // The price entered (might be per pack or per item)
+            priceMode: priceMode,
+            lineTotal: lineTotal,
             inputCurrency: currency,
             costUsd: costUsd,
             location: location,
@@ -122,7 +132,9 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
         setLoading(true);
 
         const totalUsd = items.reduce((acc, item) => acc + (item.costUsd * item.quantity), 0);
-        const totalCdf = currency === "CDF" ? items.reduce((acc, item) => acc + (item.inputPrice * item.quantity), 0) : null;
+        // Sum of all line totals in the entered currency (CDF or USD)
+        const totalAmountEntered = items.reduce((acc, item) => acc + item.lineTotal, 0);
+        const totalCdf = currency === "CDF" ? totalAmountEntered : (totalAmountEntered * parseFloat(exchangeRate));
 
         // Append Buyer Name to description if present
         const finalDesc = buyerName ? `[Acheteur: ${buyerName}] ${description}` : description;
@@ -166,7 +178,7 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
     };
 
     // Calculate Totals for UI
-    const totalDisplay = items.reduce((acc, item) => acc + (item.displayPrice * item.displayQty), 0);
+    const totalDisplay = items.reduce((acc, item) => acc + item.lineTotal, 0);
     const convertedTotal = currency === "CDF"
         ? (totalDisplay / (parseFloat(exchangeRate) || DEFAULT_RATE)).toFixed(2) + " $"
         : (totalDisplay * (parseFloat(exchangeRate) || DEFAULT_RATE)).toLocaleString() + " FC";
@@ -241,7 +253,12 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                         </div>
                         <select
                             value={selectedProduct}
-                            onChange={(e) => setSelectedProduct(e.target.value)}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setSelectedProduct(val);
+                                const p = products.find(prod => prod.id === val);
+                                setEditPackQty(p?.packingQuantity?.toString() || "1");
+                            }}
                             className="w-full p-2 border border-blue-200 rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none"
                         >
                             <option value="">choisir produit...</option>
@@ -312,27 +329,55 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                     />
                 </div>
                 <div className="w-32">
-                    <div className="text-[10px] uppercase font-bold text-gray-400 mb-1">
-                        Prix Unitaire ({currency})
+                    <div className="text-[10px] uppercase font-bold text-gray-400 mb-1 flex justify-between">
+                        <span>Prix Unitaire ({currency})</span>
+                        <div className="flex gap-1">
+                            <button
+                                onClick={() => setPriceMode("PER_PACK")}
+                                className={cn("px-1 rounded-[2px] text-[9px]", priceMode === "PER_PACK" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-500")}
+                                title="Prix par Carton/Casier"
+                            >PACK</button>
+                            <button
+                                onClick={() => setPriceMode("PER_ITEM")}
+                                className={cn("px-1 rounded-[2px] text-[9px]", priceMode === "PER_ITEM" ? "bg-green-600 text-white" : "bg-gray-200 text-gray-500")}
+                                title="Prix par Bouteille/Plat"
+                            >ITEM</button>
+                        </div>
                     </div>
                     <input
                         type="number"
                         value={unitPrice}
                         onChange={(e) => setUnitPrice(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded text-sm text-right"
+                        className="w-full p-2 border border-gray-300 rounded text-sm text-right font-bold"
                         placeholder="0"
                     />
                 </div>
 
-                {/* Live Conversion Preview */}
-                {!isCreatingNew && products.find(p => p.id === selectedProduct)?.purchaseUnit && products.find(p => p.id === selectedProduct)?.packingQuantity > 1 && qty && (
-                    <div className="flex items-center pb-2 px-3 bg-[#f0f9ff] border border-blue-100 rounded animate-in fade-in slide-in-from-bottom-1">
-                        <span className="text-xs font-bold text-blue-600">
-                            {qty} {products.find(p => p.id === selectedProduct)?.purchaseUnit} × {products.find(p => p.id === selectedProduct)?.packingQuantity} =
-                            <span className="ml-1 text-[#00d3fa]">
-                                {(parseFloat(qty) * products.find(p => p.id === selectedProduct)?.packingQuantity).toFixed(1)} {products.find(p => p.id === selectedProduct)?.saleUnit === "BOTTLE" ? "Bout." : "Unité"}
-                            </span>
-                        </span>
+                {/* Live Preview & Packing Override */}
+                {!isCreatingNew && (products.find(p => p.id === selectedProduct)?.purchaseUnit) && (
+                    <div className="flex flex-col gap-1 p-2 bg-[#f0f9ff] border border-blue-100 rounded min-w-[140px]">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-[9px] font-bold text-blue-400 uppercase">Items par {products.find(p => p.id === selectedProduct)?.purchaseUnit}</span>
+                            <input
+                                type="number"
+                                value={editPackQty}
+                                onChange={(e) => setEditPackQty(e.target.value)}
+                                className="w-10 p-0.5 text-center text-xs border border-blue-200 rounded font-bold text-blue-700 bg-white"
+                            />
+                        </div>
+                        {qty && (
+                            <div className="text-[11px] font-bold text-blue-600 border-t border-blue-50 pt-1">
+                                {qty} {products.find(p => p.id === selectedProduct)?.purchaseUnit} = {(parseFloat(qty) * (parseFloat(editPackQty) || 1)).toFixed(0)} {products.find(p => p.id === selectedProduct)?.saleUnit === "BOTTLE" ? "Bout." : "Unité"}
+                            </div>
+                        )}
+                        {qty && unitPrice && (
+                            <div className="text-[11px] font-black text-orange-600">
+                                Total: {priceMode === "PER_PACK"
+                                    ? (parseFloat(qty) * parseFloat(unitPrice)).toLocaleString()
+                                    : (parseFloat(qty) * (parseFloat(editPackQty) || 1) * parseFloat(unitPrice)).toLocaleString()
+                                } {currency}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -385,10 +430,11 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                                         )}
                                     </td>
                                     <td className="p-3 text-right text-gray-500">
-                                        {item.displayPrice.toLocaleString()} {item.inputCurrency}
+                                        <div className="font-bold">{item.itemPrice.toLocaleString()} {item.inputCurrency}</div>
+                                        <div className="text-[10px] text-gray-400 capitalize">Par {item.priceMode === "PER_PACK" ? (item.displayUnit || "Pack") : (item.saleUnit || "Item")}</div>
                                     </td>
                                     <td className="p-3 text-right font-bold text-gray-700">
-                                        {(item.displayPrice * item.displayQty).toLocaleString()} {item.inputCurrency}
+                                        {item.lineTotal.toLocaleString()} {item.inputCurrency}
                                     </td>
                                     <td className="p-3 text-center">
                                         <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">
