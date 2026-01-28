@@ -103,14 +103,30 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                 </div>
 
                 {/* ROI Info */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-green-50 border border-green-100 rounded">
-                        <p className="text-[10px] text-green-600 uppercase font-bold mb-1">Revenu Attendu</p>
-                        <p className="text-lg font-bold text-green-700">{formatCurrency(Number(investment.expectedRevenue || 0))}</p>
-                    </div>
-                    <div className="p-3 bg-[#f0f9ff] border border-blue-100 rounded">
-                        <p className="text-[10px] text-blue-600 uppercase font-bold mb-1">Profit Prévu (ROI)</p>
-                        <p className="text-lg font-bold text-[#00d3fa]">{formatCurrency(Number(investment.expectedProfit || 0))}</p>
+                <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Analyse de Rentabilité Prévue</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Space 1: Terrasse */}
+                        <div className="p-4 bg-green-50/50 border border-green-100 rounded-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 bg-green-100 text-green-700 px-2 py-0.5 text-[9px] font-black rounded-bl-lg uppercase">Terrasse / Salle</div>
+                            <p className="text-[10px] text-green-600 uppercase font-bold mb-1">Revenu (Terrasse)</p>
+                            <p className="text-xl font-black text-green-700">{formatCurrency(Number(investment.expectedRevenue || 0))}</p>
+                            <div className="mt-2 pt-2 border-t border-green-100 flex justify-between items-center">
+                                <span className="text-[10px] text-green-600 font-bold uppercase">Profit Net</span>
+                                <span className="text-sm font-black text-green-700">+{formatCurrency(Number(investment.expectedProfit || 0))}</span>
+                            </div>
+                        </div>
+
+                        {/* Space 2: VIP */}
+                        <div className="p-4 bg-[#fcf9ff] border border-purple-100 rounded-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 bg-purple-100 text-purple-700 px-2 py-0.5 text-[9px] font-black rounded-bl-lg uppercase">VIP / Salon</div>
+                            <p className="text-[10px] text-purple-600 uppercase font-bold mb-1">Revenu (VIP)</p>
+                            <p className="text-xl font-black text-purple-700">{formatCurrency(Number(investment.expectedRevenueVip || investment.expectedRevenue || 0))}</p>
+                            <div className="mt-2 pt-2 border-t border-purple-100 flex justify-between items-center">
+                                <span className="text-[10px] text-purple-600 font-bold uppercase">Profit Net</span>
+                                <span className="text-sm font-black text-purple-700">+{formatCurrency(Number(investment.expectedProfitVip || investment.expectedProfit || 0))}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

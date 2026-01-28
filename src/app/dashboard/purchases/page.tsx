@@ -10,7 +10,9 @@ import { Modal } from "@/components/ui/Modal";
 
 export default function PurchasesPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editId, setEditId] = useState<string | undefined>(undefined);
     const [stats, setStats] = useState<any>(null);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const fetchData = async () => {
         try {
@@ -18,6 +20,7 @@ export default function PurchasesPage() {
             const data = await res.json();
             if (data.success) {
                 setStats(data.data.stats);
+                setRefreshTrigger(prev => prev + 1);
             }
         } catch (error) {
             console.error("Error fetching investment stats:", error);
@@ -79,18 +82,38 @@ export default function PurchasesPage() {
                         <div className="p-4 border-b border-gray-100 flex justify-between items-center">
                             <h3 className="font-bold text-gray-700">Journal des Achats</h3>
                         </div>
-                        <PurchaseHistoryList />
+                        <PurchaseHistoryList
+                            key={refreshTrigger}
+                            onEdit={(id) => {
+                                setEditId(id);
+                                setIsFormOpen(true);
+                            }}
+                        />
                     </div>
                 </div>
 
                 {/* MODAL FORM */}
                 <Modal
                     isOpen={isFormOpen}
-                    onClose={() => setIsFormOpen(false)}
-                    title="Nouvel Investissement (Achat Stock)"
+                    onClose={() => {
+                        setIsFormOpen(false);
+                        setEditId(undefined);
+                    }}
+                    title={editId ? "Modifier l'Achat" : "Nouvel Investissement (Achat Stock)"}
                     size="2xl"
                 >
-                    <InvestmentForm onSuccess={() => setIsFormOpen(false)} />
+                    <InvestmentForm
+                        editId={editId}
+                        onSuccess={() => {
+                            setIsFormOpen(false);
+                            setEditId(undefined);
+                            fetchData();
+                        }}
+                        onCancel={() => {
+                            setIsFormOpen(false);
+                            setEditId(undefined);
+                        }}
+                    />
                 </Modal>
             </div>
         </DashboardLayout>

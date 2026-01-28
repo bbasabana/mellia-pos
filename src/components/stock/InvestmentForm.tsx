@@ -7,8 +7,9 @@ import { showToast } from "@/components/ui/Toast";
 
 const DEFAULT_RATE = 2850; // Taux par défaut (à récupérer du backend idéalement)
 
-export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
+export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: string, onSuccess?: () => void, onCancel?: () => void }) {
     const [loading, setLoading] = useState(false);
+    const [fetchingEditData, setFetchingEditData] = useState(false);
     const [products, setProducts] = useState<any[]>([]);
 
     // Form State
@@ -36,7 +37,72 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
 
     useEffect(() => {
         fetchProducts();
-    }, []);
+        if (editId) {
+            fetchEditData();
+        }
+    }, [editId]);
+
+    const fetchEditData = async () => {
+        setFetchingEditData(true);
+        try {
+            const res = await fetch(`/api/investments?id=${editId}`);
+            const json = await res.json();
+            if (json.success && json.data) {
+                const inv = json.data;
+                setSource(inv.source);
+                setCurrency(inv.exchangeRate ? "USD" : "CDF"); // Simple heuristic
+                setExchangeRate(inv.exchangeRate?.toString() || DEFAULT_RATE.toString());
+
+                // Parse Buyer Name: "[Acheteur: Name] Actual Description"
+                const desc = inv.description || "";
+                const buyerMatch = desc.match(/^\[Acheteur:\s*([^\]]+)\]\s*(.*)/);
+                if (buyerMatch) {
+                    setBuyerName(buyerMatch[1]);
+                    setDescription(buyerMatch[2]);
+                } else {
+                    setDescription(desc);
+                }
+
+                // Map movements to form items
+                const mappedItems = inv.movements.map((mov: any) => {
+                    const prod = mov.product;
+                    // We need to reconstruct the "display" values
+                    // Note: This is an estimation since we don't store displayQty in DB
+                    // If packingQuantity > 1, displayQty = quantity / packingQuantity
+                    const packQty = prod.packingQuantity || 1;
+                    const displayQty = packQty > 1 ? Number(mov.quantity) / packQty : Number(mov.quantity);
+                    const costTotal = Number(mov.costValue || 0);
+                    const unitCost = costTotal / Number(mov.quantity);
+
+                    return {
+                        productId: mov.productId,
+                        productName: prod.name,
+                        isNew: false,
+                        newUnit: null,
+                        displayQty: displayQty,
+                        displayUnit: (packQty > 1 && prod.purchaseUnit) ? prod.purchaseUnit : prod.saleUnit,
+                        displayPrice: packQty > 1 ? unitCost * packQty : unitCost,
+                        packingQuantity: packQty,
+                        saleUnit: prod.saleUnit,
+                        quantity: Number(mov.quantity),
+                        itemPrice: packQty > 1 ? unitCost * packQty : unitCost,
+                        priceMode: packQty > 1 ? "PER_PACK" : "PER_ITEM",
+                        lineTotal: costTotal,
+                        inputCurrency: "USD", // Logic: costs are USD in DB
+                        costUsd: unitCost,
+                        location: mov.toLocation || "DEPOT",
+                        isVendable: prod.vendable
+                    };
+                });
+                setItems(mappedItems);
+            }
+        } catch (error) {
+            console.error(error);
+            showToast("Erreur lors de la récupération des données", "error");
+        } finally {
+            setFetchingEditData(false);
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -142,9 +208,10 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
 
         try {
             const res = await fetch("/api/investments", {
-                method: "POST",
+                method: editId ? "PUT" : "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    id: editId,
                     totalAmount: totalUsd,
                     totalAmountCdf: totalCdf,
                     exchangeRate: parseFloat(exchangeRate),
@@ -164,7 +231,7 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
             });
             const data = await res.json();
             if (data.success) {
-                showToast("Achat enregistré ! Stock mis à jour.", "success");
+                showToast(editId ? "Achat mis à jour !" : "Achat enregistré ! Stock mis à jour.", "success");
                 setItems([]);
                 if (onSuccess) onSuccess();
             } else {
@@ -183,6 +250,8 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
     const convertedTotal = currency === "CDF"
         ? (totalDisplay / (parseFloat(exchangeRate) || DEFAULT_RATE)).toFixed(2) + " $"
         : (totalDisplay * (parseFloat(exchangeRate) || DEFAULT_RATE)).toLocaleString() + " FC";
+
+    if (fetchingEditData) return <div className="p-12 text-center text-gray-400">Chargement des données de l&apos;achat...</div>;
 
     return (
         <div className="bg-white p-6 border border-gray-200 rounded-sm">
@@ -478,8 +547,16 @@ export function InvestmentForm({ onSuccess }: { onSuccess?: () => void }) {
                     className="px-8 py-3 bg-[#71de00] text-white font-bold rounded shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center gap-2"
                 >
                     <Save size={18} />
-                    {loading ? "Traitement..." : "Valider l'Achat"}
+                    {loading ? "Traitement..." : (editId ? "Mettre à jour" : "Valider l'Achat")}
                 </button>
+                {onCancel && (
+                    <button
+                        onClick={onCancel}
+                        className="ml-2 px-4 py-3 bg-gray-200 text-gray-600 font-bold rounded hover:bg-gray-300 transition-all"
+                    >
+                        Annuler
+                    </button>
+                )}
             </div>
             {!buyerName && items.length > 0 && (
                 <p className="text-right text-xs text-red-400 mt-2">Veuillez entrer le nom de l&apos;acheteur.</p>

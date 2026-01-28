@@ -97,6 +97,7 @@ export async function POST(req: Request) {
         const result = await prisma.$transaction(async (tx) => {
             let vendableTotal = 0;
             let expectedRevenue = 0;
+            let expectedRevenueVip = 0;
             let finalItems = [];
 
             // 1. Pre-process items (create new products if needed)
@@ -132,17 +133,25 @@ export async function POST(req: Request) {
                 if (isVendable) {
                     vendableTotal += (item.cost * item.quantity);
 
-                    // ROI Logic: Get selling price
+                    // ROI Logic: Get selling prices
                     const prices = await tx.productPrice.findMany({
-                        where: { productId: actualProductId }
+                        where: { productId: actualProductId },
+                        include: { space: true }
                     });
 
-                    // Use highest price found (or default to 0 if none)
-                    const sellingPrice = prices.length > 0
-                        ? Math.max(...prices.map(p => Number(p.priceUsd)))
-                        : 0;
+                    // 1. STANDARD/TERRASSE PRICE
+                    const standardPriceEntry = prices.find(p =>
+                        ['TERRASSE', 'SALLE', 'STANDARD'].includes(p.space.name.toUpperCase())
+                    ) || prices[0];
+                    const standardPrice = standardPriceEntry ? Number(standardPriceEntry.priceUsd) : 0;
+                    expectedRevenue += (standardPrice * item.quantity);
 
-                    expectedRevenue += (sellingPrice * item.quantity);
+                    // 2. VIP PRICE
+                    const vipPriceEntry = prices.find(p =>
+                        p.space.name.toUpperCase().includes('VIP')
+                    ) || standardPriceEntry;
+                    const vipPrice = vipPriceEntry ? Number(vipPriceEntry.priceUsd) : standardPrice;
+                    expectedRevenueVip += (vipPrice * item.quantity);
                 }
 
                 finalItems.push({
@@ -154,6 +163,7 @@ export async function POST(req: Request) {
 
             const nonVendableTotal = Number(totalAmount) - vendableTotal;
             const expectedProfit = expectedRevenue - vendableTotal;
+            const expectedProfitVip = expectedRevenueVip - vendableTotal;
 
             // 2. Create Investment Record
             const investment = await tx.investment.create({
@@ -166,6 +176,8 @@ export async function POST(req: Request) {
                     nonVendableAmount: nonVendableTotal,
                     expectedRevenue: expectedRevenue,
                     expectedProfit: expectedProfit,
+                    expectedRevenueVip: expectedRevenueVip,
+                    expectedProfitVip: expectedProfitVip,
                     description,
                     userId: session.user.id
                 }
@@ -212,55 +224,135 @@ export async function POST(req: Request) {
     }
 }
 
-// DELETE: Delete Investment + Reverse Stock
-export async function DELETE(req: Request) {
+// PUT: Edit Investment + Re-sync Stock
+export async function PUT(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const { searchParams } = new URL(req.url);
-        const id = searchParams.get("id");
+        const body = await req.json();
+        const { id, totalAmount, source, description, items } = body;
 
-        if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+        if (!id || !totalAmount || !items || items.length === 0) {
+            return NextResponse.json({ error: "Invalid data" }, { status: 400 });
+        }
 
         const result = await prisma.$transaction(async (tx) => {
-            // 1. Get all movements for this investment
-            const movements = await tx.stockMovement.findMany({
+            // 1. REVERSE OLD STOCK Changes
+            const oldMovements = await tx.stockMovement.findMany({
                 where: { investmentId: id }
             });
 
-            // 2. Reverse stock changes
-            for (const mov of movements) {
+            for (const mov of oldMovements) {
                 if (mov.type === "IN" && mov.toLocation) {
-                    await tx.stockItem.updateMany({
-                        where: {
-                            productId: mov.productId,
-                            location: mov.toLocation
-                        },
-                        data: {
-                            quantity: { decrement: mov.quantity }
-                        }
+                    await tx.stockItem.upsert({
+                        where: { productId_location: { productId: mov.productId, location: mov.toLocation } },
+                        update: { quantity: { decrement: mov.quantity } },
+                        create: { productId: mov.productId, location: mov.toLocation, quantity: 0 }
                     });
                 }
             }
 
-            // 3. Delete movements
-            await tx.stockMovement.deleteMany({
-                where: { investmentId: id }
+            // 2. Clear old movements
+            await tx.stockMovement.deleteMany({ where: { investmentId: id } });
+
+            // 3. APPLY NEW DATA
+            let vendableTotal = 0;
+            let expectedRevenue = 0;
+            let expectedRevenueVip = 0;
+            let finalItems = [];
+
+            for (const item of items) {
+                let actualProductId = item.productId;
+                let isVendable = item.isVendable;
+
+                // Handle isNew in Edit? (Ideally products already created, but for safety)
+                if (item.isNew && !actualProductId.startsWith("cl")) {
+                    const newProduct = await tx.product.create({
+                        data: {
+                            name: item.productName,
+                            type: "NON_VENDABLE",
+                            active: true,
+                            vendable: false,
+                            saleUnit: item.newUnit || "PIECE",
+                            size: "STANDARD",
+                        }
+                    });
+                    actualProductId = newProduct.id;
+                    isVendable = false;
+                }
+
+                if (isVendable) {
+                    vendableTotal += (item.cost * item.quantity);
+                    const prices = await tx.productPrice.findMany({
+                        where: { productId: actualProductId },
+                        include: { space: true }
+                    });
+
+                    const standardPriceEntry = prices.find(p => ['TERRASSE', 'SALLE', 'STANDARD'].includes(p.space.name.toUpperCase())) || prices[0];
+                    const standardPrice = standardPriceEntry ? Number(standardPriceEntry.priceUsd) : 0;
+                    expectedRevenue += (standardPrice * item.quantity);
+
+                    const vipPriceEntry = prices.find(p => p.space.name.toUpperCase().includes('VIP')) || standardPriceEntry;
+                    const vipPrice = vipPriceEntry ? Number(vipPriceEntry.priceUsd) : standardPrice;
+                    expectedRevenueVip += (vipPrice * item.quantity);
+                }
+
+                finalItems.push({ ...item, productId: actualProductId, isVendable });
+            }
+
+            const nonVendableTotal = Number(totalAmount) - vendableTotal;
+            const expectedProfit = expectedRevenue - vendableTotal;
+            const expectedProfitVip = expectedRevenueVip - vendableTotal;
+
+            // 4. Update Investment Record
+            const investment = await tx.investment.update({
+                where: { id },
+                data: {
+                    totalAmount,
+                    totalAmountCdf: body.totalAmountCdf || 0,
+                    exchangeRate: body.exchangeRate || 0,
+                    source: source as FundSource,
+                    vendableAmount: vendableTotal,
+                    nonVendableAmount: nonVendableTotal,
+                    expectedRevenue,
+                    expectedProfit,
+                    expectedRevenueVip,
+                    expectedProfitVip,
+                    description,
+                    userId: session.user.id
+                }
             });
 
-            // 4. Delete investment
-            const deleted = await tx.investment.delete({
-                where: { id }
-            });
+            // 5. Create new Movements & update StockItems
+            for (const item of finalItems) {
+                const targetLocation = (item.location as StockLocation) || "DEPOT";
+                await tx.stockMovement.create({
+                    data: {
+                        productId: item.productId,
+                        type: "IN",
+                        quantity: item.quantity,
+                        toLocation: targetLocation,
+                        reason: `Mise à jour Achat #${investment.id.slice(-4)}`,
+                        costValue: item.cost * item.quantity,
+                        userId: session.user.id,
+                        investmentId: investment.id
+                    }
+                });
 
-            return deleted;
+                await tx.stockItem.upsert({
+                    where: { productId_location: { productId: item.productId, location: targetLocation } },
+                    update: { quantity: { increment: Number(item.quantity) } },
+                    create: { productId: item.productId, location: targetLocation, quantity: Number(item.quantity) }
+                });
+            }
+
+            return investment;
         });
 
         return NextResponse.json({ success: true, data: result });
-
     } catch (error) {
-        console.error("Investment DELETE Error:", error);
+        console.error("Investment PUT Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

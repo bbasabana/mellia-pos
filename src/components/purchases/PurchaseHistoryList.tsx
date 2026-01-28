@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { User, Calendar, DollarSign, Wallet, Eye, Trash2 } from "lucide-react";
+import { User, Calendar, DollarSign, Wallet, Eye, Trash2, Edit } from "lucide-react";
 import { PurchaseDetailsModal } from "./PurchaseDetailsModal";
 import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
 import { showToast } from "@/components/ui/Toast";
 
-export function PurchaseHistoryList() {
+export function PurchaseHistoryList({ onEdit }: { onEdit?: (id: string) => void }) {
     const [loading, setLoading] = useState(true);
     const [investments, setInvestments] = useState<any[]>([]);
 
@@ -140,6 +140,15 @@ export function PurchaseHistoryList() {
                                     >
                                         <Eye size={16} />
                                     </button>
+                                    {onEdit && (
+                                        <button
+                                            onClick={() => onEdit(inv.id)}
+                                            className="p-1.5 text-gray-400 hover:text-green-600 transition-colors"
+                                            title="Modifier"
+                                        >
+                                            <Edit size={16} />
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setIdToDelete(inv.id)}
                                         className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
