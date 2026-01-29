@@ -265,7 +265,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
     return (
         <div className="bg-white p-6 border border-gray-200 rounded-sm">
             {/* 1. Header & Configuration */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 p-4 bg-gray-50 rounded border border-gray-100">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6 p-4 bg-gray-50 rounded border border-gray-100">
                 <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Date Achat</label>
                     <input
