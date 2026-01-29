@@ -86,7 +86,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="font-bold text-gray-700">
-                                                {formatCurrency(Number(mov.costValue) * (Number(investment.exchangeRate) || 2850), "CDF")}
+                                                {formatCurrency(Number(mov.costValueCdf || (Number(mov.costValue) * (Number(investment.exchangeRate) || 2850))), "CDF")}
                                             </div>
                                             <div className="text-[10px] text-gray-400">
                                                 {formatCurrency(Number(mov.costValue), "USD")}
@@ -114,11 +114,11 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                     <div className="text-right space-y-1">
                         <div className="text-xs text-gray-400 flex flex-col items-end">
                             <div>
-                                Stock: <span className="font-bold text-gray-600">{formatCurrency(Number(investment.vendableAmount || 0) * (Number(investment.exchangeRate) || 2850), "CDF")}</span>
+                                Stock: <span className="font-bold text-gray-600">{formatCurrency(Number(investment.vendableAmountCdf || (Number(investment.vendableAmount) * (Number(investment.exchangeRate) || 2850))), "CDF")}</span>
                                 <span className="mx-1">|</span>
-                                Charges: <span className="font-bold text-orange-500">{formatCurrency(Number(investment.nonVendableAmount || 0) * (Number(investment.exchangeRate) || 2850), "CDF")}</span>
+                                Charges: <span className="font-bold text-orange-500">{formatCurrency(Number(investment.nonVendableAmountCdf || (Number(investment.nonVendableAmount) * (Number(investment.exchangeRate) || 2850))), "CDF")}</span>
                                 <span className="mx-1">|</span>
-                                Transport: <span className="font-bold text-purple-500">{formatCurrency(Number(investment.transportFee || 0) * (Number(investment.exchangeRate) || 2850), "CDF")}</span>
+                                Transport: <span className="font-bold text-purple-500">{formatCurrency(Number(investment.transportFeeCdf || (Number(investment.transportFee) * (Number(investment.exchangeRate) || 2850))), "CDF")}</span>
                             </div>
                             <div className="text-[9px] opacity-70">
                                 {formatCurrency(Number(investment.vendableAmount || 0), "USD")} | {formatCurrency(Number(investment.nonVendableAmount || 0), "USD")} | {formatCurrency(Number(investment.transportFee || 0), "USD")}
@@ -128,7 +128,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                             <p className="text-[10px] text-gray-500 uppercase font-bold">Total Investi</p>
                             <div className="flex flex-col items-end">
                                 <p className="text-2xl font-black text-[#00d3fa]">
-                                    {formatCurrency(Number(investment.totalAmount) * (Number(investment.exchangeRate) || 2850), "CDF")}
+                                    {formatCurrency(Number(investment.totalAmountCdf || (Number(investment.totalAmount) * (Number(investment.exchangeRate) || 2850))), "CDF")}
                                 </p>
                                 <p className="text-sm font-bold text-gray-400">
                                     {formatCurrency(Number(investment.totalAmount), "USD")}
@@ -148,7 +148,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                             <p className="text-[10px] text-green-600 uppercase font-bold mb-1">Revenu (Terrasse)</p>
                             <div className="flex flex-col">
                                 <span className="text-xl font-black text-green-700">
-                                    {formatCurrency((Number(investment.expectedRevenue || 0) * (Number(investment.exchangeRate) || 2850)), "CDF")}
+                                    {formatCurrency(Number(investment.expectedRevenueCdf || (Number(investment.expectedRevenue || 0) * (Number(investment.exchangeRate) || 2850))), "CDF")}
                                 </span>
                                 <span className="text-xs font-bold text-green-500/70">
                                     {formatCurrency(Number(investment.expectedRevenue || 0), "USD")}
@@ -158,7 +158,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                 <span className="text-[10px] text-green-600 font-bold uppercase">Profit Net</span>
                                 <div className="text-right flex flex-col items-end leading-none">
                                     <span className="text-sm font-black text-green-700">
-                                        +{formatCurrency((Number(investment.expectedProfit || 0) * (Number(investment.exchangeRate) || 2850)), "CDF")}
+                                        +{formatCurrency(Number(investment.expectedProfitCdf || (Number(investment.expectedProfit || 0) * (Number(investment.exchangeRate) || 2850))), "CDF")}
                                     </span>
                                     <span className="text-[10px] font-bold text-green-500/70">
                                         +{formatCurrency(Number(investment.expectedProfit || 0), "USD")}
@@ -173,7 +173,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                             <p className="text-[10px] text-purple-600 uppercase font-bold mb-1">Revenu (VIP)</p>
                             <div className="flex flex-col">
                                 <span className="text-xl font-black text-purple-700">
-                                    {formatCurrency((Number(investment.expectedRevenueVip || investment.expectedRevenue || 0) * (Number(investment.exchangeRate) || 2850)), "CDF")}
+                                    {formatCurrency(Number(investment.expectedRevenueVipCdf || (Number(investment.expectedRevenueVip || investment.expectedRevenue || 0) * (Number(investment.exchangeRate) || 2850))), "CDF")}
                                 </span>
                                 <span className="text-xs font-bold text-purple-500/70">
                                     {formatCurrency(Number(investment.expectedRevenueVip || investment.expectedRevenue || 0), "USD")}
@@ -183,7 +183,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                 <span className="text-[10px] text-purple-600 font-bold uppercase">Profit Net</span>
                                 <div className="text-right flex flex-col items-end leading-none">
                                     <span className="text-sm font-black text-purple-700">
-                                        +{formatCurrency((Number(investment.expectedProfitVip || investment.expectedProfit || 0) * (Number(investment.exchangeRate) || 2850)), "CDF")}
+                                        +{formatCurrency(Number(investment.expectedProfitVipCdf || (Number(investment.expectedProfitVip || investment.expectedProfit || 0) * (Number(investment.exchangeRate) || 2850))), "CDF")}
                                     </span>
                                     <span className="text-[10px] font-bold text-purple-500/70">
                                         +{formatCurrency(Number(investment.expectedProfitVip || investment.expectedProfit || 0), "USD")}

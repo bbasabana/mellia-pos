@@ -54,13 +54,16 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
             const json = await res.json();
             if (json.success && json.data) {
                 const inv = json.data;
+                const invRate = Number(inv.exchangeRate) || DEFAULT_RATE;
                 setSource(inv.source);
                 if (inv.date) setDate(new Date(inv.date).toISOString().split('T')[0]);
-                setCurrency(inv.exchangeRate ? "USD" : "CDF"); // Simple heuristic
-                setExchangeRate(inv.exchangeRate?.toString() || DEFAULT_RATE.toString());
-                setTransportFee(inv.transportFee?.toString() || "0");
 
-                // Parse Buyer Name: "[Acheteur: Name] Actual Description"
+                // Heuristic: if it was saved with a rate, the user might prefer USD view, but we default to CDF for safety/truth
+                setCurrency("CDF");
+                setExchangeRate(invRate.toString());
+                setTransportFee(inv.transportFeeCdf ? inv.transportFeeCdf.toString() : (Number(inv.transportFee || 0) * invRate).toString());
+
+                // Parse Buyer Name
                 const desc = inv.description || "";
                 const buyerMatch = desc.match(/^\[Acheteur:\s*([^\]]+)\]\s*(.*)/);
                 if (buyerMatch) {
@@ -73,13 +76,11 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                 // Map movements to form items
                 const mappedItems = inv.movements.map((mov: any) => {
                     const prod = mov.product;
-                    // We need to reconstruct the "display" values
-                    // Note: This is an estimation since we don't store displayQty in DB
-                    // If packingQuantity > 1, displayQty = quantity / packingQuantity
                     const packQty = prod.packingQuantity || 1;
-                    const displayQty = packQty > 1 ? Number(mov.quantity) / packQty : Number(mov.quantity);
-                    const costTotal = Number(mov.costValue || 0);
-                    const unitCost = costTotal / Number(mov.quantity);
+                    const displayQty = Number(mov.quantity) / packQty;
+
+                    const lineTotalCdf = Number(mov.costValueCdf || (Number(mov.costValue || 0) * invRate));
+                    const unitCostCdf = lineTotalCdf / Number(mov.quantity);
 
                     return {
                         productId: mov.productId,
@@ -88,15 +89,14 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                         newUnit: null,
                         displayQty: displayQty,
                         displayUnit: (packQty > 1 && prod.purchaseUnit) ? prod.purchaseUnit : prod.saleUnit,
-                        displayPrice: packQty > 1 ? unitCost * packQty : unitCost,
+                        displayPrice: packQty > 1 ? unitCostCdf * packQty : unitCostCdf,
+                        inputCurrencyAtSaisie: "CDF", // Fallback for old data
                         packingQuantity: packQty,
                         saleUnit: prod.saleUnit,
                         quantity: Number(mov.quantity),
-                        itemPrice: packQty > 1 ? unitCost * packQty : unitCost,
+                        itemPriceCdf: unitCostCdf,
+                        lineTotalCdf: lineTotalCdf,
                         priceMode: packQty > 1 ? "PER_PACK" : "PER_ITEM",
-                        lineTotal: costTotal,
-                        inputCurrency: "USD", // Logic: costs are USD in DB
-                        costUsd: unitCost,
                         location: mov.toLocation || "DEPOT",
                         isVendable: prod.vendable
                     };
@@ -163,8 +163,8 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
         }
 
         const lineTotal = priceMode === "PER_PACK" ? (inputQtyVal * inputPriceVal) : (inputQtyVal * packQty * inputPriceVal);
-
-        const costUsd = currency === "USD" ? realUnitCost : (realUnitCost / rate);
+        const lineTotalCdf = currency === "USD" ? (lineTotal * rate) : lineTotal;
+        const itemUnitCostCdf = currency === "USD" ? (inputPriceVal * rate) : inputPriceVal;
 
         const newItem = {
             productId,
@@ -172,20 +172,19 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
             isNew: isCreatingNew,
             newUnit: isCreatingNew ? newUnit : null,
 
-            // Display Data
+            // Display Data (Stored for reference, but calculations will use CDF)
             displayQty: inputQtyVal,
             displayUnit: (!isCreatingNew && pUnit) ? pUnit : sUnit,
             displayPrice: inputPriceVal,
+            inputCurrencyAtSaisie: currency,
             packingQuantity: packQty,
             saleUnit: sUnit,
-
-            // Backend Data
-            quantity: quantityToAdd,
-            itemPrice: inputPriceVal, // The price entered (might be per pack or per item)
             priceMode: priceMode,
-            lineTotal: lineTotal,
-            inputCurrency: currency,
-            costUsd: costUsd,
+
+            // Backend Data (CDF is the truth)
+            quantity: quantityToAdd,
+            itemPriceCdf: itemUnitCostCdf,
+            lineTotalCdf: lineTotalCdf,
             location: location,
             isVendable: isVendable
         };
@@ -205,10 +204,9 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
         if (items.length === 0) return;
         setLoading(true);
 
-        const totalUsd = items.reduce((acc, item) => acc + (item.costUsd * item.quantity), 0) + (currency === "USD" ? parseFloat(transportFee || "0") : (parseFloat(transportFee || "0") / parseFloat(exchangeRate)));
-        // Sum of all line totals in the entered currency (CDF or USD) PLUS Transport
-        const totalAmountEntered = items.reduce((acc, item) => acc + item.lineTotal, 0) + parseFloat(transportFee || "0");
-        const totalCdf = currency === "CDF" ? totalAmountEntered : (totalAmountEntered * parseFloat(exchangeRate));
+        const rate = parseFloat(exchangeRate) || DEFAULT_RATE;
+        const transportFeeCdf = currency === "CDF" ? parseFloat(transportFee || "0") : (parseFloat(transportFee || "0") * rate);
+        const totalAmountCdf = items.reduce((acc, item) => acc + item.lineTotalCdf, 0) + transportFeeCdf;
 
         // Append Buyer Name to description if present
         const finalDesc = buyerName ? `[Acheteur: ${buyerName}] ${description}` : description;
@@ -220,22 +218,22 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                 body: JSON.stringify({
                     id: editId,
                     date,
-                    totalAmount: totalUsd,
-                    totalAmountCdf: totalCdf,
-                    exchangeRate: parseFloat(exchangeRate),
+                    totalAmountCdf: totalAmountCdf,
+                    exchangeRate: rate,
                     source,
                     description: finalDesc,
+                    inputCurrency: currency, // For information
                     items: items.map(i => ({
                         productId: i.productId,
                         isNew: i.isNew,
                         productName: i.productName,
                         newUnit: i.newUnit,
                         quantity: i.quantity,
-                        cost: i.costUsd,
+                        itemPrice: i.itemPriceCdf, // This is expected in CDF by the new backend
                         location: i.location,
                         isVendable: i.isVendable
                     })),
-                    transportFee: parseFloat(transportFee) || 0
+                    transportFeeCdf: transportFeeCdf
                 })
             });
             const data = await res.json();
@@ -254,11 +252,22 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
         }
     };
 
-    // Calculate Totals for UI
-    const totalDisplay = items.reduce((acc, item) => acc + item.lineTotal, 0) + (parseFloat(transportFee) || 0);
-    const convertedTotal = currency === "CDF"
-        ? (totalDisplay / (parseFloat(exchangeRate) || DEFAULT_RATE)).toFixed(2) + " $"
-        : (totalDisplay * (parseFloat(exchangeRate) || DEFAULT_RATE)).toLocaleString() + " FC";
+    // Calculate Totals for UI (Always based on CDF base data)
+    const rate = parseFloat(exchangeRate) || DEFAULT_RATE;
+    const itemsTotalCdf = items.reduce((acc, item) => acc + item.lineTotalCdf, 0);
+    const transportCdf = currency === "CDF" ? (parseFloat(transportFee) || 0) : ((parseFloat(transportFee) || 0) * rate);
+    const totalCdf = itemsTotalCdf + transportCdf;
+
+    const displayTotal = currency === "CDF" ? totalCdf : totalCdf / rate;
+    const secondaryTotal = currency === "CDF" ? totalCdf / rate : totalCdf;
+
+    const totalDisplayFormatted = currency === "CDF"
+        ? totalCdf.toLocaleString() + " FC"
+        : (totalCdf / rate).toFixed(2) + " $";
+
+    const convertedTotalFormatted = currency === "CDF"
+        ? (totalCdf / rate).toFixed(2) + " $"
+        : totalCdf.toLocaleString() + " FC";
 
     if (fetchingEditData) return <div className="p-12 text-center text-gray-400">Chargement des données de l&apos;achat...</div>;
 
@@ -600,11 +609,21 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                                             )}
                                         </td>
                                         <td className="p-3 text-right text-gray-500">
-                                            <div className="font-bold">{item.itemPrice.toLocaleString()} {item.inputCurrency}</div>
-                                            <div className="text-[10px] text-gray-400 capitalize">Par {item.priceMode === "PER_PACK" ? (item.displayUnit || "Pack") : (item.saleUnit || "Item")}</div>
+                                            <div className="font-bold">
+                                                {currency === "CDF"
+                                                    ? item.itemPriceCdf.toLocaleString() + " FC"
+                                                    : (item.itemPriceCdf / rate).toFixed(2) + " $"}
+                                            </div>
+                                            <div className="text-[10px] text-gray-400 capitalize">
+                                                Par {item.priceMode === "PER_PACK" ? (item.displayUnit || "Pack") : (item.saleUnit || "Item")}
+                                                <br />
+                                                <span className="opacity-60 italic text-[9px]">Saisi: {item.displayPrice.toLocaleString()} {item.inputCurrencyAtSaisie}</span>
+                                            </div>
                                         </td>
                                         <td className="p-3 text-right font-bold text-gray-700">
-                                            {item.lineTotal.toLocaleString()} {item.inputCurrency}
+                                            {currency === "CDF"
+                                                ? item.lineTotalCdf.toLocaleString() + " FC"
+                                                : (item.lineTotalCdf / rate).toFixed(2) + " $"}
                                         </td>
                                         <td className="p-3 text-center">
                                             <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">
@@ -617,14 +636,14 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                             <tfoot className="bg-gray-50 border-t border-gray-200">
                                 <tr>
                                     <td colSpan={4} className="p-3 text-right font-bold text-gray-600 uppercase text-xs">
-                                        Sous-Total Marchandise: {(totalDisplay - (parseFloat(transportFee) || 0)).toLocaleString()} {currency}
+                                        Sous-Total Marchandise: {currency === "CDF" ? itemsTotalCdf.toLocaleString() + " FC" : (itemsTotalCdf / rate).toFixed(2) + " $"}
                                         <br />
-                                        <span className="text-purple-600">+ Transport: {(parseFloat(transportFee) || 0).toLocaleString()} {currency}</span>
+                                        <span className="text-purple-600">+ Transport: {currency === "CDF" ? transportCdf.toLocaleString() + " FC" : (transportCdf / rate).toFixed(2) + " $"}</span>
                                         <br />
                                         Total à Payer:
                                     </td>
                                     <td className="p-3 text-right font-bold text-xl text-[#00d3fa]">
-                                        {totalDisplay.toLocaleString()} {currency}
+                                        {totalDisplayFormatted}
                                     </td>
                                     <td></td>
                                 </tr>
@@ -633,7 +652,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                                         Contre-valeur estimée ({currency === "CDF" ? "USD" : "CDF"}):
                                     </td>
                                     <td className="p-2 text-right text-gray-500 font-medium text-xs">
-                                        ~ {convertedTotal}
+                                        ~ {convertedTotalFormatted}
                                     </td>
                                     <td></td>
                                 </tr>

@@ -99,19 +99,19 @@ export async function POST(req: Request) {
 
         // Transaction: Create Investment + Stock Movements + Update StockItems
         const result = await prisma.$transaction(async (tx) => {
-            let vendableTotal = 0;
-            let expectedRevenue = 0;
-            let expectedRevenueVip = 0;
+            let vendableTotalCdf = 0;
+            let expectedRevenueCdf = 0;
+            let expectedRevenueVipCdf = 0;
             let finalItems = [];
+
+            const exchangeRateVal = parseFloat(body.exchangeRate) || 2850;
 
             // 1. Pre-process items (create new products if needed)
             for (const item of items) {
                 let actualProductId = item.productId;
                 let isVendable = item.isVendable;
 
-                // Determine if really vendable (must not be new, and must be marked vendable)
                 if (item.isNew) {
-                    // IDEMPOTENCY CHECK: Search if product already exists (by name & type)
                     const existingProduct = await tx.product.findFirst({
                         where: {
                             name: { equals: item.productName, mode: 'insensitive' },
@@ -120,11 +120,9 @@ export async function POST(req: Request) {
                     });
 
                     if (existingProduct) {
-                        // REUSE EXISTING
                         actualProductId = existingProduct.id;
-                        isVendable = existingProduct.vendable; // Should be false
+                        isVendable = existingProduct.vendable;
                     } else {
-                        // CREATE NEW
                         const newProduct = await tx.product.create({
                             data: {
                                 name: item.productName,
@@ -138,97 +136,99 @@ export async function POST(req: Request) {
                         actualProductId = newProduct.id;
                         isVendable = false;
 
-                        // Create cost record for the new product
+                        // Create cost record (CDF First)
+                        const costCdf = body.currency === "CDF" ? item.cost : (item.cost * exchangeRateVal);
                         await tx.productCost.create({
                             data: {
                                 productId: actualProductId,
-                                unitCostUsd: item.cost,
-                                unitCostCdf: item.cost * (parseFloat(body.exchangeRate) || 2850),
+                                unitCostCdf: costCdf,
+                                unitCostUsd: costCdf / exchangeRateVal,
                                 forUnit: item.newUnit || "PIECE"
                             }
                         });
                     }
                 }
 
-                if (isVendable) {
-                    vendableTotal += (item.cost * item.quantity);
+                // Calculate item cost in CDF immediately to avoid drift
+                const itemUnitCostCdf = body.inputCurrency === "USD" ? (item.itemPrice * exchangeRateVal) : item.itemPrice;
+                const itemLineTotalCdf = itemUnitCostCdf * item.quantity;
 
-                    // ROI Logic: Get selling prices
+                if (isVendable) {
+                    vendableTotalCdf += itemLineTotalCdf;
+
+                    // ROI Logic: Get selling prices in CDF
                     const prices = await tx.productPrice.findMany({
                         where: { productId: actualProductId },
                         include: { space: true }
                     });
 
-                    // 1. STANDARD/TERRASSE PRICE logic (Strict)
-                    // Priority: TERRASSE > SALLE > STANDARD > Default (First founded if no VIP)
+                    // 1. TERRASSE/STANDARD Price (CDF)
                     const standardPriceEntry = prices.find(p => {
-                        const name = p.space.name.toUpperCase();
-                        return name === 'TERRASSE' || name === 'SALLE' || name === 'STANDARD';
+                        const name = p.space.name.toLowerCase().trim();
+                        return name === 'terrasse' || name === 'salle' || name === 'standard';
                     });
+                    const fallbackPrice = prices.find(p => !p.space.name.toLowerCase().includes('vip'));
 
-                    // If no specific standard price found, use the first available price THAT IS NOT VIP
-                    const fallbackPrice = prices.find(p => !p.space.name.toUpperCase().includes('VIP'));
+                    const priceTerrasseCdf = standardPriceEntry
+                        ? Number(standardPriceEntry.priceCdf)
+                        : (fallbackPrice ? Number(fallbackPrice.priceCdf) : 0);
 
-                    // STRICT CALCULATION: Prefer CDF source of truth if available
-                    const invRate = parseFloat(body.exchangeRate) || 2850;
-                    let standardPrice = 0;
+                    expectedRevenueCdf += (priceTerrasseCdf * item.quantity);
 
-                    if (standardPriceEntry) {
-                        standardPrice = Number(standardPriceEntry.priceCdf) > 0
-                            ? Number(standardPriceEntry.priceCdf) / invRate
-                            : Number(standardPriceEntry.priceUsd);
-                    } else if (fallbackPrice) {
-                        standardPrice = Number(fallbackPrice.priceCdf) > 0
-                            ? Number(fallbackPrice.priceCdf) / invRate
-                            : Number(fallbackPrice.priceUsd);
-                    }
+                    // 2. VIP Price (CDF)
+                    const vipPriceEntry = prices.find(p => p.space.name.toLowerCase().includes('vip'));
+                    const priceVipCdf = vipPriceEntry ? Number(vipPriceEntry.priceCdf) : priceTerrasseCdf;
 
-                    expectedRevenue += (standardPrice * item.quantity);
-
-                    // 2. VIP PRICE logic (Strict)
-                    const vipPriceEntry = prices.find(p => p.space.name.toUpperCase().includes('VIP'));
-
-                    let vipPrice = 0;
-                    if (vipPriceEntry) {
-                        vipPrice = Number(vipPriceEntry.priceCdf) > 0
-                            ? Number(vipPriceEntry.priceCdf) / invRate
-                            : Number(vipPriceEntry.priceUsd);
-                    } else {
-                        vipPrice = standardPrice;
-                    }
-
-                    expectedRevenueVip += (vipPrice * item.quantity);
+                    expectedRevenueVipCdf += (priceVipCdf * item.quantity);
                 }
 
                 finalItems.push({
                     ...item,
                     productId: actualProductId,
-                    isVendable
+                    isVendable,
+                    unitCostCdf: itemUnitCostCdf,
+                    lineTotalCdf: itemLineTotalCdf
                 });
             }
 
-            const nonVendableTotal = Number(totalAmount) - vendableTotal;
-            // Profit = Revenue - Cost of Vendable Goods (Strictly excluding charges)
-            const expectedProfit = expectedRevenue - vendableTotal;
-            const expectedProfitVip = expectedRevenueVip - vendableTotal;
+            const transportFeeCdf = parseFloat(body.transportFeeCdf) || 0;
+            const nonVendableTotalCdf = (Number(body.totalAmountCdf) || 0) - vendableTotalCdf - transportFeeCdf;
 
-            // 2. Create Investment Record
+            const expectedProfitCdf = expectedRevenueCdf - vendableTotalCdf;
+            const expectedProfitVipCdf = expectedRevenueVipCdf - vendableTotalCdf;
+
+            // 2. Create Investment Record (CDF values as source of truth)
             const investment = await tx.investment.create({
                 data: {
                     date: date ? new Date(date) : new Date(),
-                    totalAmount: totalAmount,
                     totalAmountCdf: body.totalAmountCdf || 0,
-                    exchangeRate: body.exchangeRate || 0,
+                    totalAmount: (Number(body.totalAmountCdf) || 0) / exchangeRateVal,
+                    exchangeRate: exchangeRateVal,
                     source: source as FundSource,
-                    vendableAmount: vendableTotal,
-                    nonVendableAmount: nonVendableTotal,
-                    expectedRevenue: expectedRevenue,
-                    expectedProfit: expectedProfit,
-                    // expectedRevenueVip: expectedRevenueVip,
-                    // expectedProfitVip: expectedProfitVip,
+
+                    vendableAmountCdf: vendableTotalCdf,
+                    vendableAmount: vendableTotalCdf / exchangeRateVal,
+
+                    nonVendableAmountCdf: nonVendableTotalCdf,
+                    nonVendableAmount: nonVendableTotalCdf / exchangeRateVal,
+
+                    transportFeeCdf: transportFeeCdf,
+                    transportFee: transportFeeCdf / exchangeRateVal,
+
+                    expectedRevenueCdf: expectedRevenueCdf,
+                    expectedRevenue: expectedRevenueCdf / exchangeRateVal,
+
+                    expectedProfitCdf: expectedProfitCdf,
+                    expectedProfit: expectedProfitCdf / exchangeRateVal,
+
+                    expectedRevenueVipCdf: expectedRevenueVipCdf,
+                    expectedRevenueVip: expectedRevenueVipCdf / exchangeRateVal,
+
+                    expectedProfitVipCdf: expectedProfitVipCdf,
+                    expectedProfitVip: expectedProfitVipCdf / exchangeRateVal,
+
                     description,
-                    userId: session.user.id,
-                    transportFee: transportFee || 0
+                    userId: session.user.id
                 }
             });
 
@@ -306,19 +306,18 @@ export async function PUT(req: Request) {
             await tx.stockMovement.deleteMany({ where: { investmentId: id } });
 
             // 3. APPLY NEW DATA
-            let vendableTotal = 0;
-            let expectedRevenue = 0;
-            let expectedRevenueVip = 0;
+            let vendableTotalCdf = 0;
+            let expectedRevenueCdf = 0;
+            let expectedRevenueVipCdf = 0;
             let finalItems = [];
+
+            const exchangeRateVal = parseFloat(body.exchangeRate) || 2850;
 
             for (const item of items) {
                 let actualProductId = item.productId;
                 let isVendable = item.isVendable;
 
-                // Determine if really vendable (must not be new, and must be marked vendable)
-                // Handle isNew in Edit? (Ideally products already created, but for safety)
                 if (item.isNew && !actualProductId.startsWith("cl")) {
-                    // IDEMPOTENCY CHECK: Search if product already exists (by name & type)
                     const existingProduct = await tx.product.findFirst({
                         where: {
                             name: { equals: item.productName, mode: 'insensitive' },
@@ -327,7 +326,6 @@ export async function PUT(req: Request) {
                     });
 
                     if (existingProduct) {
-                        // REUSE EXISTING
                         actualProductId = existingProduct.id;
                         isVendable = existingProduct.vendable;
                     } else {
@@ -343,82 +341,93 @@ export async function PUT(req: Request) {
                         });
                         actualProductId = newProduct.id;
                         isVendable = false;
+
+                        // Create cost record (CDF First)
+                        const costCdf = body.currency === "CDF" ? item.cost : (item.cost * exchangeRateVal);
+                        await tx.productCost.create({
+                            data: {
+                                productId: actualProductId,
+                                unitCostCdf: costCdf,
+                                unitCostUsd: costCdf / exchangeRateVal,
+                                forUnit: item.newUnit || "PIECE"
+                            }
+                        });
                     }
                 }
 
+                // Calculate item cost in CDF immediately to avoid drift
+                const itemUnitCostCdf = body.inputCurrency === "USD" ? (item.itemPrice * exchangeRateVal) : item.itemPrice;
+                const itemLineTotalCdf = itemUnitCostCdf * item.quantity;
+
                 if (isVendable) {
-                    vendableTotal += (item.cost * item.quantity);
+                    vendableTotalCdf += itemLineTotalCdf;
                     const prices = await tx.productPrice.findMany({
                         where: { productId: actualProductId },
                         include: { space: true }
                     });
 
-                    // 1. STANDARD/TERRASSE PRICE logic (Strict)
-                    // Priority: TERRASSE > SALLE > STANDARD > Default (First founded if no VIP)
+                    // 1. TERRASSE/STANDARD Price (CDF)
                     const standardPriceEntry = prices.find(p => {
-                        const name = p.space.name.toUpperCase();
-                        return name === 'TERRASSE' || name === 'SALLE' || name === 'STANDARD';
+                        const name = p.space.name.toLowerCase().trim();
+                        return name === 'terrasse' || name === 'salle' || name === 'standard';
                     });
+                    const fallbackPrice = prices.find(p => !p.space.name.toLowerCase().includes('vip'));
 
-                    // If no specific standard price found, use the first available price THAT IS NOT VIP
-                    const fallbackPrice = prices.find(p => !p.space.name.toUpperCase().includes('VIP'));
+                    const priceTerrasseCdf = standardPriceEntry
+                        ? Number(standardPriceEntry.priceCdf)
+                        : (fallbackPrice ? Number(fallbackPrice.priceCdf) : 0);
 
-                    // STRICT CALCULATION: Prefer CDF source of truth if available
-                    const invRate = parseFloat(body.exchangeRate) || 2850;
-                    let standardPrice = 0;
+                    expectedRevenueCdf += (priceTerrasseCdf * item.quantity);
 
-                    if (standardPriceEntry) {
-                        standardPrice = Number(standardPriceEntry.priceCdf) > 0
-                            ? Number(standardPriceEntry.priceCdf) / invRate
-                            : Number(standardPriceEntry.priceUsd);
-                    } else if (fallbackPrice) {
-                        standardPrice = Number(fallbackPrice.priceCdf) > 0
-                            ? Number(fallbackPrice.priceCdf) / invRate
-                            : Number(fallbackPrice.priceUsd);
-                    }
+                    // 2. VIP Price (CDF)
+                    const vipPriceEntry = prices.find(p => p.space.name.toLowerCase().includes('vip'));
+                    const priceVipCdf = vipPriceEntry ? Number(vipPriceEntry.priceCdf) : priceTerrasseCdf;
 
-                    expectedRevenue += (standardPrice * item.quantity);
-
-                    // 2. VIP PRICE logic (Strict)
-                    const vipPriceEntry = prices.find(p => p.space.name.toUpperCase().includes('VIP'));
-
-                    let vipPrice = 0;
-                    if (vipPriceEntry) {
-                        vipPrice = Number(vipPriceEntry.priceCdf) > 0
-                            ? Number(vipPriceEntry.priceCdf) / invRate
-                            : Number(vipPriceEntry.priceUsd);
-                    } else {
-                        vipPrice = standardPrice;
-                    }
-
-                    expectedRevenueVip += (vipPrice * item.quantity);
+                    expectedRevenueVipCdf += (priceVipCdf * item.quantity);
                 }
 
-                finalItems.push({ ...item, productId: actualProductId, isVendable });
+                finalItems.push({ ...item, productId: actualProductId, isVendable, unitCostCdf: itemUnitCostCdf });
             }
 
-            const nonVendableTotal = Number(totalAmount) - vendableTotal;
-            const expectedProfit = expectedRevenue - vendableTotal;
-            const expectedProfitVip = expectedRevenueVip - vendableTotal;
+            const transportFeeCdf = parseFloat(body.transportFeeCdf) || 0;
+            const nonVendableTotalCdf = (Number(body.totalAmountCdf) || 0) - vendableTotalCdf - transportFeeCdf;
+
+            const expectedProfitCdf = expectedRevenueCdf - vendableTotalCdf;
+            const expectedProfitVipCdf = expectedRevenueVipCdf - vendableTotalCdf;
 
             // 4. Update Investment Record
             const investment = await tx.investment.update({
                 where: { id },
                 data: {
                     date: date ? new Date(date) : undefined,
-                    totalAmount,
                     totalAmountCdf: body.totalAmountCdf || 0,
-                    exchangeRate: body.exchangeRate || 0,
+                    totalAmount: (Number(body.totalAmountCdf) || 0) / exchangeRateVal,
+                    exchangeRate: exchangeRateVal,
                     source: source as FundSource,
-                    vendableAmount: vendableTotal,
-                    nonVendableAmount: nonVendableTotal,
-                    expectedRevenue,
-                    expectedProfit,
-                    // expectedRevenueVip,
-                    // expectedProfitVip,
+
+                    vendableAmountCdf: vendableTotalCdf,
+                    vendableAmount: vendableTotalCdf / exchangeRateVal,
+
+                    nonVendableAmountCdf: nonVendableTotalCdf,
+                    nonVendableAmount: nonVendableTotalCdf / exchangeRateVal,
+
+                    transportFeeCdf: transportFeeCdf,
+                    transportFee: transportFeeCdf / exchangeRateVal,
+
+                    expectedRevenueCdf: expectedRevenueCdf,
+                    expectedRevenue: expectedRevenueCdf / exchangeRateVal,
+
+                    expectedProfitCdf: expectedProfitCdf,
+                    expectedProfit: expectedProfitCdf / exchangeRateVal,
+
+                    expectedRevenueVipCdf: expectedRevenueVipCdf,
+                    expectedRevenueVip: expectedRevenueVipCdf / exchangeRateVal,
+
+                    expectedProfitVipCdf: expectedProfitVipCdf,
+                    expectedProfitVip: expectedProfitVipCdf / exchangeRateVal,
+
                     description,
-                    userId: session.user.id,
-                    transportFee: transportFee || 0
+                    userId: session.user.id
                 }
             });
 
