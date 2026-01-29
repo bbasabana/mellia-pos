@@ -20,16 +20,10 @@ async function main() {
         }
 
         for (const p of products) {
-            console.log(`Product: ${p.name} (Type: ${p.type}, Vendable: ${p.vendable})`);
-            const terrasse = p.prices.find(pr => pr.space.name.toUpperCase().includes('TERRASSE') || pr.space.name.toUpperCase().includes('STANDARD'));
-            const vip = p.prices.find(pr => pr.space.name.toUpperCase().includes('VIP'));
-
-            console.log(`   - Terrasse Price: ${terrasse ? terrasse.priceUsd + ' $' : '❌ MISSING'}`);
-            console.log(`   - VIP Price:      ${vip ? vip.priceUsd + ' $' : '❌ MISSING'}`);
-
-            if (terrasse && vip && Number(terrasse.priceUsd) === Number(vip.priceUsd)) {
-                console.log(`   ⚠️ WARNING: Prices are IDENTICAL.`);
-            }
+            console.log(`Product: ${p.name} (ID: ${p.id})`);
+            p.prices.forEach(pr => {
+                console.log(`   - Space: ${pr.space.name.padEnd(10)} | USD: ${pr.priceUsd} | CDF: ${pr.priceCdf}`);
+            });
         }
     }
 

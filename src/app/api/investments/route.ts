@@ -153,17 +153,33 @@ export async function POST(req: Request) {
                     // If no specific standard price found, use the first available price THAT IS NOT VIP
                     const fallbackPrice = prices.find(p => !p.space.name.toUpperCase().includes('VIP'));
 
-                    const standardPrice = standardPriceEntry
-                        ? Number(standardPriceEntry.priceUsd)
-                        : (fallbackPrice ? Number(fallbackPrice.priceUsd) : 0);
+                    // STRICT CALCULATION: Prefer CDF source of truth if available
+                    const invRate = parseFloat(body.exchangeRate) || 2850;
+                    let standardPrice = 0;
+
+                    if (standardPriceEntry) {
+                        standardPrice = Number(standardPriceEntry.priceCdf) > 0
+                            ? Number(standardPriceEntry.priceCdf) / invRate
+                            : Number(standardPriceEntry.priceUsd);
+                    } else if (fallbackPrice) {
+                        standardPrice = Number(fallbackPrice.priceCdf) > 0
+                            ? Number(fallbackPrice.priceCdf) / invRate
+                            : Number(fallbackPrice.priceUsd);
+                    }
 
                     expectedRevenue += (standardPrice * item.quantity);
 
                     // 2. VIP PRICE logic (Strict)
                     const vipPriceEntry = prices.find(p => p.space.name.toUpperCase().includes('VIP'));
 
-                    // If VIP price exists, use it. If NOT, it falls back to standard price (assuming same price if not defined)
-                    const vipPrice = vipPriceEntry ? Number(vipPriceEntry.priceUsd) : standardPrice;
+                    let vipPrice = 0;
+                    if (vipPriceEntry) {
+                        vipPrice = Number(vipPriceEntry.priceCdf) > 0
+                            ? Number(vipPriceEntry.priceCdf) / invRate
+                            : Number(vipPriceEntry.priceUsd);
+                    } else {
+                        vipPrice = standardPrice;
+                    }
 
                     expectedRevenueVip += (vipPrice * item.quantity);
                 }
@@ -316,17 +332,33 @@ export async function PUT(req: Request) {
                     // If no specific standard price found, use the first available price THAT IS NOT VIP
                     const fallbackPrice = prices.find(p => !p.space.name.toUpperCase().includes('VIP'));
 
-                    const standardPrice = standardPriceEntry
-                        ? Number(standardPriceEntry.priceUsd)
-                        : (fallbackPrice ? Number(fallbackPrice.priceUsd) : 0);
+                    // STRICT CALCULATION: Prefer CDF source of truth if available
+                    const invRate = parseFloat(body.exchangeRate) || 2850;
+                    let standardPrice = 0;
+
+                    if (standardPriceEntry) {
+                        standardPrice = Number(standardPriceEntry.priceCdf) > 0
+                            ? Number(standardPriceEntry.priceCdf) / invRate
+                            : Number(standardPriceEntry.priceUsd);
+                    } else if (fallbackPrice) {
+                        standardPrice = Number(fallbackPrice.priceCdf) > 0
+                            ? Number(fallbackPrice.priceCdf) / invRate
+                            : Number(fallbackPrice.priceUsd);
+                    }
 
                     expectedRevenue += (standardPrice * item.quantity);
 
                     // 2. VIP PRICE logic (Strict)
                     const vipPriceEntry = prices.find(p => p.space.name.toUpperCase().includes('VIP'));
 
-                    // If VIP price exists, use it. If NOT, it falls back to standard price (assuming same price if not defined)
-                    const vipPrice = vipPriceEntry ? Number(vipPriceEntry.priceUsd) : standardPrice;
+                    let vipPrice = 0;
+                    if (vipPriceEntry) {
+                        vipPrice = Number(vipPriceEntry.priceCdf) > 0
+                            ? Number(vipPriceEntry.priceCdf) / invRate
+                            : Number(vipPriceEntry.priceUsd);
+                    } else {
+                        vipPrice = standardPrice;
+                    }
 
                     expectedRevenueVip += (vipPrice * item.quantity);
                 }
