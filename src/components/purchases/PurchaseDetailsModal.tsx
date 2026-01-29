@@ -29,7 +29,11 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                         <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Acheteur</p>
                         <div className="flex items-center gap-2 text-sm text-gray-700">
                             <User size={14} className="text-gray-400" />
-                            {investment.user?.name || "Inconnu"}
+                            {(() => {
+                                const desc = investment.description || "";
+                                const match = desc.match(/^\[Acheteur:\s*([^\]]+)\]/);
+                                return match ? match[1] : (investment.user?.name || "Inconnu");
+                            })()}
                         </div>
                     </div>
                     <div>
@@ -94,11 +98,24 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                 <div className="bg-gray-50 p-4 rounded-sm flex justify-between items-end border border-gray-100">
                     <div>
                         <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Description / Notes</p>
-                        <p className="text-sm text-gray-700 italic">{investment.description || "Aucune note"}</p>
+                        <p className="text-sm text-gray-700 italic">
+                            {(() => {
+                                const desc = investment.description || "";
+                                const match = desc.match(/^\[Acheteur:\s*[^\]]+\]\s*(.*)/);
+                                return match ? (match[1] || "Aucune note") : (desc || "Aucune note");
+                            })()}
+                        </p>
                     </div>
-                    <div className="text-right">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold">Total Investi</p>
-                        <p className="text-2xl font-black text-[#00d3fa]">{formatCurrency(Number(investment.totalAmount))}</p>
+                    <div className="text-right space-y-1">
+                        <div className="text-xs text-gray-400">
+                            Stock: <span className="font-bold text-gray-600">{formatCurrency(Number(investment.vendableAmount || 0))}</span>
+                            <span className="mx-1">|</span>
+                            Charges: <span className="font-bold text-orange-500">{formatCurrency(Number(investment.nonVendableAmount || 0))}</span>
+                        </div>
+                        <div>
+                            <p className="text-[10px] text-gray-500 uppercase font-bold">Total Investi</p>
+                            <p className="text-2xl font-black text-[#00d3fa]">{formatCurrency(Number(investment.totalAmount))}</p>
+                        </div>
                     </div>
                 </div>
 

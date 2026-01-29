@@ -110,11 +110,24 @@ export function PurchaseHistoryList({ onEdit }: { onEdit?: (id: string) => void 
                                 </div>
                             </td>
                             <td className="px-4 py-3">
-                                <div className="font-medium text-gray-800">{inv.description || "Sans description"}</div>
-                                <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                                    <User size={10} />
-                                    {inv.user?.name || "Inconnu"}
-                                </div>
+                                {(() => {
+                                    const desc = inv.description || "";
+                                    const buyerMatch = desc.match(/^\[Acheteur:\s*([^\]]+)\]\s*(.*)/);
+                                    const realBuyer = buyerMatch ? buyerMatch[1] : null;
+                                    const cleanDesc = buyerMatch ? buyerMatch[2] : (inv.description || "Sans description");
+
+                                    return (
+                                        <>
+                                            <div className="font-medium text-gray-800">{cleanDesc || "Sans description"}</div>
+                                            <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                                                <User size={10} />
+                                                <span className={realBuyer ? "font-bold text-blue-600" : ""}>
+                                                    {realBuyer || inv.user?.name || "Inconnu"}
+                                                </span>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </td>
                             <td className="px-4 py-3">
                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase ${inv.source === 'OWNER_CAPITAL'
