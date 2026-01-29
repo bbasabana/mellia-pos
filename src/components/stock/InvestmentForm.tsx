@@ -79,8 +79,10 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                     const packQty = prod.packingQuantity || 1;
                     const displayQty = Number(mov.quantity) / packQty;
 
-                    const lineTotalCdf = Number(mov.costValueCdf || (Number(mov.costValue || 0) * invRate));
-                    const unitCostCdf = lineTotalCdf / Number(mov.quantity);
+                    // FIX: costValue is ALREADY in CDF (from StockMovement). Do NOT multiply by invRate.
+                    // Fallback: If costValueCdf (Investment model field) is present, use it. Otherwise use costValue.
+                    const lineTotalCdf = Number(mov.costValueCdf || mov.costValue || 0);
+                    const unitCostCdf = Number(mov.quantity) > 0 ? (lineTotalCdf / Number(mov.quantity)) : 0;
 
                     return {
                         productId: mov.productId,
