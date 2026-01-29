@@ -227,7 +227,8 @@ export async function POST(req: Request) {
                     // expectedRevenueVip: expectedRevenueVip,
                     // expectedProfitVip: expectedProfitVip,
                     description,
-                    userId: session.user.id
+                    userId: session.user.id,
+                    transportFee: transportFee || 0
                 }
             });
 
@@ -416,7 +417,8 @@ export async function PUT(req: Request) {
                     // expectedRevenueVip,
                     // expectedProfitVip,
                     description,
-                    userId: session.user.id
+                    userId: session.user.id,
+                    transportFee: transportFee || 0
                 }
             });
 
