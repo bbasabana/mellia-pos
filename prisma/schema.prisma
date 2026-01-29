@@ -266,7 +266,7 @@ model StockMovement {
   fromLocation StockLocation?
   toLocation   StockLocation?
   reason       String?
-  costValue    Decimal?          @db.Decimal(10, 2)
+  costValue    Decimal?          @db.Decimal(15, 2)
   userId       String?
   createdAt    DateTime          @default(now())
   investmentId String?

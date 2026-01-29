@@ -601,7 +601,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="p-3 text-center text-xs text-gray-400">{item.location}</td>
+                                        <td className="p-3 text-center text-xs text-gray-400">{item.location || "DEPOT"}</td>
                                         <td className="p-3 text-right">
                                             <div className="font-bold">{item.displayQty} {item.displayUnit}</div>
                                             {item.packingQuantity > 1 && (

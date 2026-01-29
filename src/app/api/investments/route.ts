@@ -399,7 +399,13 @@ export async function PUT(req: Request) {
                     expectedRevenueVipCdf += (priceVipCdf * item.quantity);
                 }
 
-                finalItems.push({ ...item, productId: actualProductId, isVendable, unitCostCdf: itemUnitCostCdf });
+                finalItems.push({
+                    ...item,
+                    productId: actualProductId,
+                    isVendable,
+                    unitCostCdf: itemUnitCostCdf,
+                    lineTotalCdf: itemLineTotalCdf
+                });
             }
 
             const transportFeeCdf = parseFloat(body.transportFeeCdf) || 0;
