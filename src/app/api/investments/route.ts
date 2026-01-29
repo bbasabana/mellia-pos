@@ -143,7 +143,7 @@ export async function POST(req: Request) {
                         isVendable = false;
 
                         // Create cost record (CDF First)
-                        const costCdf = body.currency === "CDF" ? item.cost : (item.cost * exchangeRateVal);
+                        const costCdf = Number(item.itemPrice);
                         await tx.productCost.create({
                             data: {
                                 productId: actualProductId,
@@ -156,7 +156,8 @@ export async function POST(req: Request) {
                 }
 
                 // Calculate item cost in CDF immediately to avoid drift
-                const itemUnitCostCdf = body.inputCurrency === "USD" ? (item.itemPrice * exchangeRateVal) : item.itemPrice;
+                // Frontend sends itemPrice in CDF always
+                const itemUnitCostCdf = Number(item.itemPrice);
                 const itemLineTotalCdf = itemUnitCostCdf * item.quantity;
 
                 if (isVendable) {
@@ -250,7 +251,7 @@ export async function POST(req: Request) {
                         quantity: item.quantity,
                         toLocation: targetLocation,
                         reason: `Achat Investissement #${investment.id.slice(-4)}`,
-                        costValue: item.cost * item.quantity,
+                        costValue: item.lineTotalCdf, // Use the calculate CDF total
                         userId: session.user.id,
                         investmentId: investment.id
                     }
@@ -355,7 +356,7 @@ export async function PUT(req: Request) {
                         isVendable = false;
 
                         // Create cost record (CDF First)
-                        const costCdf = body.currency === "CDF" ? item.cost : (item.cost * exchangeRateVal);
+                        const costCdf = Number(item.itemPrice);
                         await tx.productCost.create({
                             data: {
                                 productId: actualProductId,
@@ -368,7 +369,7 @@ export async function PUT(req: Request) {
                 }
 
                 // Calculate item cost in CDF immediately to avoid drift
-                const itemUnitCostCdf = body.inputCurrency === "USD" ? (item.itemPrice * exchangeRateVal) : item.itemPrice;
+                const itemUnitCostCdf = Number(item.itemPrice);
                 const itemLineTotalCdf = itemUnitCostCdf * item.quantity;
 
                 if (isVendable) {
@@ -453,7 +454,7 @@ export async function PUT(req: Request) {
                         quantity: item.quantity,
                         toLocation: targetLocation,
                         reason: `Mise à jour Achat #${investment.id.slice(-4)}`,
-                        costValue: item.cost * item.quantity,
+                        costValue: item.lineTotalCdf,
                         userId: session.user.id,
                         investmentId: investment.id
                     }
