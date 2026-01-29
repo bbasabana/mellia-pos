@@ -110,28 +110,43 @@ export async function POST(req: Request) {
 
                 // Determine if really vendable (must not be new, and must be marked vendable)
                 if (item.isNew) {
-                    const newProduct = await tx.product.create({
-                        data: {
-                            name: item.productName,
-                            type: "NON_VENDABLE",
-                            active: true,
-                            vendable: false,
-                            saleUnit: item.newUnit || "PIECE",
-                            size: "STANDARD",
+                    // IDEMPOTENCY CHECK: Search if product already exists (by name & type)
+                    const existingProduct = await tx.product.findFirst({
+                        where: {
+                            name: { equals: item.productName, mode: 'insensitive' },
+                            type: 'NON_VENDABLE'
                         }
                     });
-                    actualProductId = newProduct.id;
-                    isVendable = false;
 
-                    // Create cost record for the new product
-                    await tx.productCost.create({
-                        data: {
-                            productId: actualProductId,
-                            unitCostUsd: item.cost,
-                            unitCostCdf: item.cost * (parseFloat(body.exchangeRate) || 2850),
-                            forUnit: item.newUnit || "PIECE"
-                        }
-                    });
+                    if (existingProduct) {
+                        // REUSE EXISTING
+                        actualProductId = existingProduct.id;
+                        isVendable = existingProduct.vendable; // Should be false
+                    } else {
+                        // CREATE NEW
+                        const newProduct = await tx.product.create({
+                            data: {
+                                name: item.productName,
+                                type: "NON_VENDABLE",
+                                active: true,
+                                vendable: false,
+                                saleUnit: item.newUnit || "PIECE",
+                                size: "STANDARD",
+                            }
+                        });
+                        actualProductId = newProduct.id;
+                        isVendable = false;
+
+                        // Create cost record for the new product
+                        await tx.productCost.create({
+                            data: {
+                                productId: actualProductId,
+                                unitCostUsd: item.cost,
+                                unitCostCdf: item.cost * (parseFloat(body.exchangeRate) || 2850),
+                                forUnit: item.newUnit || "PIECE"
+                            }
+                        });
+                    }
                 }
 
                 if (isVendable) {
@@ -301,18 +316,32 @@ export async function PUT(req: Request) {
                 // Determine if really vendable (must not be new, and must be marked vendable)
                 // Handle isNew in Edit? (Ideally products already created, but for safety)
                 if (item.isNew && !actualProductId.startsWith("cl")) {
-                    const newProduct = await tx.product.create({
-                        data: {
-                            name: item.productName,
-                            type: "NON_VENDABLE",
-                            active: true,
-                            vendable: false,
-                            saleUnit: item.newUnit || "PIECE",
-                            size: "STANDARD",
+                    // IDEMPOTENCY CHECK: Search if product already exists (by name & type)
+                    const existingProduct = await tx.product.findFirst({
+                        where: {
+                            name: { equals: item.productName, mode: 'insensitive' },
+                            type: 'NON_VENDABLE'
                         }
                     });
-                    actualProductId = newProduct.id;
-                    isVendable = false;
+
+                    if (existingProduct) {
+                        // REUSE EXISTING
+                        actualProductId = existingProduct.id;
+                        isVendable = existingProduct.vendable;
+                    } else {
+                        const newProduct = await tx.product.create({
+                            data: {
+                                name: item.productName,
+                                type: "NON_VENDABLE",
+                                active: true,
+                                vendable: false,
+                                saleUnit: item.newUnit || "PIECE",
+                                size: "STANDARD",
+                            }
+                        });
+                        actualProductId = newProduct.id;
+                        isVendable = false;
+                    }
                 }
 
                 if (isVendable) {

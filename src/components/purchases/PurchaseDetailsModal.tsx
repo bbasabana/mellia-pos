@@ -85,7 +85,12 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                            <div className="font-bold text-gray-700">{formatCurrency(Number(mov.costValue))}</div>
+                                            <div className="font-bold text-gray-700">
+                                                {formatCurrency(Number(mov.costValue) * (Number(investment.exchangeRate) || 2850), "CDF")}
+                                            </div>
+                                            <div className="text-[10px] text-gray-400">
+                                                {formatCurrency(Number(mov.costValue), "USD")}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -107,14 +112,26 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                         </p>
                     </div>
                     <div className="text-right space-y-1">
-                        <div className="text-xs text-gray-400">
-                            Stock: <span className="font-bold text-gray-600">{formatCurrency(Number(investment.vendableAmount || 0))}</span>
-                            <span className="mx-1">|</span>
-                            Charges: <span className="font-bold text-orange-500">{formatCurrency(Number(investment.nonVendableAmount || 0))}</span>
+                        <div className="text-xs text-gray-400 flex flex-col items-end">
+                            <div>
+                                Stock: <span className="font-bold text-gray-600">{formatCurrency(Number(investment.vendableAmount || 0) * (Number(investment.exchangeRate) || 2850), "CDF")}</span>
+                                <span className="mx-1">|</span>
+                                Charges: <span className="font-bold text-orange-500">{formatCurrency(Number(investment.nonVendableAmount || 0) * (Number(investment.exchangeRate) || 2850), "CDF")}</span>
+                            </div>
+                            <div className="text-[9px] opacity-70">
+                                {formatCurrency(Number(investment.vendableAmount || 0), "USD")} | {formatCurrency(Number(investment.nonVendableAmount || 0), "USD")}
+                            </div>
                         </div>
                         <div>
                             <p className="text-[10px] text-gray-500 uppercase font-bold">Total Investi</p>
-                            <p className="text-2xl font-black text-[#00d3fa]">{formatCurrency(Number(investment.totalAmount))}</p>
+                            <div className="flex flex-col items-end">
+                                <p className="text-2xl font-black text-[#00d3fa]">
+                                    {formatCurrency(Number(investment.totalAmount) * (Number(investment.exchangeRate) || 2850), "CDF")}
+                                </p>
+                                <p className="text-sm font-bold text-gray-400">
+                                    {formatCurrency(Number(investment.totalAmount), "USD")}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -127,10 +144,24 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                         <div className="p-4 bg-green-50/50 border border-green-100 rounded-xl relative overflow-hidden">
                             <div className="absolute top-0 right-0 bg-green-100 text-green-700 px-2 py-0.5 text-[9px] font-black rounded-bl-lg uppercase">Terrasse / Salle</div>
                             <p className="text-[10px] text-green-600 uppercase font-bold mb-1">Revenu (Terrasse)</p>
-                            <p className="text-xl font-black text-green-700">{formatCurrency(Number(investment.expectedRevenue || 0))}</p>
+                            <div className="flex flex-col">
+                                <span className="text-xl font-black text-green-700">
+                                    {formatCurrency((Number(investment.expectedRevenue || 0) * (Number(investment.exchangeRate) || 2850)), "CDF")}
+                                </span>
+                                <span className="text-xs font-bold text-green-500/70">
+                                    {formatCurrency(Number(investment.expectedRevenue || 0), "USD")}
+                                </span>
+                            </div>
                             <div className="mt-2 pt-2 border-t border-green-100 flex justify-between items-center">
                                 <span className="text-[10px] text-green-600 font-bold uppercase">Profit Net</span>
-                                <span className="text-sm font-black text-green-700">+{formatCurrency(Number(investment.expectedProfit || 0))}</span>
+                                <div className="text-right flex flex-col items-end leading-none">
+                                    <span className="text-sm font-black text-green-700">
+                                        +{formatCurrency((Number(investment.expectedProfit || 0) * (Number(investment.exchangeRate) || 2850)), "CDF")}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-green-500/70">
+                                        +{formatCurrency(Number(investment.expectedProfit || 0), "USD")}
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
@@ -138,10 +169,24 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                         <div className="p-4 bg-[#fcf9ff] border border-purple-100 rounded-xl relative overflow-hidden">
                             <div className="absolute top-0 right-0 bg-purple-100 text-purple-700 px-2 py-0.5 text-[9px] font-black rounded-bl-lg uppercase">VIP / Salon</div>
                             <p className="text-[10px] text-purple-600 uppercase font-bold mb-1">Revenu (VIP)</p>
-                            <p className="text-xl font-black text-purple-700">{formatCurrency(Number(investment.expectedRevenueVip || investment.expectedRevenue || 0))}</p>
+                            <div className="flex flex-col">
+                                <span className="text-xl font-black text-purple-700">
+                                    {formatCurrency((Number(investment.expectedRevenueVip || investment.expectedRevenue || 0) * (Number(investment.exchangeRate) || 2850)), "CDF")}
+                                </span>
+                                <span className="text-xs font-bold text-purple-500/70">
+                                    {formatCurrency(Number(investment.expectedRevenueVip || investment.expectedRevenue || 0), "USD")}
+                                </span>
+                            </div>
                             <div className="mt-2 pt-2 border-t border-purple-100 flex justify-between items-center">
                                 <span className="text-[10px] text-purple-600 font-bold uppercase">Profit Net</span>
-                                <span className="text-sm font-black text-purple-700">+{formatCurrency(Number(investment.expectedProfitVip || investment.expectedProfit || 0))}</span>
+                                <div className="text-right flex flex-col items-end leading-none">
+                                    <span className="text-sm font-black text-purple-700">
+                                        +{formatCurrency((Number(investment.expectedProfitVip || investment.expectedProfit || 0) * (Number(investment.exchangeRate) || 2850)), "CDF")}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-purple-500/70">
+                                        +{formatCurrency(Number(investment.expectedProfitVip || investment.expectedProfit || 0), "USD")}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
