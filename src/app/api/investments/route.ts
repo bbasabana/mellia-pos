@@ -88,6 +88,7 @@ export async function POST(req: Request) {
             totalAmount,
             source,
             description,
+            date, // Extract date
             items // Array of { productId, quantity, cost, isVendable }
         } = body;
 
@@ -182,6 +183,7 @@ export async function POST(req: Request) {
             // 2. Create Investment Record
             const investment = await tx.investment.create({
                 data: {
+                    date: date ? new Date(date) : new Date(),
                     totalAmount: totalAmount,
                     totalAmountCdf: body.totalAmountCdf || 0,
                     exchangeRate: body.exchangeRate || 0,
@@ -245,7 +247,7 @@ export async function PUT(req: Request) {
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await req.json();
-        const { id, totalAmount, source, description, items } = body;
+        const { id, totalAmount, source, description, items, date } = body;
 
         if (!id || !totalAmount || !items || items.length === 0) {
             return NextResponse.json({ error: "Invalid data" }, { status: 400 });
@@ -340,6 +342,7 @@ export async function PUT(req: Request) {
             const investment = await tx.investment.update({
                 where: { id },
                 data: {
+                    date: date ? new Date(date) : undefined,
                     totalAmount,
                     totalAmountCdf: body.totalAmountCdf || 0,
                     exchangeRate: body.exchangeRate || 0,

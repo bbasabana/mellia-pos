@@ -16,6 +16,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
     const [source, setSource] = useState("OWNER_CAPITAL");
     const [buyerName, setBuyerName] = useState("");
     const [description, setDescription] = useState("");
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [currency, setCurrency] = useState<"USD" | "CDF">("CDF");
     const [exchangeRate, setExchangeRate] = useState(DEFAULT_RATE.toString());
 
@@ -50,6 +51,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
             if (json.success && json.data) {
                 const inv = json.data;
                 setSource(inv.source);
+                if (inv.date) setDate(new Date(inv.date).toISOString().split('T')[0]);
                 setCurrency(inv.exchangeRate ? "USD" : "CDF"); // Simple heuristic
                 setExchangeRate(inv.exchangeRate?.toString() || DEFAULT_RATE.toString());
 
@@ -212,6 +214,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     id: editId,
+                    date,
                     totalAmount: totalUsd,
                     totalAmountCdf: totalCdf,
                     exchangeRate: parseFloat(exchangeRate),
@@ -256,7 +259,16 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
     return (
         <div className="bg-white p-6 border border-gray-200 rounded-sm">
             {/* 1. Header & Configuration */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded border border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 p-4 bg-gray-50 rounded border border-gray-100">
+                <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Date Achat</label>
+                    <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="w-full p-2 text-sm border-gray-300 rounded"
+                    />
+                </div>
                 <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Source Fonds</label>
                     <select
