@@ -117,9 +117,11 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                 Stock: <span className="font-bold text-gray-600">{formatCurrency(Number(investment.vendableAmount || 0) * (Number(investment.exchangeRate) || 2850), "CDF")}</span>
                                 <span className="mx-1">|</span>
                                 Charges: <span className="font-bold text-orange-500">{formatCurrency(Number(investment.nonVendableAmount || 0) * (Number(investment.exchangeRate) || 2850), "CDF")}</span>
+                                <span className="mx-1">|</span>
+                                Transport: <span className="font-bold text-purple-500">{formatCurrency(Number(investment.transportFee || 0) * (Number(investment.exchangeRate) || 2850), "CDF")}</span>
                             </div>
                             <div className="text-[9px] opacity-70">
-                                {formatCurrency(Number(investment.vendableAmount || 0), "USD")} | {formatCurrency(Number(investment.nonVendableAmount || 0), "USD")}
+                                {formatCurrency(Number(investment.vendableAmount || 0), "USD")} | {formatCurrency(Number(investment.nonVendableAmount || 0), "USD")} | {formatCurrency(Number(investment.transportFee || 0), "USD")}
                             </div>
                         </div>
                         <div>

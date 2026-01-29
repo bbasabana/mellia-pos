@@ -89,7 +89,8 @@ export async function POST(req: Request) {
             source,
             description,
             date, // Extract date
-            items // Array of { productId, quantity, cost, isVendable }
+            items, // Array of { productId, quantity, cost, isVendable }
+            transportFee = 0 // Extract transport fee (default 0)
         } = body;
 
         if (!totalAmount || !items || items.length === 0) {
@@ -278,7 +279,7 @@ export async function PUT(req: Request) {
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await req.json();
-        const { id, totalAmount, source, description, items, date } = body;
+        const { id, totalAmount, source, description, items, date, transportFee = 0 } = body;
 
         if (!id || !totalAmount || !items || items.length === 0) {
             return NextResponse.json({ error: "Invalid data" }, { status: 400 });

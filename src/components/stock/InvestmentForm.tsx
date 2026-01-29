@@ -19,6 +19,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [currency, setCurrency] = useState<"USD" | "CDF">("CDF");
     const [exchangeRate, setExchangeRate] = useState(DEFAULT_RATE.toString());
+    const [transportFee, setTransportFee] = useState("0");
 
     const [items, setItems] = useState<any[]>([]);
 
@@ -57,6 +58,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                 if (inv.date) setDate(new Date(inv.date).toISOString().split('T')[0]);
                 setCurrency(inv.exchangeRate ? "USD" : "CDF"); // Simple heuristic
                 setExchangeRate(inv.exchangeRate?.toString() || DEFAULT_RATE.toString());
+                setTransportFee(inv.transportFee?.toString() || "0");
 
                 // Parse Buyer Name: "[Acheteur: Name] Actual Description"
                 const desc = inv.description || "";
@@ -203,9 +205,9 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
         if (items.length === 0) return;
         setLoading(true);
 
-        const totalUsd = items.reduce((acc, item) => acc + (item.costUsd * item.quantity), 0);
-        // Sum of all line totals in the entered currency (CDF or USD)
-        const totalAmountEntered = items.reduce((acc, item) => acc + item.lineTotal, 0);
+        const totalUsd = items.reduce((acc, item) => acc + (item.costUsd * item.quantity), 0) + (currency === "USD" ? parseFloat(transportFee || "0") : (parseFloat(transportFee || "0") / parseFloat(exchangeRate)));
+        // Sum of all line totals in the entered currency (CDF or USD) PLUS Transport
+        const totalAmountEntered = items.reduce((acc, item) => acc + item.lineTotal, 0) + parseFloat(transportFee || "0");
         const totalCdf = currency === "CDF" ? totalAmountEntered : (totalAmountEntered * parseFloat(exchangeRate));
 
         // Append Buyer Name to description if present
@@ -232,7 +234,8 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                         cost: i.costUsd,
                         location: i.location,
                         isVendable: i.isVendable
-                    }))
+                    })),
+                    transportFee: parseFloat(transportFee) || 0
                 })
             });
             const data = await res.json();
@@ -252,7 +255,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
     };
 
     // Calculate Totals for UI
-    const totalDisplay = items.reduce((acc, item) => acc + item.lineTotal, 0);
+    const totalDisplay = items.reduce((acc, item) => acc + item.lineTotal, 0) + (parseFloat(transportFee) || 0);
     const convertedTotal = currency === "CDF"
         ? (totalDisplay / (parseFloat(exchangeRate) || DEFAULT_RATE)).toFixed(2) + " $"
         : (totalDisplay * (parseFloat(exchangeRate) || DEFAULT_RATE)).toLocaleString() + " FC";
@@ -321,6 +324,16 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                             className="w-full pl-7 p-2 text-sm border-gray-300 rounded"
                         />
                     </div>
+                </div>
+                <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 drop-shadow-sm text-purple-600">Frais Transport ({currency})</label>
+                    <input
+                        type="number"
+                        value={transportFee}
+                        onChange={(e) => setTransportFee(e.target.value)}
+                        className="w-full p-2 text-sm border-purple-200 focus:border-purple-400 rounded bg-purple-50 font-bold text-purple-700 outline-none"
+                        placeholder="0"
+                    />
                 </div>
             </div>
 
@@ -603,7 +616,13 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                             </tbody>
                             <tfoot className="bg-gray-50 border-t border-gray-200">
                                 <tr>
-                                    <td colSpan={4} className="p-3 text-right font-bold text-gray-600 uppercase text-xs">Total à Payer:</td>
+                                    <td colSpan={4} className="p-3 text-right font-bold text-gray-600 uppercase text-xs">
+                                        Sous-Total Marchandise: {(totalDisplay - (parseFloat(transportFee) || 0)).toLocaleString()} {currency}
+                                        <br />
+                                        <span className="text-purple-600">+ Transport: {(parseFloat(transportFee) || 0).toLocaleString()} {currency}</span>
+                                        <br />
+                                        Total à Payer:
+                                    </td>
                                     <td className="p-3 text-right font-bold text-xl text-[#00d3fa]">
                                         {totalDisplay.toLocaleString()} {currency}
                                     </td>

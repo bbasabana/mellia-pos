@@ -296,6 +296,7 @@ model Investment {
   createdAt         DateTime        @default(now())
   exchangeRate      Decimal?        @db.Decimal(10, 2)
   totalAmountCdf    Decimal?        @db.Decimal(15, 2)
+  transportFee      Decimal?        @db.Decimal(10, 2)
   user              User            @relation(fields: [userId], references: [id])
   movements         StockMovement[]
 
