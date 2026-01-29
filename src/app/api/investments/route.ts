@@ -84,7 +84,7 @@ export async function POST(req: Request) {
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await req.json();
-        const {
+        let {
             totalAmount,
             source,
             description,
@@ -93,8 +93,14 @@ export async function POST(req: Request) {
             transportFee = 0 // Extract transport fee (default 0)
         } = body;
 
-        if (!totalAmount || !items || items.length === 0) {
-            return NextResponse.json({ error: "Invalid data" }, { status: 400 });
+        // Validation Fix: Accept totalAmountCdf if totalAmount is missing
+        if (!totalAmount && body.totalAmountCdf) {
+            const rate = parseFloat(body.exchangeRate) || 2850;
+            totalAmount = Number(body.totalAmountCdf) / rate;
+        }
+
+        if ((!totalAmount && !body.totalAmountCdf) || !items || items.length === 0) {
+            return NextResponse.json({ error: "Invalid data: Missing totalAmount or Items" }, { status: 400 });
         }
 
         // Transaction: Create Investment + Stock Movements + Update StockItems
@@ -280,9 +286,15 @@ export async function PUT(req: Request) {
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await req.json();
-        const { id, totalAmount, source, description, items, date, transportFee = 0 } = body;
+        let { id, totalAmount, source, description, items, date, transportFee = 0 } = body;
 
-        if (!id || !totalAmount || !items || items.length === 0) {
+        // Validation Fix: Accept totalAmountCdf if totalAmount is missing
+        if (!totalAmount && body.totalAmountCdf) {
+            const rate = parseFloat(body.exchangeRate) || 2850;
+            totalAmount = Number(body.totalAmountCdf) / rate;
+        }
+
+        if (!id || (!totalAmount && !body.totalAmountCdf) || !items || items.length === 0) {
             return NextResponse.json({ error: "Invalid data" }, { status: 400 });
         }
 
@@ -475,6 +487,12 @@ export async function DELETE(req: Request) {
 
         if (!id) {
             return NextResponse.json({ error: "Investment ID required" }, { status: 400 });
+        }
+
+        // Check if exists first to avoid 500
+        const existing = await prisma.investment.findUnique({ where: { id } });
+        if (!existing) {
+            return NextResponse.json({ error: "Investment not found" }, { status: 404 });
         }
 
         await prisma.$transaction(async (tx) => {
