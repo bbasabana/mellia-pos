@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.melliapos.mellia_pos_mobile"
-    compileSdk = 36
+    compileSdk = 34
     ndkVersion = "27.0.12077973"
 
     compileOptions {

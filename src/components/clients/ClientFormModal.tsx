@@ -15,7 +15,7 @@ type ClientFormData = {
 interface ClientFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: () => void;
+    onSuccess: (client: any) => void;
     clientToEdit?: any;
 }
 
@@ -50,9 +50,9 @@ export default function ClientFormModal({ isOpen, onClose, onSuccess, clientToEd
                 const text = await res.text();
                 throw new Error(text || "Error saving client");
             }
-
+            const dataJson = await res.json();
             showToast(clientToEdit ? "Client modifié avec succès" : "Client créé avec succès", "success");
-            onSuccess();
+            onSuccess(dataJson.data || dataJson);
             onClose();
         } catch (e: any) {
             setError(e.message);

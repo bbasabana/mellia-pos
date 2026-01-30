@@ -1,7 +1,7 @@
 "use client";
 
 import { usePosStore } from "@/store/usePosStore";
-import { Search, Calculator, Trash2, UserPlus, CreditCard, Minus, Plus, Save, Store, Filter, ShoppingCart, X, Printer, FilePlus, RefreshCcw } from "lucide-react";
+import { Search, Calculator, Trash2, UserPlus, CreditCard, Minus, Plus, Save, Store, Filter, ShoppingCart, X, Printer, FilePlus, RefreshCcw, ShoppingBag } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
@@ -78,7 +78,7 @@ const ClientSelector = () => {
                     <ClientFormModal
                         isOpen={isModalOpen}
                         onClose={() => setIsModalOpen(false)}
-                        onSuccess={() => { }}
+                        onSuccess={(c) => setClient(c)}
                     />
                 </div>
             ) : (
@@ -548,6 +548,15 @@ const ProductGrid = () => {
                     </h1>
                     <p className="text-xs text-gray-500">Caisse et prise de commande</p>
                 </div>
+                <div className="flex gap-2">
+                    <a
+                        href="/pos-light"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-sm text-xs font-bold border border-orange-200 hover:bg-orange-200 transition-all"
+                    >
+                        <ShoppingBag size={14} />
+                        Mode POS Light (Petit Écran)
+                    </a>
+                </div>
             </div>
 
             {/* Category Filter */}
@@ -642,6 +651,19 @@ export default function PosPage() {
             }
         };
         fetchRate();
+
+        // Auto-detect small landscape height (standard for POS with 10" and reduced height)
+        const isSmallLandscape = window.innerHeight < 600 && window.innerWidth > 800;
+        if (isSmallLandscape) {
+            const hasNotified = localStorage.getItem('pos_light_suggestion_dismissed');
+            if (!hasNotified) {
+                if (confirm("Votre écran semble petit. Souhaitez-vous passer en mode 'POS Web Light' optimisé ?")) {
+                    window.location.href = "/pos-light";
+                } else {
+                    localStorage.setItem('pos_light_suggestion_dismissed', 'true');
+                }
+            }
+        }
     }, []);
 
     // Printing Logic
