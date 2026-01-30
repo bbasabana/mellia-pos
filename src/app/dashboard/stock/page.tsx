@@ -111,6 +111,7 @@ export default function StockPage() {
 function StockOverview({ onOpenMovement, onTransfer }: { onOpenMovement: () => void; onTransfer: (id: string) => void }) {
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [subTab, setSubTab] = useState<"vendable" | "non_vendable">("vendable");
 
     useEffect(() => {
         fetchStock();
@@ -130,17 +131,72 @@ function StockOverview({ onOpenMovement, onTransfer }: { onOpenMovement: () => v
         }
     };
 
-    // KPI Calculations
-    const stockValue = products.reduce((acc, p) => acc + p.totalValue, 0);
-    const lowStockCount = products.filter((p: any) => p.totalQuantity <= 5).length;
+    // Filtered lists for specific logic if needed
+    const vendableProducts = products.filter(p => p.vendable);
+    const nonVendableProducts = products.filter(p => !p.vendable);
+
+    // Dynamic products based on tab
+    const displayedProducts = subTab === "vendable" ? vendableProducts : nonVendableProducts;
+
+    // KPI Calculations (Based on total stock or filtered? User usually wants total context, but maybe filtered for value)
+    const currentStockValue = displayedProducts.reduce((acc, p) => acc + p.totalValue, 0);
+    const lowStockCount = displayedProducts.filter((p: any) => p.totalQuantity <= 5).length;
 
     return (
         <div className="space-y-6">
+            {/* SUB-TABS SELECTOR */}
+            <div className="flex border-b border-gray-200">
+                <button
+                    onClick={() => setSubTab("vendable")}
+                    className={cn(
+                        "px-6 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2",
+                        subTab === "vendable"
+                            ? "border-[#00d3fa] text-[#00d3fa]"
+                            : "border-transparent text-gray-400 hover:text-gray-600"
+                    )}
+                >
+                    PRODUITS DE VENTE
+                    <span className={cn(
+                        "px-1.5 py-0.5 rounded-full text-[10px]",
+                        subTab === "vendable" ? "bg-[#00d3fa] text-white" : "bg-gray-100 text-gray-500"
+                    )}>
+                        {vendableProducts.length}
+                    </span>
+                </button>
+                <button
+                    onClick={() => setSubTab("non_vendable")}
+                    className={cn(
+                        "px-6 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2",
+                        subTab === "non_vendable"
+                            ? "border-orange-500 text-orange-500"
+                            : "border-transparent text-gray-400 hover:text-gray-600"
+                    )}
+                >
+                    CHARGES & NON-VENDABLES
+                    <span className={cn(
+                        "px-1.5 py-0.5 rounded-full text-[10px]",
+                        subTab === "non_vendable" ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-500"
+                    )}>
+                        {nonVendableProducts.length}
+                    </span>
+                </button>
+            </div>
+
             <div className="flex justify-between items-center">
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 mr-4">
-                    <KpiCard title="Valeur Stock (Est.)" value={`${stockValue.toLocaleString()} $`} icon={<DollarSign />} color="text-[#00d3fa]" />
-                    <KpiCard title="Alertes Rupture" value={lowStockCount} icon={<AlertTriangle />} color={lowStockCount > 0 ? "text-red-500 bg-red-50" : "text-[#71de00]"} />
+                    <KpiCard
+                        title={subTab === "vendable" ? "Valeur Stock Vente" : "Valeur Charges/Stock"}
+                        value={`${currentStockValue.toLocaleString()} $`}
+                        icon={<DollarSign />}
+                        color={subTab === "vendable" ? "text-[#00d3fa]" : "text-orange-500"}
+                    />
+                    <KpiCard
+                        title="Alertes Rupture"
+                        value={lowStockCount}
+                        icon={<AlertTriangle />}
+                        color={lowStockCount > 0 ? "text-red-500 bg-red-50" : "text-[#71de00]"}
+                    />
                 </div>
 
                 <button
@@ -156,7 +212,9 @@ function StockOverview({ onOpenMovement, onTransfer }: { onOpenMovement: () => v
             {/* Matrix Table */}
             <div className="bg-white border border-gray-200 rounded-sm">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-700">Vue Globale (Physique)</h3>
+                    <h3 className="font-bold text-gray-700">
+                        {subTab === "vendable" ? "Inventaire des Produits de Vente" : "Inventaire des Charges & Consommables"}
+                    </h3>
                     <div className="flex gap-2">
                         <span className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-1 bg-[#00d3fa]/10 text-[#00d3fa] rounded-sm">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#00d3fa]"></span> Frigo
@@ -166,7 +224,7 @@ function StockOverview({ onOpenMovement, onTransfer }: { onOpenMovement: () => v
                         </span>
                     </div>
                 </div>
-                <StockMatrixTable products={products} loading={loading} onTransfer={onTransfer} />
+                <StockMatrixTable products={displayedProducts} loading={loading} onTransfer={onTransfer} />
             </div>
         </div>
     );

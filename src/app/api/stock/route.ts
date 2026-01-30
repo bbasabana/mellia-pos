@@ -42,6 +42,7 @@ export async function GET() {
                     id: p.id,
                     name: p.name,
                     type: p.type,
+                    vendable: p.vendable, // Added field
                     unit: p.saleUnit,
                     locations: {
                         DEPOT: depot,
