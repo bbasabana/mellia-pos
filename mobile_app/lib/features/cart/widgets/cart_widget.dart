@@ -76,8 +76,18 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
     final cartState = ref.watch(cartNotifierProvider);
     final cartItems = cartState.items.values.toList();
 
-    // Sync only if lengths or items change
-    if (_displayedItems.length != cartItems.length) {
+    // Sync if lengths or content change
+    bool shouldSync = _displayedItems.length != cartItems.length;
+    if (!shouldSync) {
+      for (int i = 0; i < _displayedItems.length; i++) {
+        if (_displayedItems[i] != cartItems[i]) {
+          shouldSync = true;
+          break;
+        }
+      }
+    }
+
+    if (shouldSync) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _syncItems(cartItems);
       });

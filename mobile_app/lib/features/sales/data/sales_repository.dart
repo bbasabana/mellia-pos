@@ -109,15 +109,20 @@ Future<SalesRepository> salesRepository(SalesRepositoryRef ref) async {
   return SalesRepository(dio);
 }
 
-final transactionsProvider =
-    FutureProvider.family<List<dynamic>, Map<String, String>>((
-      ref,
-      params,
-    ) async {
-      final repo = await ref.watch(salesRepositoryProvider.future);
-      return repo.getTransactions(
-        status: params['status'] ?? 'COMPLETED',
-        startDate: params['startDate'],
-        endDate: params['endDate'],
-      );
-    });
+final transactionsProvider = FutureProvider.family<List<dynamic>, String>((
+  ref,
+  queryKey,
+) async {
+  // queryKey format: "startDate|endDate|status"
+  final parts = queryKey.split('|');
+  final startDate = parts[0];
+  final endDate = parts[1];
+  final status = parts[2];
+
+  final repo = await ref.watch(salesRepositoryProvider.future);
+  return repo.getTransactions(
+    status: status,
+    startDate: startDate,
+    endDate: endDate,
+  );
+});

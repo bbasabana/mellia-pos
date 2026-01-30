@@ -19,11 +19,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     final transactionsAsync = ref.watch(
-      transactionsProvider({
-        'status': 'COMPLETED',
-        'startDate': _dateStr,
-        'endDate': _dateStr,
-      }),
+      transactionsProvider("$_dateStr|$_dateStr|COMPLETED"),
     );
 
     return Scaffold(

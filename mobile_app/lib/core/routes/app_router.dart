@@ -45,9 +45,8 @@ GoRouter appRouter(AppRouterRef ref) {
         return null;
       }
 
-      if (user.role == 'CASHIER' ||
-          user.role == 'ADMIN' ||
-          user.role == 'MANAGER') {
+      // Allow ADMIN and MANAGER to access kitchen too
+      if (user.role == 'CASHIER') {
         if (state.uri.toString() == '/kitchen') return '/';
       }
 
