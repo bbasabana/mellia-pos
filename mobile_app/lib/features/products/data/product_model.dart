@@ -66,8 +66,12 @@ abstract class ProductPrice with _$ProductPrice {
     @Default('BOTTLE') String forUnit,
   }) = _ProductPrice;
 
-  factory ProductPrice.fromJson(Map<String, dynamic> json) =>
-      _$ProductPriceFromJson(json);
+  factory ProductPrice.fromJson(Map<String, dynamic> json) {
+    if (json['spaceId'] == null && json['space'] != null) {
+      json['spaceId'] = json['space']['id'];
+    }
+    return _$ProductPriceFromJson(json);
+  }
 }
 
 @freezed

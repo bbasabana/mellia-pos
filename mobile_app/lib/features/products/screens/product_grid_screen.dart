@@ -74,6 +74,8 @@ class _ProductGridContentState extends ConsumerState<_ProductGridContent> {
     // Filter Logic
     final filtered = widget.allProducts.where((p) {
       if (!p.active) return false;
+      if (!p.vendable)
+        return false; // Ensure non-vendable items are never shown in POS
       if (selectedType == 'ALL') return true;
       if (selectedType == 'BOISSON') return p.type == 'BEVERAGE';
       if (selectedType == 'NOURRITURE') return p.type == 'FOOD';
