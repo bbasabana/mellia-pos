@@ -73,15 +73,19 @@ export default function HistoryLightPage() {
     }, [filteredTransactions]);
 
     const stats = useMemo(() => {
-        const today = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const getDayStr = (date: Date) => {
+            return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+        };
+
+        const today = getDayStr(new Date());
+        const yesterday = getDayStr(new Date(Date.now() - 86400000));
 
         const todayTotal = transactions
-            .filter(t => new Date(t.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) === today)
+            .filter(t => getDayStr(new Date(t.createdAt)) === today)
             .reduce((acc, t) => acc + (t.totalCdf || 0), 0);
 
         const yesterdayTotal = transactions
-            .filter(t => new Date(t.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) === yesterday)
+            .filter(t => getDayStr(new Date(t.createdAt)) === yesterday)
             .reduce((acc, t) => acc + (t.totalCdf || 0), 0);
 
         return { todayTotal, yesterdayTotal };
