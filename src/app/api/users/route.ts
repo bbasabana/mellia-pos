@@ -71,11 +71,15 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name, email, role, baseSalary, phone } = body;
+        const { name, email, role, baseSalary, phone, password } = body;
 
-        // Generate random 8-char password
-        const generatedPassword = Math.random().toString(36).slice(-8);
-        const passwordHash = await hash(generatedPassword, 10);
+        // Use provided password if valid (min 4 chars), otherwise generate random
+        let finalPassword = password;
+        if (!finalPassword || finalPassword.length < 4) {
+            finalPassword = Math.random().toString(36).slice(-8);
+        }
+
+        const passwordHash = await hash(finalPassword, 10);
 
         const newUser = await prisma.user.create({
             data: {
@@ -89,7 +93,7 @@ export async function POST(req: Request) {
             }
         });
 
-        return NextResponse.json({ success: true, data: { ...newUser, generatedPassword } });
+        return NextResponse.json({ success: true, data: { ...newUser, generatedPassword: finalPassword } });
 
     } catch (error: any) {
         if (error.code === 'P2002') {

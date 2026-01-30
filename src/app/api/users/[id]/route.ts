@@ -26,17 +26,24 @@ export async function PUT(
         }
 
         const body = await req.json();
-        const { name, role, baseSalary, phone, status } = body;
+        const { name, role, baseSalary, phone, status, password } = body;
+
+        const updateData: any = {
+            name,
+            role,
+            status,
+            baseSalary: baseSalary ? parseFloat(baseSalary) : null,
+            phone
+        };
+
+        // If password provided and >= 4 chars, hash it
+        if (password && password.length >= 4) {
+            updateData.passwordHash = await hash(password, 10);
+        }
 
         const updatedUser = await prisma.user.update({
             where: { id: params.id },
-            data: {
-                name,
-                role,
-                status,
-                baseSalary: baseSalary ? parseFloat(baseSalary) : null,
-                phone
-            }
+            data: updateData
         });
 
         return NextResponse.json({ success: true, data: updatedUser });
@@ -63,8 +70,8 @@ export async function PATCH(
         const { action } = body;
 
         if (action === "RESET_PASSWORD") {
-            // Reset to random 8-char password
-            const generatedPassword = Math.random().toString(36).slice(-8);
+            // Reset to 4-digit numeric password (simpler for staff)
+            const generatedPassword = Math.floor(1000 + Math.random() * 9000).toString();
             const passwordHash = await hash(generatedPassword, 10);
 
             await prisma.user.update({

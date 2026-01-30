@@ -25,6 +25,7 @@ export default function UsersPage() {
         name: "",
         email: "",
         role: "CASHIER",
+        password: "",
     });
 
     // Password Display State (for Create & Reset)
@@ -73,7 +74,7 @@ export default function UsersPage() {
                 showToast(selectedUser ? "Utilisateur mis à jour" : "Utilisateur créé", "success");
                 setIsCreateOpen(false);
                 setSelectedUser(null);
-                setFormData({ name: "", email: "", role: "CASHIER" });
+                setFormData({ name: "", email: "", role: "CASHIER", password: "" });
                 fetchUsers();
 
                 // If created new user, show password
@@ -96,6 +97,7 @@ export default function UsersPage() {
             name: user.name,
             email: user.email,
             role: user.role,
+            password: "",
         });
         setIsCreateOpen(true);
     };
@@ -166,7 +168,7 @@ export default function UsersPage() {
                         <p className="text-sm text-gray-500">Gérez les accès système et les rôles</p>
                     </div>
                     <button
-                        onClick={() => { setSelectedUser(null); setFormData({ name: "", email: "", role: "CASHIER" }); setIsCreateOpen(true); }}
+                        onClick={() => { setSelectedUser(null); setFormData({ name: "", email: "", role: "CASHIER", password: "" }); setIsCreateOpen(true); }}
                         className="px-4 py-2 bg-black text-white font-bold rounded-sm flex items-center gap-2 hover:bg-gray-800 shadow-sm transition-all text-sm"
                     >
                         <UserPlus size={16} />
@@ -256,6 +258,21 @@ export default function UsersPage() {
                                     <option key={role.value} value={role.value}>{role.label}</option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div className="space-y-1">
+                            <div className="flex justify-between items-center">
+                                <label className="text-[10px] font-bold uppercase text-gray-400">Mot de Passe</label>
+                                {selectedUser && <span className="text-[9px] text-gray-400 font-medium">Laisser vide pour ne pas changer</span>}
+                            </div>
+                            <input
+                                type="text"
+                                value={formData.password}
+                                onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] font-mono"
+                                placeholder={selectedUser ? "••••••••" : "Min 4 caractères"}
+                                minLength={4}
+                            />
                         </div>
 
                         <div className="pt-4 flex justify-end gap-2 border-t border-gray-100 mt-4">
