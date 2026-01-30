@@ -44,7 +44,7 @@ const LightDraftsModal = ({ isOpen, onClose, onLoad }: { isOpen: boolean, onClos
             <div className="bg-white w-full max-w-lg rounded-sm shadow-2xl flex flex-col h-[80vh] overflow-hidden">
                 <div className="p-4 bg-black text-white flex justify-between items-center shrink-0">
                     <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                        <FileText size={16} className="text-[#00d3fa]" />
+                        <FileText size={16} className="text-orange-500" />
                         Brouillons en attente
                     </h2>
                     <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-400">
@@ -65,22 +65,22 @@ const LightDraftsModal = ({ isOpen, onClose, onLoad }: { isOpen: boolean, onClos
                             <div
                                 key={d.id}
                                 onClick={() => { onLoad(d); onClose(); }}
-                                className="bg-white border border-gray-200 p-4 rounded-sm shadow-sm hover:border-[#00d3fa] cursor-pointer transition-all flex justify-between items-center group"
+                                className="bg-white border border-gray-200 p-4 rounded-sm shadow-sm hover:border-orange-500 cursor-pointer transition-all flex justify-between items-center group"
                             >
                                 <div>
                                     <div className="text-sm font-black text-gray-800 flex items-center gap-2">
                                         #{d.ticketNum}
-                                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 rounded uppercase">{d.orderType}</span>
+                                        <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 rounded uppercase font-black">{d.orderType}</span>
                                     </div>
                                     <div className="text-[10px] text-gray-400 mt-1 font-bold flex items-center gap-2">
                                         <Clock size={10} />
                                         {new Date(d.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        {d.client && <span className="flex items-center gap-1 text-blue-500"><User size={10} /> {d.client.name}</span>}
+                                        {d.client && <span className="flex items-center gap-1 text-orange-600"><User size={10} /> {d.client.name}</span>}
                                     </div>
                                 </div>
                                 <div className="text-right">
                                     <div className="text-sm font-black text-black">{(d.totalCdf || 0).toLocaleString()} <span className="text-[10px] text-gray-400">FC</span></div>
-                                    <div className="text-[10px] text-blue-600 font-black uppercase mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Charger</div>
+                                    <div className="text-[10px] text-orange-600 font-black uppercase mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Charger</div>
                                 </div>
                             </div>
                         ))
@@ -114,7 +114,7 @@ const LightClientModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, onCl
             <div className="bg-white w-full max-w-md rounded-sm shadow-2xl flex flex-col h-[70vh] overflow-hidden">
                 <div className="p-4 bg-black text-white flex justify-between items-center shrink-0">
                     <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                        <Search size={16} className="text-[#00d3fa]" />
+                        <Search size={16} className="text-orange-500" />
                         Sélectionner Client
                     </h2>
                     <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full text-gray-400">
@@ -128,7 +128,7 @@ const LightClientModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, onCl
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Nom ou téléphone..."
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-sm text-sm focus:border-[#00d3fa] outline-none font-bold"
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-sm text-sm focus:border-orange-500 outline-none font-bold"
                     />
                 </div>
 
@@ -137,13 +137,13 @@ const LightClientModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, onCl
                         <div
                             key={c.id}
                             onClick={() => { onSelect(c); onClose(); }}
-                            className="p-4 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center group"
+                            className="p-4 hover:bg-orange-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center group"
                         >
                             <div>
-                                <div className="font-bold text-sm text-gray-800 group-hover:text-blue-700">{c.name}</div>
+                                <div className="font-black text-sm text-gray-800 group-hover:text-orange-700 uppercase tracking-tighter">{c.name}</div>
                                 <div className="text-[10px] text-gray-400 font-bold">{c.phone || "Pas de numéro"}</div>
                             </div>
-                            <div className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase">
+                            <div className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-sm font-black uppercase">
                                 {c.points} PTS
                             </div>
                         </div>
@@ -154,7 +154,7 @@ const LightClientModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, onCl
                 <div className="p-3 bg-gray-50 border-t border-gray-100">
                     <button
                         onClick={() => setIsAdding(true)}
-                        className="w-full py-2.5 bg-blue-600 text-white text-xs font-black uppercase tracking-widest rounded-sm hover:bg-blue-700 transition-all shadow-md active:scale-[0.98]"
+                        className="w-full py-2.5 bg-orange-600 text-white text-xs font-black uppercase tracking-widest rounded-sm hover:bg-orange-700 transition-all shadow-md active:scale-[0.98]"
                     >
                         Nouveau Client
                     </button>
@@ -230,7 +230,7 @@ export default function PosLightPage() {
     };
 
     return (
-        <div className="h-screen flex flex-col bg-white overflow-hidden text-gray-900 selection:bg-[#00d3fa] selection:text-black">
+        <div className="h-screen flex flex-col bg-white overflow-hidden text-gray-900 selection:bg-orange-500 selection:text-white">
             <PosLightHeader />
 
             <div className="flex-1 flex overflow-hidden">

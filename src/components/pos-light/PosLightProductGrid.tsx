@@ -92,30 +92,30 @@ export default function PosLightProductGrid({ onSelectPrice }: { onSelectPrice: 
     if (loading) return <div className="flex-1 flex items-center justify-center bg-gray-50 text-gray-400 font-bold animate-pulse">Chargement catalogue...</div>;
 
     return (
-        <div className="flex flex-col h-full bg-gray-100 overflow-hidden">
+        <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
             {/* Search & Categories Bar - Very Compact */}
-            <div className="bg-white border-b border-gray-200 shrink-0 flex items-center px-4 py-1.5 gap-4 overflow-hidden">
-                <div className="relative w-48 shrink-0">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div className="bg-white border-b border-gray-200 shrink-0 flex items-center px-4 py-2 gap-4 overflow-hidden shadow-sm">
+                <div className="relative w-56 shrink-0">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Rechercher..."
+                        placeholder="Rechercher un produit..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-8 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-sm text-xs focus:border-[#00d3fa] focus:outline-none"
+                        className="w-full pl-9 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-sm text-xs focus:border-orange-500 focus:outline-none transition-all font-bold"
                     />
                 </div>
 
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth flex-1 py-0.5">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth flex-1 py-1">
                     {categories.map(cat => (
                         <button
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
                             className={cn(
-                                "px-3 py-1 rounded-sm text-[10px] font-black whitespace-nowrap uppercase transition-all border",
+                                "px-4 py-1.5 rounded-sm text-[10px] font-black whitespace-nowrap uppercase transition-all border",
                                 activeCategory === cat
-                                    ? "bg-black text-[#00d3fa] border-black shadow-sm"
-                                    : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                                    ? "bg-orange-600 text-white border-orange-600 shadow-md transform scale-[1.02]"
+                                    : "bg-white text-gray-600 border-gray-200 hover:border-orange-200 hover:bg-orange-50"
                             )}
                         >
                             {categoryTranslations[cat] || cat}
@@ -124,9 +124,9 @@ export default function PosLightProductGrid({ onSelectPrice }: { onSelectPrice: 
                 </div>
             </div>
 
-            {/* Product Grid - Maximum Space, Custom Scrollbar for Touch */}
-            <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-gray-300">
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+            {/* Product Grid - Maximum Space */}
+            <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-gray-200">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
                     {filtered.map(product => {
                         const targetLocation = product.type === 'BEVERAGE' ? 'FRIGO' : 'CUISINE';
                         const stock = product.stockItems?.find((s: any) => s.location === targetLocation)?.quantity || 0;
@@ -138,25 +138,28 @@ export default function PosLightProductGrid({ onSelectPrice }: { onSelectPrice: 
                                 disabled={isOutOfStock}
                                 onClick={() => handleProductClick(product)}
                                 className={cn(
-                                    "relative flex flex-col items-center justify-between p-2 bg-white border border-gray-200 rounded-sm shadow-sm transition-all active:scale-95 group overflow-hidden h-24",
-                                    isOutOfStock ? "opacity-40 grayscale pointer-events-none" : "hover:border-[#00d3fa] hover:shadow-md"
+                                    "relative flex flex-col items-center justify-between p-3 bg-white border border-gray-200 rounded-sm shadow-sm transition-all active:scale-95 group overflow-hidden h-28",
+                                    isOutOfStock ? "opacity-40 grayscale pointer-events-none" : "hover:border-orange-500 hover:shadow-lg"
                                 )}
                             >
-                                <span className="absolute top-1 right-1 text-[8px] font-black px-1 rounded-full bg-gray-100 text-gray-600">
+                                <div className={cn(
+                                    "absolute top-1 right-1 text-[8px] font-black px-1.5 py-0.5 rounded-full",
+                                    isOutOfStock ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-700"
+                                )}>
                                     {stock}
-                                </span>
+                                </div>
 
-                                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm shrink-0 mt-1 mb-1">
+                                <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center font-black text-base shrink-0 mb-1 group-hover:bg-orange-600 group-hover:text-white transition-colors">
                                     {product.name.charAt(0)}
                                 </div>
 
-                                <span className="text-[10px] font-bold text-gray-800 text-center line-clamp-2 leading-tight w-full italic px-1">
+                                <span className="text-[10px] font-extrabold text-gray-900 text-center line-clamp-2 leading-tight w-full mb-1">
                                     {product.name}
                                 </span>
 
-                                <span className="text-[9px] font-black text-[#00d3fa] bg-black px-1.5 py-0.5 rounded-full mt-auto w-full text-center">
-                                    {product.prices?.[0]?.priceCdf.toLocaleString()}
-                                </span>
+                                <div className="text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-1 rounded-sm mt-auto w-full text-center group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                                    {product.prices?.[0]?.priceCdf.toLocaleString()} FC
+                                </div>
                             </button>
                         );
                     })}
@@ -165,7 +168,7 @@ export default function PosLightProductGrid({ onSelectPrice }: { onSelectPrice: 
                 {filtered.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-40 text-gray-300 italic">
                         <Box size={32} className="mb-2 opacity-20" />
-                        <span className="text-xs">Aucun produit trouvé</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">Aucun produit</span>
                     </div>
                 )}
             </div>

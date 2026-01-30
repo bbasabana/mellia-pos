@@ -128,7 +128,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                         <div className="text-5xl font-black text-gray-900 tracking-tighter">
                             {Math.round(amountToPayCdf).toLocaleString()} <span className="text-2xl text-gray-400">FC</span>
                         </div>
-                        <div className="text-lg font-bold text-[#00d3fa] mt-1">
+                        <div className="text-lg font-bold text-orange-600 mt-1">
                             ${formatUsd(amountToPayUsd)}
                         </div>
                     </div>
@@ -187,7 +187,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                                     placeholder="Référence (Ex: MP123...)"
                                     value={paymentReference}
                                     onChange={(e) => setPaymentReference(e.target.value)}
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-3 text-sm outline-none focus:border-[#00d3fa] transition-all font-bold placeholder:font-medium"
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-3 text-sm outline-none focus:border-orange-500 transition-all font-bold placeholder:font-medium"
                                 />
                             </div>
                         )}
@@ -207,7 +207,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                             <div className="flex items-center gap-3">
                                 <div className={cn(
                                     "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
-                                    usePoints ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600"
+                                    usePoints ? "bg-white/20 text-white" : "bg-orange-50 text-orange-600"
                                 )}>
                                     <Award size={20} />
                                 </div>
@@ -224,7 +224,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                                         -{Math.round(possibleDiscountCdf).toLocaleString()} FC
                                     </div>
                                 ) : (
-                                    <div className="w-5 h-5 rounded-sm border-2 border-gray-200 group-hover:border-[#00d3fa]"></div>
+                                    <div className="w-5 h-5 rounded-sm border-2 border-gray-200 group-hover:border-orange-500"></div>
                                 )}
                             </div>
                         </button>
@@ -240,7 +240,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                                 type="datetime-local"
                                 value={customDate}
                                 onChange={(e) => setCustomDate(e.target.value)}
-                                className="w-full bg-white border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] transition-all font-bold"
+                                className="w-full bg-white border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-orange-500 transition-all font-bold"
                             />
                             <p className="text-[10px] text-gray-400 font-medium mt-2 italic">
                                 Laissez vide pour utiliser la date actuelle
@@ -266,7 +266,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
                             type="button"
                             onClick={handlePay}
                             disabled={loading}
-                            className="py-4 bg-black text-white rounded-sm font-black text-sm uppercase tracking-widest hover:bg-gray-800 transition-all shadow-xl active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="py-4 bg-orange-600 text-white rounded-sm font-black text-sm uppercase tracking-widest hover:bg-orange-700 transition-all shadow-xl active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 className="animate-spin" size={18} /> : <span>Encaisser {Math.round(amountToPayCdf).toLocaleString()} FC</span>}
                         </button>

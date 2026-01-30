@@ -44,16 +44,16 @@ export default function PriceSelectionModal({
                                 <button
                                     key={price.id}
                                     onClick={() => onSelectPrice(price)}
-                                    className="w-full group flex flex-col items-center p-4 border-2 border-gray-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all"
+                                    className="w-full group flex flex-col items-center p-4 border-2 border-gray-100 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all"
                                 >
-                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-blue-500">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-orange-500">
                                         {price.space?.name || "Standard"}
                                     </span>
                                     <div className="flex flex-col items-center">
-                                        <span className="text-2xl font-black text-gray-800 group-hover:text-blue-700">
+                                        <span className="text-2xl font-black text-gray-800 group-hover:text-orange-700">
                                             {Number(price.priceCdf || 0).toLocaleString()} FC
                                         </span>
-                                        <span className="text-sm font-medium text-gray-500 group-hover:text-blue-600">
+                                        <span className="text-sm font-medium text-gray-500 group-hover:text-orange-600">
                                             ${Number(price.priceUsd || 0).toFixed(2)}
                                         </span>
                                     </div>
