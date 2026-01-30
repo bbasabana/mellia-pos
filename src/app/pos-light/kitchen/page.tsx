@@ -56,11 +56,16 @@ export default function KitchenLightPage() {
         }
     };
 
+    const [hasMounted, setHasMounted] = useState(false);
+
     useEffect(() => {
+        setHasMounted(true);
         fetchOrders();
         const interval = setInterval(fetchOrders, 30000);
         return () => clearInterval(interval);
     }, []);
+
+    if (!hasMounted) return null;
 
     const updateStatus = async (id: string, newStatus: string) => {
         try {

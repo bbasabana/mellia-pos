@@ -58,10 +58,19 @@ export default function PosLightProductGrid({ onSelectPrice }: { onSelectPrice: 
         "AUTRE": "Autres"
     };
 
+    const getProductStock = (product: any) => {
+        // Aggregate stock from all "sale-ready" locations
+        const saleLocations = ['FRIGO', 'CUISINE', 'CASIER'];
+        return product.stockItems?.reduce((acc: number, item: any) => {
+            if (saleLocations.includes(item.location)) {
+                return acc + Number(item.quantity);
+            }
+            return acc;
+        }, 0) || 0;
+    };
+
     const handleProductClick = (product: any) => {
-        const targetLocation = product.type === 'BEVERAGE' ? 'FRIGO' : 'CUISINE';
-        const stockItem = product.stockItems?.find((s: any) => s.location === targetLocation);
-        const stock = stockItem ? Number(stockItem.quantity) : 0;
+        const stock = getProductStock(product);
 
         if (stock <= 0) {
             showToast(`Épuisé: ${product.name}`, "error");
@@ -128,9 +137,8 @@ export default function PosLightProductGrid({ onSelectPrice }: { onSelectPrice: 
             <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-gray-200">
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
                     {filtered.map(product => {
-                        const targetLocation = product.type === 'BEVERAGE' ? 'FRIGO' : 'CUISINE';
-                        const stock = product.stockItems?.find((s: any) => s.location === targetLocation)?.quantity || 0;
-                        const isOutOfStock = Number(stock) <= 0;
+                        const stock = getProductStock(product);
+                        const isOutOfStock = stock <= 0;
 
                         return (
                             <button

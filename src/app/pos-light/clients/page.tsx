@@ -8,6 +8,7 @@ import ClientFormModal from "@/components/clients/ClientFormModal";
 import { showToast } from "@/components/ui/Toast";
 
 export default function ClientsLightPage() {
+    const [hasMounted, setHasMounted] = useState(false);
     const [search, setSearch] = useState("");
     const [clients, setClients] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -28,9 +29,12 @@ export default function ClientsLightPage() {
     };
 
     useEffect(() => {
+        setHasMounted(true);
         const t = setTimeout(() => fetchClients(search), 300);
         return () => clearTimeout(t);
     }, [search]);
+
+    if (!hasMounted) return null;
 
     return (
         <LightLayout>

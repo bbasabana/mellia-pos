@@ -11,17 +11,14 @@ import {
     Users,
     FileText,
     Receipt,
-    Menu,
     LogOut,
-    X,
-    Clock,
-    ChevronRight
+    Menu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const lightMenuItems = [
     {
-        label: "POS Ventes",
+        label: "POS",
         href: "/pos-light",
         icon: ShoppingCart,
         roles: ["ADMIN", "MANAGER", "CASHIER"],
@@ -54,17 +51,16 @@ const lightMenuItems = [
 
 interface LightLayoutProps {
     children: React.ReactNode;
-    showSidebarInitial?: boolean;
-    headerActions?: React.ReactNode;
 }
 
-function LightLayout({ children, showSidebarInitial = false, headerActions }: LightLayoutProps) {
+function LightLayout({ children }: LightLayoutProps) {
     const { data: session } = useSession();
     const pathname = usePathname();
-    const [sidebarOpen, setSidebarOpen] = useState(showSidebarInitial);
+    const [hasMounted, setHasMounted] = useState(false);
     const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
     useEffect(() => {
+        setHasMounted(true);
         setCurrentTime(new Date());
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(timer);
@@ -74,7 +70,7 @@ function LightLayout({ children, showSidebarInitial = false, headerActions }: Li
     const filteredMenuItems = useMemo(() => lightMenuItems.filter((item) => item.roles.includes(userRole)), [userRole]);
 
     const formattedTime = useMemo(() => {
-        if (!currentTime) return "";
+        if (!currentTime) return "--:--";
         return currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     }, [currentTime]);
 
@@ -83,31 +79,21 @@ function LightLayout({ children, showSidebarInitial = false, headerActions }: Li
         return currentTime.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
     }, [currentTime]);
 
-    return (
-        <div className="flex h-screen bg-gray-50 overflow-hidden font-sans selection:bg-orange-500 selection:text-white">
-            {/* Sidebar Overlay */}
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
+    if (!hasMounted) return <div className="h-screen bg-gray-50 flex items-center justify-center font-black text-orange-500 animate-pulse uppercase tracking-widest">Mellia POS...</div>;
 
-            {/* Modern Sidebar */}
-            <aside className={cn(
-                "fixed inset-y-0 left-0 w-72 bg-white border-r border-gray-100 z-[70] flex flex-col transition-all duration-300 transform shadow-2xl",
-                sidebarOpen ? "translate-x-0" : "-translate-x-full"
-            )}>
-                {/* Sidebar Header */}
-                <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-                    <Image src="/images/logos/logo.png" alt="Logo" width={100} height={32} className="object-contain" />
-                    <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-gray-50 rounded-full text-gray-400">
-                        <X size={20} />
-                    </button>
+    return (
+        <div className="flex h-screen bg-gray-50 overflow-hidden font-sans selection:bg-orange-500 selection:text-white flex-col">
+            {/* Horizontal Header Menu */}
+            <header className="h-14 bg-white border-b border-gray-100 flex items-center gap-4 px-4 shrink-0 z-50 overflow-hidden">
+                {/* Logo & Platform Info */}
+                <div className="flex items-center gap-3 shrink-0 mr-2">
+                    <Image src="/images/logos/logo.png" alt="Logo" width={80} height={24} className="object-contain" />
+                    <div className="h-4 w-[1px] bg-gray-200" />
+                    <span className="text-[10px] font-black uppercase text-orange-600 tracking-tighter">Light</span>
                 </div>
 
-                {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+                {/* Scrolling Navigation */}
+                <nav className="flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth h-full px-2">
                     {filteredMenuItems.map((item) => {
                         const isActive = pathname === item.href;
                         const Icon = item.icon;
@@ -115,77 +101,59 @@ function LightLayout({ children, showSidebarInitial = false, headerActions }: Li
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                onClick={() => setSidebarOpen(false)}
                                 className={cn(
-                                    "flex items-center gap-4 px-4 py-4 rounded-sm text-sm font-black uppercase tracking-widest transition-all group",
+                                    "flex items-center gap-2 px-3 h-10 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border-b-2",
                                     isActive
-                                        ? "bg-orange-600 text-white shadow-xl shadow-orange-500/20"
-                                        : "text-gray-500 hover:bg-orange-50 hover:text-orange-600"
+                                        ? "border-orange-600 text-orange-600 bg-orange-50 tracking-tight"
+                                        : "border-transparent text-gray-400 hover:text-gray-900"
                                 )}
                             >
-                                <Icon size={20} strokeWidth={isActive ? 3 : 2} />
-                                <span className="flex-1">{item.label}</span>
-                                {isActive && <ChevronRight size={16} />}
+                                <Icon size={14} strokeWidth={isActive ? 3 : 2} />
+                                <span>{item.label}</span>
                             </Link>
                         );
                     })}
                 </nav>
 
-                {/* Sidebar Footer */}
-                <div className="p-4 border-t border-gray-50 bg-gray-50/50">
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-sm border border-gray-100 mb-4">
-                        <div className="w-10 h-10 bg-black text-orange-500 rounded-sm flex items-center justify-center font-black text-xs">
-                            {(session?.user?.name || "U").charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-black text-gray-800 truncate uppercase">{session?.user?.name}</span>
-                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{userRole}</span>
-                        </div>
+                {/* Right Actions: User & Time */}
+                <div className="flex items-center gap-4 shrink-0 pl-2">
+                    {/* Time (Hydration safe via hasMounted check above) */}
+                    <div className="hidden sm:flex flex-col items-end mr-2">
+                        <span className="text-xs font-black text-gray-900 leading-none">{formattedTime}</span>
+                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter mt-1">{formattedDate}</span>
                     </div>
-                    <button
-                        onClick={() => signOut({ callbackUrl: "/login" })}
-                        className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-red-100 text-red-500 rounded-sm text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-colors"
-                    >
-                        <LogOut size={14} />
-                        Quitter
-                    </button>
-                </div>
-            </aside>
 
-            {/* Main Area */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {/* Unified Top Header */}
-                <header className="h-14 bg-white border-b border-gray-100 px-4 flex items-center justify-between shrink-0 z-50">
-                    <div className="flex items-center gap-4">
+                    {/* User Info & Logout */}
+                    <div className="flex items-center gap-3 pl-4 border-l border-gray-100">
+                        <div className="hidden lg:flex flex-col items-end">
+                            <span className="text-[10px] font-black text-gray-800 uppercase leading-none truncate max-w-[80px]">{(session?.user?.name || "").split(' ')[0]}</span>
+                            <span className="text-[8px] font-black text-orange-600 uppercase tracking-tighter">{userRole}</span>
+                        </div>
                         <button
-                            onClick={() => setSidebarOpen(true)}
-                            className="p-2 -ml-2 hover:bg-gray-50 rounded-sm text-gray-800 transition-colors"
+                            onClick={() => signOut({ callbackUrl: "/login" })}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-sm transition-all active:scale-95"
+                            title="Quitter"
                         >
-                            <Menu size={24} />
+                            <LogOut size={18} />
                         </button>
-                        <div className="flex items-center gap-4">
-                            <Image src="/images/logos/logo.png" alt="Logo" width={90} height={28} className="object-contain hidden sm:block" />
-                            <div className="h-6 w-[1px] bg-gray-100 hidden sm:block" />
-                            <h1 className="text-xs font-black uppercase tracking-widest text-gray-900 truncate">
-                                {lightMenuItems.find(m => m.href === pathname)?.label || "Mellia POS"}
-                            </h1>
-                        </div>
                     </div>
+                </div>
+            </header>
 
-                    <div className="flex items-center gap-4">
-                        {headerActions && <div className="hidden sm:flex items-center gap-2 mr-4">{headerActions}</div>}
-                        <div className="flex flex-col items-end">
-                            <span className="text-sm font-black text-gray-900 leading-none">{formattedTime}</span>
-                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-1">{formattedDate}</span>
-                        </div>
-                    </div>
-                </header>
+            {/* Page Content */}
+            <main className="flex-1 overflow-hidden relative">
+                {children}
+            </main>
 
-                {/* Page Content */}
-                <main className="flex-1 overflow-hidden relative">
-                    {children}
-                </main>
-            </div>
+            <style jsx global>{`
+                .no-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .no-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
         </div>
     );
 }

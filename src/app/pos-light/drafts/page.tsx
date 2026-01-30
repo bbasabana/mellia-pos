@@ -10,6 +10,7 @@ import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
 
 export default function DraftsLightPage() {
     const router = useRouter();
+    const [hasMounted, setHasMounted] = useState(false);
     const [drafts, setDrafts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -31,6 +32,7 @@ export default function DraftsLightPage() {
     };
 
     useEffect(() => {
+        setHasMounted(true);
         fetchDrafts();
     }, []);
 
@@ -51,6 +53,8 @@ export default function DraftsLightPage() {
             setIsDeleting(false);
         }
     };
+
+    if (!hasMounted) return null;
 
     return (
         <LightLayout>

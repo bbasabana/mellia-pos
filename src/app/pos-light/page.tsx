@@ -8,7 +8,6 @@ import PosLightCart from "@/components/pos-light/PosLightCart";
 import PaymentModal from "@/components/pos/PaymentModal";
 import PriceSelectionModal from "@/components/pos/PriceSelectionModal";
 import ClientFormModal from "@/components/clients/ClientFormModal";
-import DeliveryFormModal from "@/components/pos/DeliveryFormModal";
 import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { X, Search, FileText, RefreshCw, Trash2, Clock, User } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
@@ -175,17 +174,17 @@ export default function PosLightPage() {
         setOrderType,
         setCurrentDraftId,
         clearCart,
-        orderType,
-        deliveryInfo,
-        setDeliveryInfo
+        orderType
     } = usePosStore();
+
+    // Hydration check
+    const [hasMounted, setHasMounted] = useState(false);
 
     // Modals
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isDraftsOpen, setIsDraftsOpen] = useState(false);
     const [isClientOpen, setIsClientOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-    const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
 
     // Printing
     const [printSale, setPrintSale] = useState<any | null>(null);
@@ -196,6 +195,10 @@ export default function PosLightPage() {
         contentRef: printRef,
         onAfterPrint: () => setPrintSale(null),
     });
+
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
 
     useEffect(() => {
         if (printSale && printRef.current) handlePrint();
@@ -229,25 +232,10 @@ export default function PosLightPage() {
         showToast(`Brouillon #${sale.ticketNum} chargé`, "info");
     };
 
-    const handleNewSale = () => {
-        if (confirm("Voulez-vous vraiment annuler la vente en cours ?")) {
-            clearCart();
-            showToast("Nouvelle vente initialisée", "info");
-        }
-    };
-
-    const posActions = (
-        <button
-            onClick={handleNewSale}
-            className="flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-600 rounded-sm text-[10px] font-black uppercase tracking-widest border border-orange-100 hover:bg-orange-100 transition-all active:scale-95"
-        >
-            <RefreshCw size={12} />
-            Nouvelle Vente
-        </button>
-    );
+    if (!hasMounted) return null;
 
     return (
-        <LightLayout headerActions={posActions}>
+        <LightLayout>
             <div className="flex-1 flex overflow-hidden h-full">
                 {/* Left: Product Grid - Max Width */}
                 <div className="flex-1 h-full overflow-hidden border-r border-gray-100">

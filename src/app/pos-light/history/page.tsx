@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { showToast } from "@/components/ui/Toast";
 
 export default function HistoryLightPage() {
+    const [hasMounted, setHasMounted] = useState(false);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -27,6 +28,7 @@ export default function HistoryLightPage() {
     };
 
     useEffect(() => {
+        setHasMounted(true);
         fetchTransactions();
     }, []);
 
@@ -49,6 +51,8 @@ export default function HistoryLightPage() {
             default: return <Banknote size={10} />;
         }
     };
+
+    if (!hasMounted) return null;
 
     return (
         <LightLayout>
@@ -224,6 +228,16 @@ export default function HistoryLightPage() {
                     </div>
                 </div>
             </div>
+
+            <style jsx global>{`
+                .no-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .no-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
         </LightLayout>
     );
 }
