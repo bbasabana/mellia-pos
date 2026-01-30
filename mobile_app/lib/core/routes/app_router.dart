@@ -39,10 +39,9 @@ GoRouter appRouter(AppRouterRef ref) {
         return isLoggingIn ? null : '/login';
       }
 
-      // Role Based Redirect
-      if (user!.role == 'KITCHEN') {
-        if (state.uri.toString() != '/kitchen') return '/kitchen';
-        return null;
+      // Role Based initial landing
+      if (user!.role == 'KITCHEN' && state.uri.toString() == '/') {
+        return '/kitchen';
       }
 
       // Allow ADMIN and MANAGER to access kitchen too
