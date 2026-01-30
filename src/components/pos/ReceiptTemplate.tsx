@@ -45,16 +45,16 @@ export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: R
 
             <div style={{ textAlign: "center", marginBottom: "5px" }}>
                 <p>{separator}</p>
-                <p style={{ fontWeight: "bold" }}>TICKET: {sale.ticketNum}</p>
-                <p>{format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm", { locale: fr })}</p>
+                <p style={{ fontWeight: "bold" }}>TICKET: {sale?.ticketNum}</p>
+                <p>{sale?.createdAt ? format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm", { locale: fr }) : ""}</p>
                 <p>{separator}</p>
             </div>
 
             {/* Info */}
             <div style={{ marginBottom: "5px", fontSize: "11px" }}>
-                <p>Caissier: {sale.user.name}</p>
-                {sale.client && <p>Client: {sale.client.name}</p>}
-                <p>Espace: {sale.orderType === "DINE_IN" ? "Sur Place" : sale.orderType}</p>
+                <p>Caissier: {sale?.user?.name || "..."}</p>
+                {sale?.client && <p>Client: {sale.client.name}</p>}
+                <p>Espace: {sale?.orderType === "DINE_IN" ? "Sur Place" : (sale?.orderType || "...")}</p>
             </div>
 
             <p>{separator}</p>
@@ -68,10 +68,10 @@ export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: R
                     </tr>
                 </thead>
                 <tbody>
-                    {sale.items.map((item) => (
+                    {sale?.items?.map((item) => (
                         <tr key={item.id}>
                             <td style={{ paddingBottom: "2px" }}>
-                                {Number(item.quantity)} x {item.product.name}
+                                {Number(item.quantity)} x {item.product?.name || "???"}
                                 <br />
                                 <span style={{ fontSize: "10px", color: "#444" }}>
                                     @{Math.round(Number(item.unitPriceCdf)).toLocaleString()} FC
@@ -90,7 +90,7 @@ export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: R
             {/* Totals */}
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginBottom: "2px" }}>
                 <span>TOTAL A PAYER:</span>
-                <span>{Math.round(Number(sale.totalCdf)).toLocaleString()} FC</span>
+                <span>{Math.round(Number(sale?.totalCdf || 0)).toLocaleString()} FC</span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#666", marginBottom: "10px" }}>
@@ -99,14 +99,14 @@ export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: R
 
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "10px" }}>
                 <span>Mode de paiement:</span>
-                <span>{formatPaymentMethod(sale.paymentMethod)}</span>
+                <span>{formatPaymentMethod(sale?.paymentMethod || "")}</span>
             </div>
 
             {/* Loyalty */}
-            {sale.client && (
+            {sale?.client && (
                 <div style={{ border: "1px dashed black", padding: "5px", marginBottom: "10px", textAlign: "center", fontSize: "10px" }}>
                     <p style={{ margin: "0", fontWeight: "bold" }}>FIDELITE MELLIA</p>
-                    <p style={{ margin: "2px 0" }}>Points gagnés: +{sale.pointsEarned}</p>
+                    <p style={{ margin: "2px 0" }}>Points gagnés: +{sale?.pointsEarned || 0}</p>
                     <p style={{ margin: "0" }}>SOLDE ACTUEL: {sale.client.points} pts</p>
                 </div>
             )}

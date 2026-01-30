@@ -308,6 +308,15 @@ export async function PUT(req: NextRequest) {
                     totalCdf: newTotalCdf > 0 ? Math.round(newTotalCdf) : undefined, // Round total CDF to integer
                     status: newStatus || undefined, // Update status if provided (DRAFT -> COMPLETED)
                     updatedAt: new Date()
+                },
+                include: {
+                    client: true,
+                    user: true,
+                    items: {
+                        include: {
+                            product: true
+                        }
+                    }
                 }
             });
         });
@@ -401,6 +410,15 @@ export async function DELETE(req: NextRequest) {
                 data: {
                     status: "CANCELLED",
                     updatedAt: new Date()
+                },
+                include: {
+                    client: true,
+                    user: true,
+                    items: {
+                        include: {
+                            product: true
+                        }
+                    }
                 }
             });
         });
