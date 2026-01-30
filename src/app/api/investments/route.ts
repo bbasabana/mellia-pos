@@ -199,10 +199,11 @@ export async function POST(req: Request) {
             }
 
             const transportFeeCdf = parseFloat(body.transportFeeCdf) || 0;
-            const nonVendableTotalCdf = (Number(body.totalAmountCdf) || 0) - vendableTotalCdf - transportFeeCdf;
+            const totalInvestCdf = Number(body.totalAmountCdf) || 0;
+            const nonVendableTotalCdf = totalInvestCdf - vendableTotalCdf - transportFeeCdf;
 
-            const expectedProfitCdf = expectedRevenueCdf - vendableTotalCdf;
-            const expectedProfitVipCdf = expectedRevenueVipCdf - vendableTotalCdf;
+            const expectedProfitCdf = expectedRevenueCdf - totalInvestCdf;
+            const expectedProfitVipCdf = expectedRevenueVipCdf - totalInvestCdf;
 
             // 2. Create Investment Record (CDF values as source of truth)
             const investment = await tx.investment.create({
@@ -409,10 +410,11 @@ export async function PUT(req: Request) {
             }
 
             const transportFeeCdf = parseFloat(body.transportFeeCdf) || 0;
-            const nonVendableTotalCdf = (Number(body.totalAmountCdf) || 0) - vendableTotalCdf - transportFeeCdf;
+            const totalInvestCdf = Number(body.totalAmountCdf) || 0;
+            const nonVendableTotalCdf = totalInvestCdf - vendableTotalCdf - transportFeeCdf;
 
-            const expectedProfitCdf = expectedRevenueCdf - vendableTotalCdf;
-            const expectedProfitVipCdf = expectedRevenueVipCdf - vendableTotalCdf;
+            const expectedProfitCdf = expectedRevenueCdf - totalInvestCdf;
+            const expectedProfitVipCdf = expectedRevenueVipCdf - totalInvestCdf;
 
             // 4. Update Investment Record
             const investment = await tx.investment.update({
