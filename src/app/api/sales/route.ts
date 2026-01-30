@@ -8,14 +8,14 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!session || !session.user) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ success: false, error: "Non autorisé" }, { status: 401 });
         }
 
         const body = await req.json();
         const { items, clientId, paymentMethod, paymentReference, orderType, deliveryInfo, status = "COMPLETED", createdAt } = body;
 
         if (!items || items.length === 0) {
-            return new NextResponse("No items in cart", { status: 400 });
+            return NextResponse.json({ success: false, error: "Panier vide" }, { status: 400 });
         }
 
         // Handle custom date (Admin only)
@@ -23,12 +23,12 @@ export async function POST(req: Request) {
         if (createdAt) {
             // Only ADMIN can backdate sales
             if (session.user.role !== "ADMIN") {
-                return new NextResponse("Unauthorized: Only admins can specify custom dates", { status: 403 });
+                return NextResponse.json({ success: false, error: "Seuls les administrateurs peuvent spécifier une date personnalisée" }, { status: 403 });
             }
             saleDate = new Date(createdAt);
             // Validate date
             if (isNaN(saleDate.getTime())) {
-                return new NextResponse("Invalid date format", { status: 400 });
+                return NextResponse.json({ success: false, error: "Format de date invalide" }, { status: 400 });
             }
         }
 

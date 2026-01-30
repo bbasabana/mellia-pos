@@ -80,15 +80,20 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || !session.user || (session.user as any).role !== "ADMIN") {
-            return new NextResponse("Unauthorized", { status: 401 });
+        if (!session || !session.user) {
+            return NextResponse.json({ success: false, error: "Non autorisé" }, { status: 401 });
+        }
+
+        const userRole = (session.user as any).role;
+        if (!["ADMIN", "MANAGER", "CASHIER"].includes(userRole)) {
+            return NextResponse.json({ success: false, error: "Rôle non autorisé" }, { status: 403 });
         }
 
         const { searchParams } = new URL(req.url);
         const id = searchParams.get("id");
 
         if (!id) {
-            return new NextResponse("Missing ID", { status: 400 });
+            return NextResponse.json({ success: false, error: "ID manquant" }, { status: 400 });
         }
 
         const body = await req.json();
@@ -107,6 +112,11 @@ export async function PUT(req: NextRequest) {
 
             if (!sale) throw new Error("Sale not found");
             if (sale.status === "CANCELLED") throw new Error("Cannot edit cancelled sale");
+
+            // Cashier can only edit DRAFT
+            if (userRole === "CASHIER" && sale.status !== "DRAFT") {
+                throw new Error("Seuls les administrateurs peuvent modifier une vente clôturée");
+            }
 
             const isDraft = sale.status === "DRAFT";
             const isFinalizing = isDraft && newStatus === "COMPLETED";
@@ -315,15 +325,20 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || !session.user || (session.user as any).role !== "ADMIN") {
-            return new NextResponse("Unauthorized", { status: 401 });
+        if (!session || !session.user) {
+            return NextResponse.json({ success: false, error: "Non autorisé" }, { status: 401 });
+        }
+
+        const userRole = (session.user as any).role;
+        if (!["ADMIN", "MANAGER", "CASHIER"].includes(userRole)) {
+            return NextResponse.json({ success: false, error: "Rôle non autorisé" }, { status: 403 });
         }
 
         const { searchParams } = new URL(req.url);
         const id = searchParams.get("id");
 
         if (!id) {
-            return new NextResponse("Missing ID", { status: 400 });
+            return NextResponse.json({ success: false, error: "ID manquant" }, { status: 400 });
         }
 
         const result = await prisma.$transaction(async (tx) => {
@@ -335,6 +350,11 @@ export async function DELETE(req: NextRequest) {
 
             if (!sale) throw new Error("Sale not found");
             if (sale.status === "CANCELLED") throw new Error("Sale already cancelled");
+
+            // Cashier can only delete DRAFT
+            if (userRole === "CASHIER" && sale.status !== "DRAFT") {
+                throw new Error("Seuls les administrateurs peuvent annuler une vente clôturée");
+            }
 
             // 2. Restore Stock
             for (const item of sale.items) {
