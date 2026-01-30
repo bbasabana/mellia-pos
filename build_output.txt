@@ -1,0 +1,42 @@
+
+> mellia-pos@0.1.0 build
+> prisma generate && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 798ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Help us improve the Prisma ORM for everyone. Share your feedback in a short 2-min survey: https://pris.ly/orm/survey/release-5-22
+
+  ▲ Next.js 14.2.35
+  - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+> [PWA] Compile server
+> [PWA] Compile server
+> [PWA] Compile client (static)
+> [PWA] Auto register service worker with: /Users/eic/Devlab/devproject/meyllos/melliaPos/node_modules/next-pwa/register.js
+> [PWA] Service worker: /Users/eic/Devlab/devproject/meyllos/melliaPos/public/sw.js
+> [PWA]   url: /sw.js
+> [PWA]   scope: /
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+Failed to compile.
+
+./src/app/pos-light/history/page.tsx
+103:129  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+
+./src/components/stock/InvestmentForm.tsx
+50:8  Warning: React Hook useEffect has a missing dependency: 'fetchEditData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/transactions/EditTransactionModal.tsx
+45:8  Warning: React Hook useEffect has a missing dependency: 'exchangeRate'. Either include it or remove the dependency array. If 'setItems' needs the current value of 'exchangeRate', you can also switch to useReducer instead of useState and read 'exchangeRate' in the reducer.  react-hooks/exhaustive-deps
+
+./src/components/users/PayrollModal.tsx
+39:8  Warning: React Hook useEffect has a missing dependency: 'fetchHistory'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules

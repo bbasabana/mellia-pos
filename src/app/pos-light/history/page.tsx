@@ -44,6 +44,49 @@ export default function HistoryLightPage() {
         return filteredTransactions.reduce((acc, t) => acc + (t.totalCdf || 0), 0);
     }, [filteredTransactions]);
 
+    const { groupedTransactions, totalsByDate } = useMemo(() => {
+        const groups: Record<string, any[]> = {};
+        const dailyTotals: Record<string, number> = {};
+
+        filteredTransactions.forEach(t => {
+            const date = new Date(t.createdAt).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            if (!groups[date]) groups[date] = [];
+            groups[date].push(t);
+            dailyTotals[date] = (dailyTotals[date] || 0) + (t.totalCdf || 0);
+        });
+
+        // Sort keys by date descending
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            const [da, ma, ya] = a.split('/').map(Number);
+            const [db, mb, yb] = b.split('/').map(Number);
+            return new Date(yb, mb - 1, db).getTime() - new Date(ya, ma - 1, da).getTime();
+        });
+
+        const sortedGroups: Record<string, any[]> = {};
+        sortedKeys.forEach(k => sortedGroups[k] = groups[k]);
+
+        return { groupedTransactions: sortedGroups, totalsByDate: dailyTotals };
+    }, [filteredTransactions]);
+
+    const stats = useMemo(() => {
+        const today = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        const todayTotal = transactions
+            .filter(t => new Date(t.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) === today)
+            .reduce((acc, t) => acc + (t.totalCdf || 0), 0);
+
+        const yesterdayTotal = transactions
+            .filter(t => new Date(t.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) === yesterday)
+            .reduce((acc, t) => acc + (t.totalCdf || 0), 0);
+
+        return { todayTotal, yesterdayTotal };
+    }, [transactions]);
+
     const getPaymentIcon = (method: string) => {
         switch (method) {
             case 'MOBILE_MONEY': return <Smartphone size={10} />;
@@ -60,21 +103,21 @@ export default function HistoryLightPage() {
                 {/* Stats & Search Header */}
                 <div className="bg-white border-b border-gray-100 shrink-0">
                     <div className="p-4 grid grid-cols-2 gap-4">
-                        <div className="bg-orange-50 border border-orange-100 p-4 rounded-sm">
-                            <span className="text-[10px] font-black uppercase text-orange-400 tracking-widest block mb-1">Recettes Total (Session)</span>
-                            <span className="text-xl font-black text-orange-600 leading-none">
-                                {totalRevenueCdf.toLocaleString()} <span className="text-xs">FC</span>
+                        <div className="bg-green-50 border border-green-100 p-4 rounded-sm">
+                            <span className="text-[10px] font-black uppercase text-green-500 tracking-widest block mb-1">Aujourd&apos;hui</span>
+                            <span className="text-xl font-black text-green-700 leading-none">
+                                {stats.todayTotal.toLocaleString()} <span className="text-xs">FC</span>
                             </span>
                         </div>
-                        <div className="bg-gray-50 border border-gray-100 p-4 rounded-sm">
-                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Ventes</span>
-                            <span className="text-xl font-black text-gray-800 leading-none">
-                                {filteredTransactions.length}
+                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-sm">
+                            <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest block mb-1">Hier</span>
+                            <span className="text-xl font-black text-blue-700 leading-none">
+                                {stats.yesterdayTotal.toLocaleString()} <span className="text-xs">FC</span>
                             </span>
                         </div>
                     </div>
-                    <div className="px-4 pb-4">
-                        <div className="relative">
+                    <div className="px-4 pb-4 flex gap-2">
+                        <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
                                 type="text"
@@ -84,6 +127,10 @@ export default function HistoryLightPage() {
                                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-sm text-sm font-bold focus:border-orange-500 outline-none transition-all"
                             />
                         </div>
+                        <div className="bg-orange-50 border border-orange-100 px-4 py-2 rounded-sm flex flex-col justify-center min-w-[120px]">
+                            <span className="text-[8px] font-black uppercase text-orange-400 tracking-widest">Total Sélection</span>
+                            <span className="text-sm font-black text-orange-600 truncate">{totalRevenueCdf.toLocaleString()} FC</span>
+                        </div>
                     </div>
                 </div>
 
@@ -91,50 +138,62 @@ export default function HistoryLightPage() {
                 <div className="flex-1 flex overflow-hidden">
                     {/* List */}
                     <div className={cn(
-                        "flex-1 overflow-y-auto p-4 space-y-2",
+                        "flex-1 overflow-y-auto p-4 space-y-6",
                         selectedSale ? "hidden lg:block lg:max-w-md lg:border-r lg:border-gray-100" : "block"
                     )}>
                         {loading && transactions.length === 0 ? (
                             <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse uppercase tracking-widest">Chargement...</div>
                         ) : (
-                            filteredTransactions.map(t => (
-                                <div
-                                    key={t.id}
-                                    onClick={() => setSelectedSale(t)}
-                                    className={cn(
-                                        "bg-white border-2 p-4 rounded-sm shadow-sm transition-all flex items-center justify-between group cursor-pointer active:bg-orange-50",
-                                        selectedSale?.id === t.id ? "border-orange-500" : "border-transparent"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-gray-900 text-orange-500 rounded-sm flex items-center justify-center font-black text-xs ring-4 ring-gray-100">
-                                            {t.ticketNum.split('-')[1]}
-                                        </div>
-                                        <div>
-                                            <div className="font-black text-gray-900 uppercase tracking-tighter text-sm">
-                                                Ticket #{t.ticketNum}
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-[10px] font-black text-orange-600 uppercase bg-orange-50 px-1 py-0.5 rounded flex items-center gap-1">
-                                                    {getPaymentIcon(t.paymentMethod)}
-                                                    {t.paymentMethod}
-                                                </span>
-                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                                                    {new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            </div>
-                                        </div>
+                            Object.keys(groupedTransactions).map(date => (
+                                <div key={date} className="space-y-2">
+                                    <div className="flex justify-between items-center px-1 border-l-2 border-orange-500 pl-2">
+                                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">{date}</span>
+                                        <span className="text-[10px] font-black text-gray-900 bg-gray-100 px-2 py-0.5 rounded-sm">
+                                            {totalsByDate[date].toLocaleString()} FC
+                                        </span>
                                     </div>
-                                    <div className="text-right flex items-center gap-3">
-                                        <div>
-                                            <div className="text-sm font-black text-gray-800">
-                                                {(t.totalCdf || 0).toLocaleString()} FC
+                                    <div className="space-y-2">
+                                        {groupedTransactions[date].map(t => (
+                                            <div
+                                                key={t.id}
+                                                onClick={() => setSelectedSale(t)}
+                                                className={cn(
+                                                    "bg-white border-2 p-4 rounded-sm shadow-sm transition-all flex items-center justify-between group cursor-pointer active:bg-orange-50",
+                                                    selectedSale?.id === t.id ? "border-orange-500" : "border-transparent"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 bg-gray-900 text-orange-500 rounded-sm flex items-center justify-center font-black text-xs ring-4 ring-gray-100">
+                                                        {t.ticketNum.split('-')[1]}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-black text-gray-900 uppercase tracking-tighter text-sm">
+                                                            Ticket #{t.ticketNum}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="text-[10px] font-black text-orange-600 uppercase bg-orange-50 px-1 py-0.5 rounded flex items-center gap-1">
+                                                                {getPaymentIcon(t.paymentMethod)}
+                                                                {t.paymentMethod}
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                                                                {new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right flex items-center gap-3">
+                                                    <div>
+                                                        <div className="text-sm font-black text-gray-800">
+                                                            {(t.totalCdf || 0).toLocaleString()} FC
+                                                        </div>
+                                                        <div className="text-[10px] font-bold text-gray-400 mt-1 uppercase">
+                                                            $ {Number(t.totalReceived || 0).toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRight size={16} className="text-gray-200 group-hover:text-orange-500 transition-all group-hover:translate-x-1 sm:block hidden" />
+                                                </div>
                                             </div>
-                                            <div className="text-[10px] font-bold text-gray-400 mt-1 uppercase">
-                                                $ {Number(t.totalReceived || 0).toFixed(2)}
-                                            </div>
-                                        </div>
-                                        <ChevronRight size={16} className="text-gray-200 group-hover:text-orange-500 transition-all group-hover:translate-x-1 sm:block hidden" />
+                                        ))}
                                     </div>
                                 </div>
                             ))
