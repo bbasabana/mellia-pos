@@ -15,7 +15,7 @@ async function verifyFix() {
                 productId: "cl_test_product_1", // Mock ID, ensure this doesn't fail FK
                 productName: "Makemba",
                 isNew: true, // Force new product creation to avoid FK issues if possible, or we need real product
-                newUnit: "CARTON",
+                newUnit: "PIECE",
                 quantity: 1,
                 itemPrice: 22000000, // CDF Price
                 location: "DEPOT",
@@ -31,7 +31,7 @@ async function verifyFix() {
         data: {
             name: "Test Makemba " + Date.now(),
             type: "NON_VENDABLE",
-            saleUnit: "CARTON",
+            saleUnit: "PIECE",
             active: true
         }
     });

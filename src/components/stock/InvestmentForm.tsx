@@ -26,8 +26,10 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
     // Line Item State
     const [selectedProduct, setSelectedProduct] = useState("");
     const [qty, setQty] = useState("");
-    const [unitPrice, setUnitPrice] = useState(""); // In selected currency
+    const [unitPrice, setUnitPrice] = useState("");
     const [location, setLocation] = useState("DEPOT");
+    const [saisieMode, setSaisieMode] = useState<"UNIT" | "TOTAL">("UNIT");
+    const [lineTotalInput, setLineTotalInput] = useState("");
 
     // On-the-fly NEW product state
     const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -126,11 +128,22 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
     const addItem = () => {
         if (!isCreatingNew && !selectedProduct) return;
         if (isCreatingNew && !newName) return;
-        if (!qty || !unitPrice) return;
+
+        const isUnitPriceMissing = saisieMode === "UNIT" && !unitPrice;
+        const isTotalMissing = saisieMode === "TOTAL" && !lineTotalInput;
+        if (!qty || isUnitPriceMissing || isTotalMissing) return;
 
         const rate = parseFloat(exchangeRate) || DEFAULT_RATE;
-        const inputPriceVal = parseFloat(unitPrice);
         const inputQtyVal = parseFloat(qty);
+
+        // Calculate inputPriceVal based on mode
+        let inputPriceVal = 0;
+        if (saisieMode === "TOTAL") {
+            const totalVal = parseFloat(lineTotalInput);
+            inputPriceVal = inputQtyVal > 0 ? (totalVal / inputQtyVal) : 0;
+        } else {
+            inputPriceVal = parseFloat(unitPrice);
+        }
 
         let quantityToAdd = inputQtyVal;
         let realUnitCost = inputPriceVal;
@@ -194,6 +207,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
         setItems([...items, newItem]);
         setQty("");
         setUnitPrice("");
+        setLineTotalInput("");
         setNewName("");
         setIsCreatingNew(false);
     };
@@ -497,29 +511,51 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                     />
                 </div>
 
-                <div className="w-32">
+                <div className="w-40">
                     <div className="text-[10px] uppercase font-bold text-gray-400 mb-1 flex justify-between">
-                        <span>Prix ({currency})</span>
-                        <div className="flex gap-1">
+                        <div className="flex gap-2">
                             <button
-                                onClick={() => setPriceMode("PER_PACK")}
-                                className={cn("px-1 rounded-[2px] text-[9px]", priceMode === "PER_PACK" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-500")}
-                                title="Prix par Carton"
-                            >PACK</button>
+                                onClick={() => setSaisieMode("UNIT")}
+                                className={cn("px-1 rounded-[2px] text-[9px] font-bold transition-all", saisieMode === "UNIT" ? "bg-gray-800 text-white" : "bg-gray-200 text-gray-500 hover:bg-gray-300")}
+                            >P.U</button>
                             <button
-                                onClick={() => setPriceMode("PER_ITEM")}
-                                className={cn("px-1 rounded-[2px] text-[9px]", priceMode === "PER_ITEM" ? "bg-green-600 text-white" : "bg-gray-200 text-gray-500")}
-                                title="Prix par Unité"
-                            >ITEM</button>
+                                onClick={() => setSaisieMode("TOTAL")}
+                                className={cn("px-1 rounded-[2px] text-[9px] font-bold transition-all", saisieMode === "TOTAL" ? "bg-gray-800 text-white" : "bg-gray-200 text-gray-500 hover:bg-gray-300")}
+                            >TOTAL</button>
                         </div>
+                        <span>{currency} ({priceMode === "PER_PACK" ? "PACK" : "ITEM"})</span>
                     </div>
-                    <input
-                        type="number"
-                        value={unitPrice}
-                        onChange={(e) => setUnitPrice(e.target.value)}
-                        className="w-full p-2 border border-blue-200 focus:border-blue-400 rounded text-sm text-right font-bold outline-none"
-                        placeholder="0"
-                    />
+                    {saisieMode === "UNIT" ? (
+                        <input
+                            type="number"
+                            step="any"
+                            value={unitPrice}
+                            onChange={(e) => setUnitPrice(e.target.value)}
+                            className="w-full p-2 border border-blue-200 focus:border-blue-400 rounded text-sm text-right font-bold outline-none"
+                            placeholder="Prix Unit."
+                        />
+                    ) : (
+                        <input
+                            type="number"
+                            step="any"
+                            value={lineTotalInput}
+                            onChange={(e) => setLineTotalInput(e.target.value)}
+                            className="w-full p-2 border border-orange-200 focus:border-orange-400 rounded text-sm text-right font-bold outline-none bg-orange-50"
+                            placeholder="Total Ligne"
+                        />
+                    )}
+                    <div className="flex gap-1 mt-1 justify-end">
+                        <button
+                            onClick={() => setPriceMode("PER_PACK")}
+                            className={cn("px-1 rounded-[2px] text-[9px] border", priceMode === "PER_PACK" ? "bg-blue-50 border-blue-600 text-blue-700 font-bold" : "bg-gray-50 border-gray-200 text-gray-400")}
+                            title="Prix par Carton"
+                        >PACK</button>
+                        <button
+                            onClick={() => setPriceMode("PER_ITEM")}
+                            className={cn("px-1 rounded-[2px] text-[9px] border", priceMode === "PER_ITEM" ? "bg-green-50 border-green-600 text-green-700 font-bold" : "bg-gray-50 border-gray-200 text-gray-400")}
+                            title="Prix par Unité"
+                        >ITEM</button>
+                    </div>
                 </div>
 
                 {/* Live Preview & Packing Override */}
@@ -539,11 +575,14 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                                 {qty} {products.find(p => p.id === selectedProduct)?.purchaseUnit} = {(parseFloat(qty) * (parseFloat(editPackQty) || 1)).toFixed(0)} {products.find(p => p.id === selectedProduct)?.saleUnit === "BOTTLE" ? "Bout." : "Unité"}
                             </div>
                         )}
-                        {qty && unitPrice && (
+                        {qty && (saisieMode === "UNIT" ? unitPrice : lineTotalInput) && (
                             <div className="text-[11px] font-black text-orange-600">
-                                Total: {priceMode === "PER_PACK"
-                                    ? (parseFloat(qty) * parseFloat(unitPrice)).toLocaleString()
-                                    : (parseFloat(qty) * (parseFloat(editPackQty) || 1) * parseFloat(unitPrice)).toLocaleString()
+                                Total: {saisieMode === "TOTAL"
+                                    ? parseFloat(lineTotalInput).toLocaleString()
+                                    : (priceMode === "PER_PACK"
+                                        ? (parseFloat(qty) * parseFloat(unitPrice)).toLocaleString()
+                                        : (parseFloat(qty) * (parseFloat(editPackQty) || 1) * parseFloat(unitPrice)).toLocaleString()
+                                    )
                                 } {currency}
                             </div>
                         )}
@@ -565,7 +604,12 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
 
                 <button
                     onClick={addItem}
-                    disabled={(!selectedProduct && !isCreatingNew) || (!newName && isCreatingNew) || !qty || !unitPrice}
+                    disabled={
+                        (!selectedProduct && !isCreatingNew) ||
+                        (!newName && isCreatingNew) ||
+                        !qty ||
+                        (saisieMode === "UNIT" ? !unitPrice : !lineTotalInput)
+                    }
                     className="p-2 bg-[#00d3fa] text-white rounded hover:opacity-90 transition-all disabled:opacity-50 h-[38px] w-[38px] flex items-center justify-center mb-[1px]"
                 >
                     <Plus size={20} />
