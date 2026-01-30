@@ -18,14 +18,21 @@ import LightLayout from "@/components/layout/LightLayout";
 const LightDraftsModal = ({ isOpen, onClose, onLoad }: { isOpen: boolean, onClose: () => void, onLoad: (sale: any) => void }) => {
     const [drafts, setDrafts] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const fetchDrafts = async () => {
         setLoading(true);
+        setError(null);
         try {
             const res = await fetch("/api/transactions?status=DRAFT&limit=20");
             const json = await res.json();
-            if (json.success) setDrafts(json.data);
+            if (json.success) {
+                setDrafts(json.data);
+            } else {
+                setError(json.error || "Erreur de chargement");
+            }
         } catch (e) {
+            setError("Erreur de connexion");
             console.error(e);
         } finally {
             setLoading(false);
@@ -39,51 +46,79 @@ const LightDraftsModal = ({ isOpen, onClose, onLoad }: { isOpen: boolean, onClos
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-lg rounded-sm shadow-2xl flex flex-col h-[80vh] overflow-hidden">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-lg rounded-sm shadow-2xl flex flex-col h-[85vh] overflow-hidden">
                 <div className="p-4 bg-black text-white flex justify-between items-center shrink-0">
                     <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                         <FileText size={16} className="text-orange-500" />
-                        Brouillons en attente
+                        Brouillons
                     </h2>
-                    <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-400">
+                    <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1">
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+                <div className="flex-1 overflow-y-auto p-2 bg-gray-50">
                     {loading ? (
-                        <div className="h-full flex items-center justify-center text-gray-400 font-bold animate-pulse">Chargement...</div>
+                        <div className="h-full flex flex-col items-center justify-center text-gray-400 font-black text-[10px] uppercase tracking-widest animate-pulse">
+                            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
+                            Chargement...
+                        </div>
+                    ) : error ? (
+                        <div className="h-full flex flex-col items-center justify-center text-red-500 p-4 text-center">
+                            <p className="text-[10px] font-black uppercase tracking-widest mb-4">{error}</p>
+                            <button onClick={fetchDrafts} className="px-4 py-2 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-sm">Réessayer</button>
+                        </div>
                     ) : drafts.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-300 italic">
+                        <div className="h-full flex flex-col items-center justify-center text-gray-300 italic p-8 text-center">
                             <FileText size={48} className="mb-4 opacity-10" />
-                            <p className="text-xs uppercase font-bold tracking-widest">Aucun brouillon</p>
+                            <p className="text-[10px] uppercase font-black tracking-widest mb-1">Aucun brouillon</p>
+                            <p className="text-[9px] font-medium text-gray-400">Les ventes en attente apparaîtront ici.</p>
                         </div>
                     ) : (
-                        drafts.map((d) => (
-                            <div
-                                key={d.id}
-                                onClick={() => { onLoad(d); onClose(); }}
-                                className="bg-white border border-gray-200 p-4 rounded-sm shadow-sm hover:border-orange-500 cursor-pointer transition-all flex justify-between items-center group"
-                            >
-                                <div>
-                                    <div className="text-sm font-black text-gray-800 flex items-center gap-2">
-                                        #{d.ticketNum}
-                                        <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 rounded uppercase font-black">{d.orderType}</span>
+                        <div className="grid gap-2">
+                            {drafts.map((d) => (
+                                <div
+                                    key={d.id}
+                                    onClick={() => { onLoad(d); onClose(); }}
+                                    className="p-4 bg-white border border-gray-200 rounded-sm hover:border-orange-500 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden active:scale-[0.98] flex justify-between items-center"
+                                >
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <div>
+                                        <div className="text-sm font-black text-gray-800 flex items-center gap-2 uppercase tracking-tighter">
+                                            #{d.ticketNum}
+                                            <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 rounded uppercase font-black tracking-widest">{d.orderType}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-[9px] font-black text-gray-400 group-hover:bg-orange-100 group-hover:text-orange-600 transition-colors">
+                                                {d.client?.name.charAt(0) || 'P'}
+                                            </div>
+                                            <span className="text-[10px] font-bold text-gray-500 uppercase truncate max-w-[120px]">
+                                                {d.client?.name || 'Client Passager'}
+                                            </span>
+                                        </div>
+                                        <div className="text-[9px] text-gray-400 mt-1 flex items-center gap-1 font-bold">
+                                            <Clock size={10} />
+                                            {new Date(d.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
                                     </div>
-                                    <div className="text-[10px] text-gray-400 mt-1 font-bold flex items-center gap-2">
-                                        <Clock size={10} />
-                                        {new Date(d.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        {d.client && <span className="flex items-center gap-1 text-orange-600"><User size={10} /> {d.client.name}</span>}
+                                    <div className="text-right">
+                                        <div className="text-sm font-black text-black">{(d.totalCdf || 0).toLocaleString()} <span className="text-[10px] text-gray-400">FC</span></div>
+                                        <div className="text-[9px] font-black text-orange-600 uppercase mt-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-1 group-hover:translate-x-0">Charger</div>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-black text-black">{(d.totalCdf || 0).toLocaleString()} <span className="text-[10px] text-gray-400">FC</span></div>
-                                    <div className="text-[10px] text-orange-600 font-black uppercase mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Charger</div>
-                                </div>
-                            </div>
-                        ))
+                            ))}
+                        </div>
                     )}
+                </div>
+
+                <div className="p-3 bg-white border-t border-gray-100 shrink-0">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2.5 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-sm hover:bg-black transition-all active:scale-[0.98]"
+                    >
+                        Fermer
+                    </button>
                 </div>
             </div>
         </div>
@@ -109,7 +144,7 @@ const LightClientModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean, onCl
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white w-full max-w-md rounded-sm shadow-2xl flex flex-col h-[70vh] overflow-hidden">
                 <div className="p-4 bg-black text-white flex justify-between items-center shrink-0">
                     <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
@@ -174,6 +209,7 @@ export default function PosLightPage() {
         setOrderType,
         setCurrentDraftId,
         clearCart,
+        addToCart,
         orderType
     } = usePosStore();
 
@@ -277,7 +313,7 @@ export default function PosLightPage() {
                     onClose={() => setSelectedProduct(null)}
                     product={selectedProduct}
                     onSelectPrice={(price) => {
-                        usePosStore.getState().addToCart({
+                        addToCart({
                             id: selectedProduct.id,
                             name: selectedProduct.name,
                             price: parseFloat(price.priceUsd || 0),

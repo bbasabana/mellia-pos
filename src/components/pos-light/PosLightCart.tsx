@@ -159,14 +159,14 @@ export default function PosLightCart({
                             <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-50">
                                 <div className="flex items-center gap-4">
                                     <button
-                                        onClick={() => updateQuantity(item.productId, -1)}
+                                        onClick={() => updateQuantity(item.productId, -1, item.spaceName, item.saleUnit)}
                                         className="w-6 h-6 flex items-center justify-center bg-gray-50 border border-gray-200 rounded-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
                                     >
                                         <Minus size={12} />
                                     </button>
                                     <span className="text-[11px] font-black text-gray-900 min-w-[12px] text-center">{item.quantity}</span>
                                     <button
-                                        onClick={() => updateQuantity(item.productId, 1)}
+                                        onClick={() => updateQuantity(item.productId, 1, item.spaceName, item.saleUnit)}
                                         className="w-6 h-6 flex items-center justify-center bg-gray-50 border border-gray-200 rounded-sm text-gray-500 hover:bg-green-50 hover:text-green-600 transition-colors"
                                     >
                                         <Plus size={12} />

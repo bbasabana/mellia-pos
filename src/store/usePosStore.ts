@@ -49,7 +49,7 @@ interface PosState {
     // Cart actions
     addToCart: (product: any) => void;
     removeFromCart: (productId: string) => void;
-    updateQuantity: (productId: string, delta: number) => void;
+    updateQuantity: (productId: string, delta: number, spaceName?: string, saleUnit?: string) => void;
     clearCart: () => void;
     setCart: (items: CartItem[]) => void; // Needed to load draft
 
@@ -81,16 +81,22 @@ export const usePosStore = create<PosState>()(
             addToCart: (product) => {
                 const { cart } = get();
                 const productId = product.id || product.productId;
-                const existing = cart.find((item) => item.productId === productId);
+                const saleUnit = product.saleUnit || 'UNIT';
+                const spaceName = product.spaceName || 'Standard';
 
-                if (existing) {
-                    set({
-                        cart: cart.map((item) =>
-                            item.productId === productId
-                                ? { ...item, quantity: item.quantity + 1 }
-                                : item
-                        ),
-                    });
+                const existingIndex = cart.findIndex((item) =>
+                    item.productId === productId &&
+                    item.spaceName === spaceName &&
+                    item.saleUnit === saleUnit
+                );
+
+                if (existingIndex > -1) {
+                    const newCart = [...cart];
+                    newCart[existingIndex] = {
+                        ...newCart[existingIndex],
+                        quantity: newCart[existingIndex].quantity + 1
+                    };
+                    set({ cart: newCart });
                 } else {
                     set({
                         cart: [
@@ -100,9 +106,9 @@ export const usePosStore = create<PosState>()(
                                 name: product.name,
                                 price: typeof product.price === 'string' ? parseFloat(product.price) : (product.price || 0),
                                 priceCdf: Math.round(typeof product.priceCdf === 'string' ? parseFloat(product.priceCdf) : (product.priceCdf || 0)),
-                                spaceName: product.spaceName,
+                                spaceName: spaceName,
                                 quantity: 1,
-                                saleUnit: product.saleUnit || 'UNIT',
+                                saleUnit: saleUnit,
                             },
                         ],
                     });
@@ -113,15 +119,19 @@ export const usePosStore = create<PosState>()(
                 set({ cart: get().cart.filter((item) => item.productId !== productId) });
             },
 
-            updateQuantity: (productId, delta) => {
+            updateQuantity: (productId, delta, spaceName, saleUnit) => {
                 const { cart } = get();
                 set({
                     cart: cart
-                        .map((item) =>
-                            item.productId === productId
+                        .map((item) => {
+                            const isMatch = item.productId === productId &&
+                                (spaceName === undefined || item.spaceName === spaceName) &&
+                                (saleUnit === undefined || item.saleUnit === saleUnit);
+
+                            return isMatch
                                 ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-                                : item
-                        )
+                                : item;
+                        })
                         .filter((item) => item.quantity > 0),
                 });
             },

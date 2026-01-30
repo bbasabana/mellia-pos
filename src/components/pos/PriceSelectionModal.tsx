@@ -23,8 +23,8 @@ export default function PriceSelectionModal({
     const prices = product.prices || [];
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+            <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                     <h3 className="font-bold text-lg text-gray-800">Choisir le prix</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600">

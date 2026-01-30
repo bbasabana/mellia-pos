@@ -333,14 +333,14 @@ const Cart = ({ setPrintSale }: { setPrintSale: (sale: any) => void }) => {
                             <div className="flex justify-end pt-2 border-t border-gray-50 mt-1">
                                 <div className="flex items-center bg-gray-50 rounded-sm border border-gray-200 h-8 overflow-hidden">
                                     <button
-                                        onClick={() => updateQuantity(item.productId, -1)}
+                                        onClick={() => updateQuantity(item.productId, -1, item.spaceName, item.saleUnit)}
                                         className="w-8 h-full flex items-center justify-center hover:bg-gray-200 text-gray-500 hover:text-red-500 transition-colors border-r border-gray-200"
                                     >
                                         <Minus size={12} />
                                     </button>
                                     <span className="w-10 text-center font-bold text-sm text-gray-800">{item.quantity}</span>
                                     <button
-                                        onClick={() => updateQuantity(item.productId, 1)}
+                                        onClick={() => updateQuantity(item.productId, 1, item.spaceName, item.saleUnit)}
                                         className="w-8 h-full flex items-center justify-center hover:bg-gray-200 text-gray-500 hover:text-green-600 transition-colors border-l border-gray-200"
                                     >
                                         <Plus size={12} />
@@ -461,9 +461,14 @@ const ProductGrid = () => {
         });
 
     const getProductStock = (product: any) => {
-        const targetLocation = product.type === 'BEVERAGE' ? 'FRIGO' : 'CUISINE';
-        const stockItem = product.stockItems?.find((s: any) => s.location === targetLocation);
-        return stockItem ? Number(stockItem.quantity) : 0;
+        // Aggregate stock from all "sale-ready" locations (consistent with mobile and light)
+        const saleLocations = ['FRIGO', 'CUISINE', 'CASIER', 'DEPOT'];
+        return product.stockItems?.reduce((acc: number, item: any) => {
+            if (saleLocations.includes(item.location)) {
+                return acc + Number(item.quantity);
+            }
+            return acc;
+        }, 0) || 0;
     };
 
     const handleProductClick = (product: any) => {

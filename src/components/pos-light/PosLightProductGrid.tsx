@@ -59,8 +59,8 @@ export default function PosLightProductGrid({ onSelectPrice }: { onSelectPrice: 
     };
 
     const getProductStock = (product: any) => {
-        // Aggregate stock from all "sale-ready" locations
-        const saleLocations = ['FRIGO', 'CUISINE', 'CASIER'];
+        // Aggregate stock from all "sale-ready" locations including DEPOT
+        const saleLocations = ['FRIGO', 'CUISINE', 'CASIER', 'DEPOT'];
         return product.stockItems?.reduce((acc: number, item: any) => {
             if (saleLocations.includes(item.location)) {
                 return acc + Number(item.quantity);
