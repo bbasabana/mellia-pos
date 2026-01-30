@@ -289,11 +289,13 @@ export default function PosLightPage() {
             </div>
 
             {/* Modals Mapping */}
-            <PaymentModal
-                isOpen={isPaymentOpen}
-                onClose={() => setIsPaymentOpen(false)}
-                onSuccess={(sale) => { if (sale) setPrintSale(sale); }}
-            />
+            {isPaymentOpen && (
+                <PaymentModal
+                    isOpen={isPaymentOpen}
+                    onClose={() => setIsPaymentOpen(false)}
+                    onSuccess={(sale) => { if (sale) setPrintSale(sale); }}
+                />
+            )}
 
             <LightDraftsModal
                 isOpen={isDraftsOpen}
@@ -307,7 +309,7 @@ export default function PosLightPage() {
                 onSelect={(c) => setClient(c)}
             />
 
-            {selectedProduct && (
+            {Boolean(selectedProduct) && (
                 <PriceSelectionModal
                     isOpen={!!selectedProduct}
                     onClose={() => setSelectedProduct(null)}

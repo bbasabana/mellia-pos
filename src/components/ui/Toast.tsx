@@ -68,12 +68,18 @@ export function Toast({ message, type = "success", duration = 3000, onClose }: T
     );
 }
 
-// Simple event bus for toast
-export const toastEvent = new EventTarget();
+// Simple event bus for toast (Compatibility fix: avoid EventTarget constructor which is modern)
+class SimpleBus {
+    private listeners: Function[] = [];
+    addEventListener(_: string, callback: Function) { this.listeners.push(callback); }
+    removeEventListener(_: string, callback: Function) { this.listeners = this.listeners.filter(l => l !== callback); }
+    dispatchEvent(event: any) { this.listeners.forEach(callback => callback(event)); }
+}
+
+export const toastEvent = new SimpleBus();
 
 export function showToast(message: string, type: ToastType = "success") {
-    const event = new CustomEvent("toast", { detail: { message, type } });
-    toastEvent.dispatchEvent(event);
+    toastEvent.dispatchEvent({ detail: { message, type } });
 }
 
 export function ToastContainer() {

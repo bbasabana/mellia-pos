@@ -113,8 +113,8 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModa
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-sm shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200 flex flex-col max-h-[95vh]">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-[150] flex items-center justify-center p-4">
+            <div className="bg-white rounded-sm shadow-2xl w-full max-w-lg overflow-hidden border border-gray-200 flex flex-col max-h-[95vh]">
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <h2 className="text-xl font-bold text-gray-800">Paiement</h2>
                     <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400">
