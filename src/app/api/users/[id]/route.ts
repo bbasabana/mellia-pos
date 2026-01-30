@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
-import { hash } from "bcryptjs";
+import { hashPassword } from "@/lib/auth";
 
 // GET: Check if route is reachable
 export async function GET(
@@ -38,7 +38,7 @@ export async function PUT(
 
         // If password provided and >= 4 chars, hash it
         if (password && password.length >= 4) {
-            updateData.passwordHash = await hash(password, 10);
+            updateData.passwordHash = await hashPassword(password);
         }
 
         const updatedUser = await prisma.user.update({
@@ -72,7 +72,7 @@ export async function PATCH(
         if (action === "RESET_PASSWORD") {
             // Reset to 4-digit numeric password (simpler for staff)
             const generatedPassword = Math.floor(1000 + Math.random() * 9000).toString();
-            const passwordHash = await hash(generatedPassword, 10);
+            const passwordHash = await hashPassword(generatedPassword);
 
             await prisma.user.update({
                 where: { id: params.id },

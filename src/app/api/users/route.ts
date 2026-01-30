@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
-import { hash } from "bcryptjs";
+import { hashPassword } from "@/lib/auth";
 
 // GET: List all users
 export async function GET() {
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
             finalPassword = Math.random().toString(36).slice(-8);
         }
 
-        const passwordHash = await hash(finalPassword, 10);
+        const passwordHash = await hashPassword(finalPassword);
 
         const newUser = await prisma.user.create({
             data: {
