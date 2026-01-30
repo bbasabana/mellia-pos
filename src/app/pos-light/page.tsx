@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { usePosStore } from "@/store/usePosStore";
 import { useReactToPrint } from "react-to-print";
-import PosLightHeader from "@/components/pos-light/PosLightHeader";
 import PosLightProductGrid from "@/components/pos-light/PosLightProductGrid";
 import PosLightCart from "@/components/pos-light/PosLightCart";
 import PaymentModal from "@/components/pos/PaymentModal";
@@ -14,6 +13,7 @@ import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { X, Search, FileText, RefreshCw, Trash2, Clock, User } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
+import LightLayout from "@/components/layout/LightLayout";
 
 // --- Light Drafts Modal ---
 const LightDraftsModal = ({ isOpen, onClose, onLoad }: { isOpen: boolean, onClose: () => void, onLoad: (sale: any) => void }) => {
@@ -229,11 +229,26 @@ export default function PosLightPage() {
         showToast(`Brouillon #${sale.ticketNum} chargé`, "info");
     };
 
-    return (
-        <div className="h-screen flex flex-col bg-white overflow-hidden text-gray-900 selection:bg-orange-500 selection:text-white">
-            <PosLightHeader />
+    const handleNewSale = () => {
+        if (confirm("Voulez-vous vraiment annuler la vente en cours ?")) {
+            clearCart();
+            showToast("Nouvelle vente initialisée", "info");
+        }
+    };
 
-            <div className="flex-1 flex overflow-hidden">
+    const posActions = (
+        <button
+            onClick={handleNewSale}
+            className="flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-600 rounded-sm text-[10px] font-black uppercase tracking-widest border border-orange-100 hover:bg-orange-100 transition-all active:scale-95"
+        >
+            <RefreshCw size={12} />
+            Nouvelle Vente
+        </button>
+    );
+
+    return (
+        <LightLayout headerActions={posActions}>
+            <div className="flex-1 flex overflow-hidden h-full">
                 {/* Left: Product Grid - Max Width */}
                 <div className="flex-1 h-full overflow-hidden border-r border-gray-100">
                     <PosLightProductGrid onSelectPrice={setSelectedProduct} />
@@ -293,6 +308,6 @@ export default function PosLightPage() {
                     {printSale && <ReceiptTemplate sale={printSale} exchangeRate={exchangeRate} />}
                 </div>
             </div>
-        </div>
+        </LightLayout>
     );
 }
