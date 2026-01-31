@@ -136,7 +136,11 @@ export default function ExpensesPage() {
     };
 
     const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat('fr-CD', { style: 'currency', currency: 'USD' }).format(val);
+        return new Intl.NumberFormat('fr-CD', {
+            style: 'currency',
+            currency: 'CDF',
+            maximumFractionDigits: 0
+        }).format(val).replace('CDF', 'FC');
     };
 
     // Filter Logic
@@ -228,7 +232,7 @@ export default function ExpensesPage() {
                                     {formatCurrency(summary?.balance || 0)}
                                 </p>
                                 <div className="mt-2 text-[10px] font-medium bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm self-start">
-                                    = Ventes - (Dépenses + Achats)
+                                    Total Caisse en FC
                                 </div>
                             </div>
                         </div>
@@ -409,10 +413,10 @@ export default function ExpensesPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-bold uppercase text-gray-400">Montant (USD)</label>
+                                            <label className="text-[10px] font-bold uppercase text-gray-400">Montant (FC)</label>
                                             <input
                                                 type="number"
-                                                step="0.01"
+                                                step="1"
                                                 required
                                                 value={formData.amount}
                                                 onChange={e => setFormData({ ...formData, amount: e.target.value })}

@@ -31,20 +31,20 @@ export async function GET(req: Request) {
         }
         console.log(`🕒 [API] Date Range: ${gte.toISOString()} - ${lte.toISOString()}`);
 
-        // 1. Total Sales (Revenue)
+        // 1. Total Sales (Revenue) in CDF
         const sales = await prisma.sale.aggregate({
             where: {
                 createdAt: { gte, lte },
                 status: "COMPLETED",
             },
             _sum: {
-                totalNet: true,
+                totalCdf: true,
             },
         });
-        const totalSales = Number(sales._sum.totalNet || 0);
-        console.log(`💰 [API] Sales: ${totalSales}`);
+        const totalSales = Number(sales._sum.totalCdf || 0);
+        console.log(`💰 [API] Sales (CDF): ${totalSales}`);
 
-        // 2. Total Expenses from Cash Register
+        // 2. Total Expenses from Cash Register (Already in CDF)
         const expenses = await prisma.expense.aggregate({
             where: {
                 date: { gte, lte },
@@ -55,21 +55,22 @@ export async function GET(req: Request) {
             },
         });
         const totalExpenses = Number(expenses._sum.amount || 0);
-        console.log(`💸 [API] Expenses: ${totalExpenses}`);
+        console.log(`💸 [API] Expenses (CDF): ${totalExpenses}`);
 
-        // 3. Total Purchases (Investments) from Cash Register
+        // 3. Total Purchases (Investments) from Cash Register in CDF
         const purchases = await prisma.investment.aggregate({
             where: {
                 date: { gte, lte },
                 source: "CASH_REGISTER",
             },
             _sum: {
-                totalAmount: true,
+                totalAmountCdf: true,
             },
         });
-        const totalPurchases = Number(purchases._sum.totalAmount || 0);
+        const totalPurchases = Number(purchases._sum.totalAmountCdf || 0);
+        console.log(`🛒 [API] Purchases (CDF): ${totalPurchases}`);
 
-        // 4. Final Cash Balance
+        // 4. Final Cash Balance in CDF
         const balance = totalSales - totalExpenses - totalPurchases;
 
         // 5. Total Expenses from Boss
