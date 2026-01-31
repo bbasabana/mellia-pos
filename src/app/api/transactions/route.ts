@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
             };
         }
 
-        const [sales, total] = await Promise.all([
+        const [sales, total, aggregates] = await Promise.all([
             prisma.sale.findMany({
                 where,
                 include: {
@@ -56,11 +56,22 @@ export async function GET(req: NextRequest) {
                 take: limit,
             }),
             prisma.sale.count({ where }),
+            prisma.sale.aggregate({
+                where,
+                _sum: {
+                    totalCdf: true,
+                    totalNet: true,
+                }
+            })
         ]);
 
         return NextResponse.json({
             success: true,
             data: sales,
+            summary: {
+                totalCdf: Number(aggregates._sum.totalCdf || 0),
+                totalUsd: Number(aggregates._sum.totalNet || 0),
+            },
             pagination: {
                 total,
                 page,
