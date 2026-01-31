@@ -3,20 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
-    Plus,
-    Filter,
-    DollarSign,
-    TrendingDown,
-    ShoppingCart,
-    Wallet,
-    Calendar,
-    MoreVertical,
-    ArrowUpRight,
-    ArrowDownRight,
-    Loader2,
-    X,
-    TrendingUp,
-    PieChart
+    Plus, Filter, Calendar, TrendingUp, TrendingDown,
+    ShoppingCart, Wallet, Loader2, DollarSign, X,
+    Edit, Trash2, PieChart, AlertCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -59,6 +48,12 @@ export default function ExpensesPage() {
     // Filters
     const [selectedCategory, setSelectedCategory] = useState("ALL");
 
+    const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+    const [actualCash, setActualCash] = useState("");
+
     // Form State
     const [formData, setFormData] = useState({
         description: "",
@@ -67,6 +62,27 @@ export default function ExpensesPage() {
         source: "CASH_REGISTER",
         date: new Date().toISOString().split('T')[0]
     });
+
+    useEffect(() => {
+        if (editingExpense) {
+            setFormData({
+                description: editingExpense.description,
+                amount: editingExpense.amount.toString(),
+                categoryId: editingExpense.category.id,
+                source: editingExpense.source,
+                date: editingExpense.date.split('T')[0]
+            });
+            setShowModal(true);
+        } else {
+            setFormData({
+                description: "",
+                amount: "",
+                categoryId: "",
+                source: "CASH_REGISTER",
+                date: new Date().toISOString().split('T')[0]
+            });
+        }
+    }, [editingExpense]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -88,7 +104,10 @@ export default function ExpensesPage() {
             }
 
             if (expData.success) setExpenses(expData.data);
-            if (catData.success) setCategories(catData.data);
+            if (catData.success) {
+                setCategories(catData.data);
+                // Ensure "Ajustement de Caisse" category exists in background if needed
+            }
         } catch (error) {
             console.error("❌ [Expenses] Error fetching data:", error);
         } finally {
@@ -104,11 +123,13 @@ export default function ExpensesPage() {
         e.preventDefault();
         setSubmitting(true);
         try {
+            const method = editingExpense ? "PUT" : "POST";
             const res = await fetch("/api/expenses", {
-                method: "POST",
+                method,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...formData,
+                    id: editingExpense?.id,
                     amount: parseFloat(formData.amount)
                 })
             });
@@ -116,15 +137,9 @@ export default function ExpensesPage() {
             const data = await res.json();
             if (data.success) {
                 setShowModal(false);
-                setFormData({
-                    description: "",
-                    amount: "",
-                    categoryId: "",
-                    source: "CASH_REGISTER",
-                    date: new Date().toISOString().split('T')[0]
-                });
+                setEditingExpense(null);
                 fetchData();
-                showToast("Dépense enregistrée avec succès", "success");
+                showToast(editingExpense ? "Dépense modifiée" : "Dépense enregistrée", "success");
             } else {
                 showToast("Erreur: " + data.error, "error");
             }
@@ -132,6 +147,25 @@ export default function ExpensesPage() {
             showToast("Une erreur est survenue", "error");
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        setIsDeleting(true);
+        try {
+            const res = await fetch(`/api/expenses?id=${id}`, { method: "DELETE" });
+            const data = await res.json();
+            if (data.success) {
+                showToast("Dépense supprimée", "success");
+                setConfirmDeleteId(null);
+                fetchData();
+            } else {
+                showToast(data.error || "Erreur de suppression", "error");
+            }
+        } catch (error) {
+            showToast("Erreur réseau", "error");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -188,7 +222,7 @@ export default function ExpensesPage() {
                         </div>
                         <button
                             className="bg-black text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-gray-800 transition-all shadow-md active:scale-95"
-                            onClick={() => setShowModal(true)}
+                            onClick={() => { setEditingExpense(null); setShowModal(true); }}
                         >
                             <Plus size={16} />
                             Nouvelle Dépense
@@ -227,7 +261,15 @@ export default function ExpensesPage() {
                                 <div className="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-110 transition-transform">
                                     <Wallet size={48} />
                                 </div>
-                                <p className="text-[10px] uppercase font-bold tracking-wider opacity-80">Solde Théorique Caisse</p>
+                                <div className="flex justify-between items-start">
+                                    <p className="text-[10px] uppercase font-bold tracking-wider opacity-80">Solde Théorique Caisse</p>
+                                    <button
+                                        onClick={() => { setActualCash(summary?.balance.toString() || "0"); setShowAdjustmentModal(true); }}
+                                        className="text-[8px] font-black uppercase bg-white/20 px-1.5 py-0.5 rounded hover:bg-white/40 transition-colors"
+                                    >
+                                        Ajuster
+                                    </button>
+                                </div>
                                 <p className="text-2xl font-black mt-1 tracking-tight">
                                     {formatCurrency(summary?.balance || 0)}
                                 </p>
@@ -289,18 +331,19 @@ export default function ExpensesPage() {
                                                 <th className="px-6 py-3 border-b border-gray-100">Catégorie</th>
                                                 <th className="px-6 py-3 border-b border-gray-100">Source</th>
                                                 <th className="px-6 py-3 border-b border-gray-100 text-right">Montant</th>
+                                                <th className="px-6 py-3 border-b border-gray-100 text-right">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
                                             {loading ? (
                                                 <tr>
-                                                    <td colSpan={5} className="text-center py-12 text-gray-400 italic text-sm">
+                                                    <td colSpan={6} className="text-center py-12 text-gray-400 italic text-sm">
                                                         <Loader2 className="animate-spin inline-block mr-2" size={16} /> Chargement...
                                                     </td>
                                                 </tr>
                                             ) : filteredExpenses.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={5} className="text-center py-12 text-gray-400 italic text-sm">
+                                                    <td colSpan={6} className="text-center py-12 text-gray-400 italic text-sm">
                                                         Aucune dépense trouvée pour ce filtre.
                                                     </td>
                                                 </tr>
@@ -333,6 +376,22 @@ export default function ExpensesPage() {
                                                             <span className="text-sm font-black text-gray-800">
                                                                 {formatCurrency(exp.amount)}
                                                             </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={() => setEditingExpense(exp)}
+                                                                    className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors"
+                                                                >
+                                                                    <Edit size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setConfirmDeleteId(exp.id)}
+                                                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))
@@ -388,13 +447,45 @@ export default function ExpensesPage() {
 
                 </div>
 
-                {/* Modal */}
+                {/* Confirm Delete Modal */}
+                {confirmDeleteId && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                            <div className="p-6 text-center">
+                                <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Trash2 size={24} />
+                                </div>
+                                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Supprimer la dépense ?</h3>
+                                <p className="text-sm text-gray-500 mt-2">Cette action est irréversible et affectera le solde de caisse.</p>
+                            </div>
+                            <div className="px-6 py-4 bg-gray-50 flex gap-3">
+                                <button
+                                    onClick={() => setConfirmDeleteId(null)}
+                                    className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 font-bold text-sm rounded-sm hover:bg-white transition-all"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(confirmDeleteId)}
+                                    disabled={isDeleting}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white font-bold text-sm rounded-sm hover:bg-red-700 shadow-md flex items-center justify-center gap-2"
+                                >
+                                    {isDeleting ? <Loader2 size={16} className="animate-spin" /> : "Supprimer"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Add/Edit Modal */}
                 {showModal && (
                     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-sm shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                                <h3 className="font-bold text-gray-800 text-lg">Ajouter une dépense</h3>
-                                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                <h3 className="font-bold text-gray-800 text-lg">
+                                    {editingExpense ? "Modifier la dépense" : "Ajouter une dépense"}
+                                </h3>
+                                <button onClick={() => { setShowModal(false); setEditingExpense(null); }} className="text-gray-400 hover:text-red-500 transition-colors">
                                     <X size={20} />
                                 </button>
                             </div>
@@ -464,7 +555,7 @@ export default function ExpensesPage() {
                                     <button
                                         type="button"
                                         className="px-6 py-2 rounded-sm text-sm font-bold text-gray-500 hover:bg-gray-200 transition-all border border-transparent"
-                                        onClick={() => setShowModal(false)}
+                                        onClick={() => { setShowModal(false); setEditingExpense(null); }}
                                     >
                                         Annuler
                                     </button>
@@ -473,10 +564,112 @@ export default function ExpensesPage() {
                                         className="px-8 py-2 bg-black text-white rounded-sm font-bold text-sm hover:bg-gray-800 transition-all shadow-md disabled:opacity-50"
                                         disabled={submitting}
                                     >
-                                        {submitting ? "Enregistrement..." : "Enregistrer"}
+                                        {submitting ? "Traitement..." : (editingExpense ? "Mettre à jour" : "Enregistrer")}
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+                {/* Adjustment Modal */}
+                {showAdjustmentModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                            <div className="px-6 py-4 border-b border-gray-100 bg-gray-900 text-white flex items-center justify-between">
+                                <h3 className="font-bold uppercase tracking-widest text-sm">Ajuster le Solde</h3>
+                                <button onClick={() => setShowAdjustmentModal(false)}><X size={20} /></button>
+                            </div>
+                            <div className="p-6 space-y-6">
+                                <div className="bg-gray-50 p-4 border border-gray-200 rounded-sm">
+                                    <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                                        <span>Solde Théorique</span>
+                                        <span>Solde Réel (Main)</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold text-gray-500">{formatCurrency(summary?.balance || 0)}</span>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                value={actualCash}
+                                                onChange={e => setActualCash(e.target.value)}
+                                                className="bg-white border-2 border-gray-900 rounded-sm px-3 py-1.5 w-32 text-right font-black text-lg outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {Number(actualCash) !== summary?.balance && (
+                                    <div className={cn(
+                                        "p-4 rounded-sm border flex items-center gap-3",
+                                        Number(actualCash) > (summary?.balance || 0) ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"
+                                    )}>
+                                        <AlertCircle size={20} />
+                                        <div className="text-xs font-bold">
+                                            L&apos;application va créer une entrée de correction de
+                                            <span className="mx-1 font-black">
+                                                {formatCurrency(Math.abs(Number(actualCash) - (summary?.balance || 0)))}
+                                            </span>
+                                            pour équilibrer la caisse.
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={async () => {
+                                        const diff = Number(actualCash) - (summary?.balance || 0);
+                                        if (diff === 0) { setShowAdjustmentModal(false); return; }
+
+                                        setSubmitting(true);
+                                        try {
+                                            // Find adjustment category
+                                            let adjCat = categories.find(c => c.name.toLowerCase().includes("ajustement"));
+                                            if (!adjCat) {
+                                                // Create it if not found
+                                                const res = await fetch("/api/expenses/categories", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ name: "Ajustement de Caisse", description: "Corrections de solde" })
+                                                });
+                                                const data = await res.json();
+                                                adjCat = data.data;
+                                            }
+
+                                            // The logic: 
+                                            // If actual > theoretical (surplus), we add a negative expense? 
+                                            // No, our expense model subtracts. So a SURPLUS means we need to "remove" a negative amount.
+                                            // Let's just create an expense with a negative amount if it's a surplus.
+                                            // Backend uses Prisma.Decimal which supports negative.
+
+                                            // Actually, easier: if SURPLUS, it's a negative expense. If LOSS, it's a positive expense.
+                                            const amount = -diff;
+
+                                            const res = await fetch("/api/expenses", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                    description: diff > 0 ? "Ajustement (Surplus constaté)" : "Ajustement (Manquant constaté)",
+                                                    amount: amount,
+                                                    categoryId: adjCat?.id,
+                                                    source: "CASH_REGISTER",
+                                                    date: new Date().toISOString()
+                                                })
+                                            });
+
+                                            if (res.ok) {
+                                                showToast("Solde ajusté avec succès", "success");
+                                                setShowAdjustmentModal(false);
+                                                fetchData();
+                                            }
+                                        } finally {
+                                            setSubmitting(false);
+                                        }
+                                    }}
+                                    disabled={submitting}
+                                    className="w-full bg-gray-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-black transition-all shadow-lg active:scale-95"
+                                >
+                                    {submitting ? "Traitement..." : "Confirmer l'ajustement"}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

@@ -91,3 +91,67 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 }
+
+export async function PUT(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const body = await req.json();
+        const { id, description, amount, categoryId, source, date } = body;
+
+        if (!id || !description || !amount || !categoryId) {
+            return new NextResponse("Missing required fields", { status: 400 });
+        }
+
+        const expense = await prisma.expense.update({
+            where: { id },
+            data: {
+                description,
+                amount: new Prisma.Decimal(amount),
+                categoryId,
+                source: source || "CASH_REGISTER",
+                date: date ? new Date(date) : undefined,
+            },
+            include: {
+                category: true,
+            },
+        });
+
+        return NextResponse.json({ success: true, data: expense });
+    } catch (error: any) {
+        console.error("[EXPENSES_PUT]", error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        if ((session.user as any).role !== "ADMIN") {
+            return new NextResponse("Only admins can delete expenses", { status: 403 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get("id");
+
+        if (!id) {
+            return new NextResponse("Missing ID", { status: 400 });
+        }
+
+        await prisma.expense.delete({
+            where: { id },
+        });
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error("[EXPENSES_DELETE]", error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+}
