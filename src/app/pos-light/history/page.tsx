@@ -9,19 +9,34 @@ import { showToast } from "@/components/ui/Toast";
 export default function HistoryLightPage() {
     const [hasMounted, setHasMounted] = useState(false);
     const [transactions, setTransactions] = useState<any[]>([]);
+    const [expenses, setExpenses] = useState<any[]>([]);
+    const [exchangeRate, setExchangeRate] = useState<number>(2850);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedSale, setSelectedSale] = useState<any | null>(null);
 
-    const fetchTransactions = async () => {
+    const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/transactions?limit=100&status=COMPLETED");
-            const json = await res.json();
-            if (json.success) setTransactions(json.data);
+            // Fetch Transactions
+            const transRes = await fetch(`/api/transactions?limit=100&status=COMPLETED&startDate=${selectedDate}&endDate=${selectedDate}`);
+            const transJson = await transRes.json();
+            if (transJson.success) setTransactions(transJson.data);
+
+            // Fetch Expenses
+            const expRes = await fetch(`/api/expenses?period=custom&start=${selectedDate}&end=${selectedDate}`);
+            const expJson = await expRes.json();
+            if (expJson.success) setExpenses(expJson.data);
+
+            // Fetch Exchange Rate
+            const rateRes = await fetch("/api/exchange-rate");
+            const rateJson = await rateRes.json();
+            if (rateJson.success && rateJson.data) setExchangeRate(Number(rateJson.data.rateUsdToCdf));
+
         } catch (e) {
             console.error(e);
-            showToast("Erreur lors du chargement de l'historique", "error");
+            showToast("Erreur lors du chargement des données", "error");
         } finally {
             setLoading(false);
         }
@@ -29,8 +44,8 @@ export default function HistoryLightPage() {
 
     useEffect(() => {
         setHasMounted(true);
-        fetchTransactions();
-    }, []);
+        fetchData();
+    }, [selectedDate]);
 
     const filteredTransactions = useMemo(() => {
         if (!search) return transactions;
@@ -43,6 +58,10 @@ export default function HistoryLightPage() {
     const totalRevenueCdf = useMemo(() => {
         return filteredTransactions.reduce((acc, t) => acc + (t.totalCdf || 0), 0);
     }, [filteredTransactions]);
+
+    const totalExpensesCdf = useMemo(() => {
+        return expenses.reduce((acc, e) => acc + Number(e.amount), 0);
+    }, [expenses]);
 
     const { groupedTransactions, totalsByDate } = useMemo(() => {
         const groups: Record<string, any[]> = {};
@@ -72,25 +91,6 @@ export default function HistoryLightPage() {
         return { groupedTransactions: sortedGroups, totalsByDate: dailyTotals };
     }, [filteredTransactions]);
 
-    const stats = useMemo(() => {
-        const getDayStr = (date: Date) => {
-            return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-        };
-
-        const today = getDayStr(new Date());
-        const yesterday = getDayStr(new Date(Date.now() - 86400000));
-
-        const todayTotal = transactions
-            .filter(t => getDayStr(new Date(t.createdAt)) === today)
-            .reduce((acc, t) => acc + (t.totalCdf || 0), 0);
-
-        const yesterdayTotal = transactions
-            .filter(t => getDayStr(new Date(t.createdAt)) === yesterday)
-            .reduce((acc, t) => acc + (t.totalCdf || 0), 0);
-
-        return { todayTotal, yesterdayTotal };
-    }, [transactions]);
-
     const getPaymentIcon = (method: string) => {
         switch (method) {
             case 'MOBILE_MONEY': return <Smartphone size={10} />;
@@ -106,18 +106,33 @@ export default function HistoryLightPage() {
             <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
                 {/* Stats & Search Header */}
                 <div className="bg-white border-b border-gray-100 shrink-0">
-                    <div className="p-4 grid grid-cols-2 gap-4">
+                    <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="bg-green-50 border border-green-100 p-4 rounded-sm">
-                            <span className="text-[10px] font-black uppercase text-green-500 tracking-widest block mb-1">Aujourd&apos;hui</span>
+                            <span className="text-[10px] font-black uppercase text-green-500 tracking-widest block mb-1">Ventes Totales</span>
                             <span className="text-xl font-black text-green-700 leading-none">
-                                {stats.todayTotal.toLocaleString()} <span className="text-xs">FC</span>
+                                {totalRevenueCdf.toLocaleString()} <span className="text-xs font-bold opacity-50">FC</span>
+                            </span>
+                        </div>
+                        <div className="bg-red-50 border border-red-100 p-4 rounded-sm">
+                            <span className="text-[10px] font-black uppercase text-red-500 tracking-widest block mb-1">Dépenses</span>
+                            <span className="text-xl font-black text-red-700 leading-none">
+                                {totalExpensesCdf.toLocaleString()} <span className="text-xs font-bold opacity-50">FC</span>
                             </span>
                         </div>
                         <div className="bg-blue-50 border border-blue-100 p-4 rounded-sm">
-                            <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest block mb-1">Hier</span>
+                            <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest block mb-1">Recette Net</span>
                             <span className="text-xl font-black text-blue-700 leading-none">
-                                {stats.yesterdayTotal.toLocaleString()} <span className="text-xs">FC</span>
+                                {(totalRevenueCdf - totalExpensesCdf).toLocaleString()} <span className="text-xs font-bold opacity-50">FC</span>
                             </span>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-100 p-4 rounded-sm">
+                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Date Sélectionnée</span>
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full bg-transparent border-none text-sm font-black text-gray-800 focus:ring-0 p-0"
+                            />
                         </div>
                     </div>
                     <div className="px-4 pb-4 flex gap-2">
@@ -132,8 +147,10 @@ export default function HistoryLightPage() {
                             />
                         </div>
                         <div className="bg-orange-50 border border-orange-100 px-4 py-2 rounded-sm flex flex-col justify-center min-w-[120px]">
-                            <span className="text-[8px] font-black uppercase text-orange-400 tracking-widest">Total Sélection</span>
-                            <span className="text-sm font-black text-orange-600 truncate">{totalRevenueCdf.toLocaleString()} FC</span>
+                            <span className="text-[8px] font-black uppercase text-orange-400 tracking-widest">Taux: 1$ = {exchangeRate} FC</span>
+                            <span className="text-sm font-black text-orange-600 truncate">
+                                {Math.round(totalRevenueCdf / exchangeRate).toLocaleString()} USD
+                            </span>
                         </div>
                     </div>
                 </div>

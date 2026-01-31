@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import LightLayout from "@/components/layout/LightLayout";
-import { Utensils, Clock, CheckCircle, Flame, Truck, ShoppingBag, RotateCcw, ChefHat, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { Utensils, Clock, CheckCircle, Flame, Truck, ShoppingBag, RotateCcw, ChefHat, Trash2, Loader2, AlertCircle, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
 import { showToast } from "@/components/ui/Toast";
+import { useCallback } from "react";
 
 interface KitchenOrder {
     id: string;
@@ -36,15 +37,17 @@ export default function KitchenLightPage() {
     const { data: session } = useSession();
     const isAdmin = (session?.user as any)?.role === "ADMIN";
 
+    const [activeTab, setActiveTab] = useState<'active' | 'today' | 'past'>('active');
     const [orders, setOrders] = useState<KitchenOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<KitchenOrder | null>(null);
 
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
+        setLoading(true);
         try {
-            const res = await fetch("/api/kitchen/orders");
+            const res = await fetch(`/api/kitchen/orders?type=${activeTab}`);
             const json = await res.json();
             if (json.success) {
                 setOrders(json.data);
@@ -54,18 +57,21 @@ export default function KitchenLightPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeTab]);
 
     const [hasMounted, setHasMounted] = useState(false);
 
     useEffect(() => {
         setHasMounted(true);
         fetchOrders();
-        const interval = setInterval(fetchOrders, 30000);
-        return () => clearInterval(interval);
-    }, []);
+    }, [fetchOrders]);
 
-    if (!hasMounted) return null;
+    useEffect(() => {
+        if (activeTab === 'active') {
+            const interval = setInterval(fetchOrders, 30000);
+            return () => clearInterval(interval);
+        }
+    }, [activeTab, fetchOrders]);
 
     const updateStatus = async (id: string, newStatus: string) => {
         try {
@@ -108,50 +114,73 @@ export default function KitchenLightPage() {
             case 'PENDING': return 'border-red-500 bg-red-50/30';
             case 'IN_PREPARATION': return 'border-orange-500 bg-orange-50/30';
             case 'READY': return 'border-green-500 bg-green-50/30';
+            case 'DELIVERED': return 'border-gray-200 bg-gray-50';
             default: return 'border-gray-200 bg-white';
         }
     };
 
-    const activeOrders = orders.filter(o => o.status !== 'DELIVERED');
+    if (!hasMounted) return null;
 
     return (
         <LightLayout>
             <div className="h-full flex flex-col bg-gray-50 overflow-hidden px-4 py-4">
-                {/* Header Stats */}
-                <div className="grid grid-cols-3 gap-4 mb-4 shrink-0">
-                    <div className="bg-white p-4 rounded-sm border-2 border-red-100 flex flex-col items-center">
-                        <span className="text-[10px] font-black uppercase text-red-400 tracking-widest mb-1">En Attente</span>
-                        <span className="text-2xl font-black text-red-600">{activeOrders.filter(o => o.status === 'PENDING').length}</span>
-                    </div>
-                    <div className="bg-white p-4 rounded-sm border-2 border-orange-100 flex flex-col items-center">
-                        <span className="text-[10px] font-black uppercase text-orange-400 tracking-widest mb-1">En Cours</span>
-                        <span className="text-2xl font-black text-orange-600">{activeOrders.filter(o => o.status === 'IN_PREPARATION').length}</span>
-                    </div>
-                    <div className="bg-white p-4 rounded-sm border-2 border-green-100 flex flex-col items-center">
-                        <span className="text-[10px] font-black uppercase text-green-400 tracking-widest mb-1">Prêt</span>
-                        <span className="text-2xl font-black text-green-600">{activeOrders.filter(o => o.status === 'READY').length}</span>
-                    </div>
+                {/* Tabs */}
+                <div className="flex gap-2 mb-4 shrink-0 overflow-x-auto no-scrollbar">
+                    <button
+                        onClick={() => setActiveTab('active')}
+                        className={cn(
+                            "px-6 py-3 font-black uppercase tracking-widest text-[10px] rounded-sm transition-all flex items-center gap-2",
+                            activeTab === 'active' ? "bg-orange-600 text-white shadow-lg shadow-orange-100" : "bg-white text-gray-400 border border-gray-100"
+                        )}
+                    >
+                        <Flame size={14} />
+                        Actives
+                        <span className={cn("ml-2 px-1.5 py-0.5 rounded-full text-[8px]", activeTab === 'active' ? "bg-orange-500 text-white" : "bg-gray-100 uppercase")}>
+                            {activeTab === 'active' ? orders.length : ""}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('today')}
+                        className={cn(
+                            "px-6 py-3 font-black uppercase tracking-widest text-[10px] rounded-sm transition-all flex items-center gap-2",
+                            activeTab === 'today' ? "bg-gray-900 text-white shadow-lg shadow-gray-200" : "bg-white text-gray-400 border border-gray-100"
+                        )}
+                    >
+                        <Clock size={14} />
+                        Aujourd&apos;hui
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('past')}
+                        className={cn(
+                            "px-6 py-3 font-black uppercase tracking-widest text-[10px] rounded-sm transition-all flex items-center gap-2",
+                            activeTab === 'past' ? "bg-gray-900 text-white shadow-lg shadow-gray-200" : "bg-white text-gray-400 border border-gray-100"
+                        )}
+                    >
+                        <History size={14} />
+                        Historique
+                    </button>
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
                         <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse uppercase tracking-widest">Chargement...</div>
-                    ) : activeOrders.length === 0 ? (
+                    ) : orders.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-gray-300">
                             <ChefHat size={80} strokeWidth={1} className="mb-4 opacity-20" />
-                            <p className="font-black uppercase tracking-widest">Cuisine Libre</p>
+                            <p className="font-black uppercase tracking-widest">Aucune commande</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {activeOrders.map(order => {
+                            {orders.map(order => {
                                 const elapsedTime = Math.floor((new Date().getTime() - new Date(order.createdAt).getTime()) / 60000);
-                                const isLate = elapsedTime > 20;
+                                const isLate = elapsedTime > 20 && order.status !== 'DELIVERED';
 
                                 return (
                                     <div key={order.id} className={cn(
                                         "bg-white border-2 rounded-sm p-4 flex flex-col gap-4 shadow-sm transition-all",
-                                        getStatusStyles(order.status)
+                                        getStatusStyles(order.status),
+                                        order.status === 'DELIVERED' && "opacity-60 bg-gray-50 border-gray-100"
                                     )}>
                                         <div className="flex justify-between items-start">
                                             <div>
@@ -162,7 +191,7 @@ export default function KitchenLightPage() {
                                                     isLate ? "bg-red-600 text-white animate-pulse" : "bg-gray-900 text-white"
                                                 )}>
                                                     <Clock size={10} />
-                                                    {elapsedTime} MIN
+                                                    {order.status === 'DELIVERED' ? "SERVIE" : `${elapsedTime} MIN`}
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
@@ -206,6 +235,11 @@ export default function KitchenLightPage() {
                                                 <button onClick={() => updateStatus(order.id, 'DELIVERED')} className="w-full py-4 bg-gray-900 text-white font-black uppercase tracking-widest text-xs rounded-sm hover:bg-black active:scale-95 transition-all shadow-lg">
                                                     Commande Servie
                                                 </button>
+                                            )}
+                                            {order.status === 'DELIVERED' && (
+                                                <div className="w-full py-3 bg-gray-100 text-gray-400 font-black uppercase tracking-widest text-[10px] rounded-sm text-center">
+                                                    Livrée le {new Date(order.createdAt).toLocaleDateString()}
+                                                </div>
                                             )}
                                         </div>
                                     </div>
