@@ -249,7 +249,7 @@ export default function EditTransactionModal({
                                     </div>
                                     <div className="text-right">
                                         <div className="font-black text-gray-900 text-base">
-                                            {(item.quantity * item.unitPrice * exchangeRate).toLocaleString()} FC
+                                            {(item.quantity * item.unitPriceCdf).toLocaleString()} FC
                                         </div>
                                         <div className="text-xs text-gray-400 font-bold">
                                             ${(item.quantity * item.unitPrice).toFixed(2)}
@@ -284,7 +284,6 @@ export default function EditTransactionModal({
                                             </div>
                                         </div>
                                     </div>
-                                    鼓
                                     <div className="flex items-center bg-gray-50 rounded-md border border-gray-200 h-8">
                                         <button
                                             onClick={() => handleQuantityChange(index, -1)}
