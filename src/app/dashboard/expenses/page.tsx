@@ -313,11 +313,17 @@ export default function ExpensesPage() {
                                         </div>
                                         <div className="space-y-2">
                                             <div className="flex justify-between items-center">
-                                                <span className="text-sm text-red-700 font-medium">• Dépenses journalières</span>
+                                                <span className="text-sm text-red-700 font-medium flex items-center gap-1">
+                                                    <DollarSign size={12} className="text-red-500" />
+                                                    Dépenses journalières
+                                                </span>
                                                 <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalExpenses || 0)}</span>
                                             </div>
                                             <div className="flex justify-between items-center">
-                                                <span className="text-sm text-red-700 font-medium">• Achats de stock</span>
+                                                <span className="text-sm text-red-700 font-medium flex items-center gap-1">
+                                                    <ShoppingCart size={12} className="text-red-500" />
+                                                    Achats de stock
+                                                </span>
                                                 <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalPurchases || 0)}</span>
                                             </div>
                                             <div className="border-t border-red-200 pt-2 mt-2">
@@ -331,12 +337,28 @@ export default function ExpensesPage() {
                                         </div>
                                     </div>
 
-                                    {/* Final Balance */}
+                                    {/* Final Balance with Adjustment Button */}
                                     <div className="bg-[#00d3fa]/10 border-2 border-[#00d3fa] rounded-sm p-4">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <Wallet size={16} className="text-[#00d3fa]" />
+                                                <div className="text-[10px] uppercase font-bold text-[#00d3fa] tracking-wider">Résultat</div>
+                                            </div>
+                                            <button
+                                                onClick={() => { setActualCash(summary?.balance.toString() || "0"); setShowAdjustmentModal(true); }}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#00d3fa] text-white text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#00b8e0] transition-all shadow-sm"
+                                            >
+                                                <Edit size={12} />
+                                                Ajuster le Solde
+                                            </button>
+                                        </div>
+                                        
                                         <div className="flex justify-between items-center">
                                             <div>
-                                                <div className="text-[10px] uppercase font-bold text-[#00d3fa] tracking-wider mb-1">Résultat</div>
-                                                <div className="text-sm font-medium text-gray-700">💵 Argent à la Main (Caisse)</div>
+                                                <div className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                                    <Wallet size={14} className="text-gray-500" />
+                                                    Argent à la Main (Caisse)
+                                                </div>
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-2xl font-black text-[#00d3fa]">
@@ -354,13 +376,16 @@ export default function ExpensesPage() {
 
                                     {/* Info Box */}
                                     <div className="bg-blue-50 border border-blue-100 rounded-sm p-3">
-                                        <p className="text-xs text-blue-700 leading-relaxed">
-                                            <strong>📊 Formule:</strong> Solde Caisse = Ventes (CASH) - Dépenses (Caisse) - Achats (Caisse)
-                                            <br />
-                                            <span className="text-[10px] text-blue-600 mt-1 inline-block">
-                                                Les dépenses payées par le Boss et les ventes à crédit ne sont pas déduites du solde caisse.
-                                            </span>
-                                        </p>
+                                        <div className="flex items-start gap-2">
+                                            <AlertCircle size={14} className="text-blue-600 mt-0.5 shrink-0" />
+                                            <div className="text-xs text-blue-700 leading-relaxed">
+                                                <strong>Formule:</strong> Solde Caisse = Ventes (CASH) - Dépenses (Caisse) - Achats (Caisse)
+                                                <br />
+                                                <span className="text-[10px] text-blue-600 mt-1 inline-block">
+                                                    Les dépenses payées par le Boss et les ventes à crédit ne sont pas déduites du solde caisse.
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
