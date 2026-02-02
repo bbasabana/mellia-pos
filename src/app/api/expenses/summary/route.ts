@@ -13,28 +13,45 @@ export async function GET(req: Request) {
         }
 
         const { searchParams } = new URL(req.url);
-        const period = searchParams.get("period") || "today";
+        const period = searchParams.get("period") || "all";
         console.log(`📅 [API] Period: ${period}`);
 
         const now = new Date();
-        let gte: Date;
-        let lte: Date = new Date();
+        let gte: Date | undefined;
+        let lte: Date | undefined;
 
-        if (period === "today") {
+        if (period === "all") {
+            // No date filter - calculate from all time
+            gte = undefined;
+            lte = undefined;
+        } else if (period === "today") {
             gte = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            lte = new Date();
+        } else if (period === "week") {
+            gte = new Date(now);
+            gte.setDate(now.getDate() - 7);
+            lte = new Date();
         } else if (period === "month") {
             gte = new Date(now.getFullYear(), now.getMonth(), 1);
+            lte = new Date();
         } else if (period === "year") {
             gte = new Date(now.getFullYear(), 0, 1);
-        } else {
-            gte = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            lte = new Date();
         }
-        console.log(`🕒 [API] Date Range: ${gte.toISOString()} - ${lte.toISOString()}`);
+        
+        if (gte && lte) {
+            console.log(`🕒 [API] Date Range: ${gte.toISOString()} - ${lte.toISOString()}`);
+        } else {
+            console.log(`🕒 [API] Date Range: ALL TIME`);
+        }
+
+        // Build where clause for date filtering
+        const dateFilter = (gte && lte) ? { gte, lte } : undefined;
 
         // 1. Total Sales (Revenue) in CDF
         const sales = await prisma.sale.aggregate({
             where: {
-                createdAt: { gte, lte },
+                ...(dateFilter && { createdAt: dateFilter }),
                 status: "COMPLETED",
             },
             _sum: {
@@ -47,7 +64,7 @@ export async function GET(req: Request) {
         // 2. Total Expenses from Cash Register (Already in CDF)
         const expenses = await prisma.expense.aggregate({
             where: {
-                date: { gte, lte },
+                ...(dateFilter && { date: dateFilter }),
                 source: "CASH_REGISTER",
             },
             _sum: {
@@ -60,7 +77,7 @@ export async function GET(req: Request) {
         // 3. Total Purchases (Investments) from Cash Register in CDF
         const purchases = await prisma.investment.aggregate({
             where: {
-                date: { gte, lte },
+                ...(dateFilter && { date: dateFilter }),
                 source: "CASH_REGISTER",
             },
             _sum: {
@@ -76,7 +93,7 @@ export async function GET(req: Request) {
         // 5. Total Expenses from Boss
         const expensesBoss = await prisma.expense.aggregate({
             where: {
-                date: { gte, lte },
+                ...(dateFilter && { date: dateFilter }),
                 source: "OWNER_CAPITAL",
             },
             _sum: {

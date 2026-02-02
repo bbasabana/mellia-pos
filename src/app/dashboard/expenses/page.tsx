@@ -5,7 +5,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
     Plus, Filter, Calendar, TrendingUp, TrendingDown,
     ShoppingCart, Wallet, Loader2, DollarSign, X,
-    Edit, Trash2, PieChart, AlertCircle
+    Edit, Trash2, PieChart, AlertCircle, Calculator
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -38,7 +38,7 @@ interface Expense {
 
 export default function ExpensesPage() {
     const [loading, setLoading] = useState(true);
-    const [period, setPeriod] = useState("today");
+    const [period, setPeriod] = useState("all");
     const [summary, setSummary] = useState<Summary | null>(null);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -214,6 +214,7 @@ export default function ExpensesPage() {
                                 onChange={(e) => setPeriod(e.target.value)}
                                 className="bg-transparent border-l border-gray-100 px-3 py-1.5 text-xs font-bold text-gray-800 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
                             >
+                                <option value="all">Toutes</option>
                                 <option value="today">Aujourd&apos;hui</option>
                                 <option value="week">Cette Semaine</option>
                                 <option value="month">Ce Mois</option>
@@ -238,46 +239,132 @@ export default function ExpensesPage() {
                             <Loader2 className="animate-spin text-[#00d3fa]" size={40} />
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <KpiCard
-                                title="Total Ventes (Caisse)"
-                                value={formatCurrency(summary?.totalSales || 0)}
-                                icon={<TrendingUp size={20} />}
-                                color="bg-green-50 text-green-600 border-green-100"
-                            />
-                            <KpiCard
-                                title="Dépenses payées par Caisse"
-                                value={'- ' + formatCurrency(summary?.totalExpenses || 0)}
-                                icon={<TrendingDown size={20} />}
-                                color="bg-red-50 text-red-500 border-red-100"
-                            />
-                            <KpiCard
-                                title="Achats payés par Caisse"
-                                value={'- ' + formatCurrency(summary?.totalPurchases || 0)}
-                                icon={<ShoppingCart size={20} />}
-                                color="bg-orange-50 text-orange-500 border-orange-100"
-                            />
-                            <div className="bg-[#00d3fa] p-4 rounded-sm shadow-md flex flex-col justify-between text-white relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-110 transition-transform">
-                                    <Wallet size={48} />
-                                </div>
-                                <div className="flex justify-between items-start">
-                                    <p className="text-[10px] uppercase font-bold tracking-wider opacity-80">Solde Théorique Caisse</p>
-                                    <button
-                                        onClick={() => { setActualCash(summary?.balance.toString() || "0"); setShowAdjustmentModal(true); }}
-                                        className="text-[8px] font-black uppercase bg-white/20 px-1.5 py-0.5 rounded hover:bg-white/40 transition-colors"
-                                    >
-                                        Ajuster
-                                    </button>
-                                </div>
-                                <p className="text-2xl font-black mt-1 tracking-tight">
-                                    {formatCurrency(summary?.balance || 0)}
-                                </p>
-                                <div className="mt-2 text-[10px] font-medium bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm self-start">
-                                    Total Caisse en FC
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <KpiCard
+                                    title="Total Ventes (Caisse)"
+                                    value={formatCurrency(summary?.totalSales || 0)}
+                                    icon={<TrendingUp size={20} />}
+                                    color="bg-green-50 text-green-600 border-green-100"
+                                />
+                                <KpiCard
+                                    title="Dépenses payées par Caisse"
+                                    value={'- ' + formatCurrency(summary?.totalExpenses || 0)}
+                                    icon={<TrendingDown size={20} />}
+                                    color="bg-red-50 text-red-500 border-red-100"
+                                />
+                                <KpiCard
+                                    title="Achats payés par Caisse"
+                                    value={'- ' + formatCurrency(summary?.totalPurchases || 0)}
+                                    icon={<ShoppingCart size={20} />}
+                                    color="bg-orange-50 text-orange-500 border-orange-100"
+                                />
+                                <div className="bg-[#00d3fa] p-4 rounded-sm shadow-md flex flex-col justify-between text-white relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-110 transition-transform">
+                                        <Wallet size={48} />
+                                    </div>
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-[10px] uppercase font-bold tracking-wider opacity-80">Solde Théorique Caisse</p>
+                                        <button
+                                            onClick={() => { setActualCash(summary?.balance.toString() || "0"); setShowAdjustmentModal(true); }}
+                                            className="text-[8px] font-black uppercase bg-white/20 px-1.5 py-0.5 rounded hover:bg-white/40 transition-colors"
+                                        >
+                                            Ajuster
+                                        </button>
+                                    </div>
+                                    <p className="text-2xl font-black mt-1 tracking-tight">
+                                        {formatCurrency(summary?.balance || 0)}
+                                    </p>
+                                    <div className="mt-2 text-[10px] font-medium bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm self-start">
+                                        Total Caisse en FC
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+
+                            {/* Cash Flow Breakdown */}
+                            <div className="bg-white border border-gray-200 rounded-sm shadow-sm p-6">
+                                <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <Calculator size={16} className="text-[#00d3fa]" />
+                                    Détail du Solde de Caisse
+                                </h3>
+                                
+                                <div className="space-y-3">
+                                    {/* Entries */}
+                                    <div className="bg-green-50 border border-green-100 rounded-sm p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <TrendingUp size={16} className="text-green-600" />
+                                                <span className="text-[10px] uppercase font-bold text-green-600 tracking-wider">Entrées</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-green-700 font-medium">Ventes encaissées (CASH)</span>
+                                            <span className="text-lg font-black text-green-800">{formatCurrency(summary?.totalSales || 0)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Exits */}
+                                    <div className="bg-red-50 border border-red-100 rounded-sm p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <TrendingDown size={16} className="text-red-600" />
+                                                <span className="text-[10px] uppercase font-bold text-red-600 tracking-wider">Sorties</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm text-red-700 font-medium">• Dépenses journalières</span>
+                                                <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalExpenses || 0)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm text-red-700 font-medium">• Achats de stock</span>
+                                                <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalPurchases || 0)}</span>
+                                            </div>
+                                            <div className="border-t border-red-200 pt-2 mt-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs uppercase font-bold text-red-600">Total Sorties</span>
+                                                    <span className="text-lg font-black text-red-800">
+                                                        {formatCurrency((summary?.totalExpenses || 0) + (summary?.totalPurchases || 0))}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Final Balance */}
+                                    <div className="bg-[#00d3fa]/10 border-2 border-[#00d3fa] rounded-sm p-4">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <div className="text-[10px] uppercase font-bold text-[#00d3fa] tracking-wider mb-1">Résultat</div>
+                                                <div className="text-sm font-medium text-gray-700">💵 Argent à la Main (Caisse)</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-2xl font-black text-[#00d3fa]">
+                                                    {formatCurrency(summary?.balance || 0)}
+                                                </div>
+                                                <div className="text-[10px] text-gray-500 font-medium mt-1">
+                                                    {period === "all" ? "Depuis le début" : 
+                                                     period === "today" ? "Aujourd'hui" :
+                                                     period === "week" ? "Cette semaine" :
+                                                     period === "month" ? "Ce mois" : "Cette année"}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Info Box */}
+                                    <div className="bg-blue-50 border border-blue-100 rounded-sm p-3">
+                                        <p className="text-xs text-blue-700 leading-relaxed">
+                                            <strong>📊 Formule:</strong> Solde Caisse = Ventes (CASH) - Dépenses (Caisse) - Achats (Caisse)
+                                            <br />
+                                            <span className="text-[10px] text-blue-600 mt-1 inline-block">
+                                                Les dépenses payées par le Boss et les ventes à crédit ne sont pas déduites du solde caisse.
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
                     )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

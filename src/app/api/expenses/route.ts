@@ -12,35 +12,42 @@ export async function GET(req: Request) {
         }
 
         const { searchParams } = new URL(req.url);
-        const period = searchParams.get("period") || "today"; // today, week, month, year, custom
+        const period = searchParams.get("period") || "all"; // all, today, week, month, year, custom
         const start = searchParams.get("start");
         const end = searchParams.get("end");
 
-        let gte: Date;
-        let lte: Date = new Date();
+        let whereClause: any = {};
 
         const now = new Date();
-        if (period === "today") {
-            gte = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (period === "all") {
+            // No date filter - fetch all expenses
+            whereClause = {};
+        } else if (period === "today") {
+            const gte = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const lte = new Date();
+            whereClause = { date: { gte, lte } };
+        } else if (period === "week") {
+            const gte = new Date(now);
+            gte.setDate(now.getDate() - 7);
+            const lte = new Date();
+            whereClause = { date: { gte, lte } };
         } else if (period === "month") {
-            gte = new Date(now.getFullYear(), now.getMonth(), 1);
+            const gte = new Date(now.getFullYear(), now.getMonth(), 1);
+            const lte = new Date();
+            whereClause = { date: { gte, lte } };
         } else if (period === "year") {
-            gte = new Date(now.getFullYear(), 0, 1);
+            const gte = new Date(now.getFullYear(), 0, 1);
+            const lte = new Date();
+            whereClause = { date: { gte, lte } };
         } else if (period === "custom" && start && end) {
-            gte = new Date(start);
-            lte = new Date(end);
+            const gte = new Date(start);
+            const lte = new Date(end);
             lte.setHours(23, 59, 59, 999);
-        } else {
-            gte = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            whereClause = { date: { gte, lte } };
         }
 
         const expenses = await prisma.expense.findMany({
-            where: {
-                date: {
-                    gte,
-                    lte,
-                },
-            },
+            where: whereClause,
             include: {
                 category: true,
                 user: {
