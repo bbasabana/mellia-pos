@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Save, Trash2, Plus, Minus, Loader2, AlertTriangle, Search, Calculator } from "lucide-react";
+import { X, Save, Trash2, Plus, Minus, Loader2, AlertTriangle, Search, Calculator, Calendar } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
+import { useSession } from "next-auth/react";
 
 interface EditTransactionModalProps {
     isOpen: boolean;
@@ -19,9 +20,13 @@ export default function EditTransactionModal({
     onSuccess,
     exchangeRate
 }: EditTransactionModalProps) {
+    const { data: session } = useSession();
+    const isAdmin = session?.user?.role === "ADMIN";
+
     const [loading, setLoading] = useState(false);
     const [items, setItems] = useState<any[]>([]);
     const [isVisible, setIsVisible] = useState(false);
+    const [customDate, setCustomDate] = useState("");
 
     // Product search state
     const [search, setSearch] = useState("");
@@ -37,6 +42,14 @@ export default function EditTransactionModal({
                 unitPrice: Number(item.unitPrice),
                 unitPriceCdf: Number(item.unitPriceCdf || Math.round(Number(item.unitPrice) * exchangeRate)),
             })));
+            // Initialize date (handling timezone offset for datetime-local input)
+            if (transaction.createdAt) {
+                const date = new Date(transaction.createdAt);
+                // Adjust to local ISO string for input
+                const offset = date.getTimezoneOffset() * 60000;
+                const localISOTime = (new Date(date.getTime() - offset)).toISOString().slice(0, 16);
+                setCustomDate(localISOTime);
+            }
         } else {
             setIsVisible(false);
             setSearch("");
@@ -146,7 +159,8 @@ export default function EditTransactionModal({
                         unitPriceCdf: item.unitPriceCdf,
                         // We need original quantity to calculate stock difference
                         originalQuantity: transaction.items.find((i: any) => i.productId === item.productId)?.quantity || 0
-                    }))
+                    })),
+                    ...(customDate && isAdmin ? { createdAt: new Date(customDate).toISOString() } : {})
                 })
             });
 
@@ -192,6 +206,23 @@ export default function EditTransactionModal({
                         Si vous augmentez une quantité, assurez-vous que le produit est disponible.
                     </p>
                 </div>
+
+                {isAdmin && (
+                    <div className="bg-gray-50 px-6 py-3 border-b border-gray-100 flex items-center gap-4">
+                        <div className="flex-1">
+                            <label className="flex items-center gap-2 text-[10px] font-bold uppercase text-gray-400 tracking-widest mb-1">
+                                <Calendar size={12} />
+                                Date de la transaction
+                            </label>
+                            <input
+                                type="datetime-local"
+                                value={customDate}
+                                onChange={(e) => setCustomDate(e.target.value)}
+                                className="w-full bg-white border border-gray-200 rounded-sm px-3 py-1.5 text-xs outline-none focus:border-orange-500 font-bold text-gray-700"
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {/* Product search */}
                 <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">

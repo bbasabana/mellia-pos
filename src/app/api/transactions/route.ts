@@ -108,7 +108,19 @@ export async function PUT(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { items: incomingItems, status: newStatus, paymentMethod, paymentReference } = body; // List of items with new quantities
+        const { items: incomingItems, status: newStatus, paymentMethod, paymentReference, createdAt } = body; // List of items with new quantities
+
+        // Validate custom date if provided
+        let newDate: Date | undefined;
+        if (createdAt) {
+            if (userRole !== "ADMIN") {
+                return NextResponse.json({ success: false, error: "Seuls les administrateurs peuvent modifier la date" }, { status: 403 });
+            }
+            newDate = new Date(createdAt);
+            if (isNaN(newDate.getTime())) {
+                return NextResponse.json({ success: false, error: "Date invalide" }, { status: 400 });
+            }
+        }
 
         const result = await prisma.$transaction(async (tx) => {
             // Get rate for fallback
@@ -318,7 +330,8 @@ export async function PUT(req: NextRequest) {
                     totalNet: newTotal > 0 ? newTotal : undefined,
                     totalCdf: newTotalCdf > 0 ? Math.round(newTotalCdf) : undefined, // Round total CDF to integer
                     status: newStatus || undefined, // Update status if provided (DRAFT -> COMPLETED)
-                    updatedAt: new Date()
+                    updatedAt: new Date(),
+                    ...(newDate && { createdAt: newDate }), // Update creation date if provided (Admin only)
                 },
                 include: {
                     client: true,
