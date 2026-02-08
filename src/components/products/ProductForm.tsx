@@ -564,7 +564,7 @@ export function ProductForm({
                 onChange={setCost}
                 onCdfChange={setCostCdf}
                 exchangeRate={exchangeRate}
-                initialCdfValue={product?.costs?.[0]?.unitCostCdf}
+                initialCdfValue={product?.costs?.[0]?.unitCostCdf ? parseFloat(product.costs[0].unitCostCdf) : undefined}
                 required
               />
             </div>
