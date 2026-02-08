@@ -273,10 +273,10 @@ function ProductsPageContent() {
                             {vipPrice ? (
                               <div className="flex flex-col">
                                 <span className="text-sm font-bold text-gray-800">
-                                  ${parseFloat(vipPrice.priceUsd).toFixed(2)}
+                                  ${Number(vipPrice.priceUsd).toFixed(2)}
                                 </span>
                                 <span className="text-xs text-gray-500">
-                                  {parseFloat(vipPrice.priceCdf).toLocaleString('fr-FR')} FC
+                                  {Number(vipPrice.priceCdf).toLocaleString('fr-FR')} FC
                                 </span>
                               </div>
                             ) : (
