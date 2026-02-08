@@ -21,7 +21,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { product, prices, measurePrices, halfPlatePrices, cost, exchangeRate } = body;
+    const { product, prices, pricesCdf, measurePrices, halfPlatePrices, cost, costCdf, exchangeRate } = body;
 
     // Update product
     const updatedProduct = await prisma.product.update({
@@ -47,15 +47,20 @@ export async function PUT(
       where: { productId: params.id },
     });
 
-    // Create new prices
+    // Create new prices - use pricesCdf directly if provided to avoid precision loss
     for (const [spaceId, priceUsd] of Object.entries(prices)) {
       if ((priceUsd as number) > 0) {
+        // Use the exact CDF value from frontend if available, otherwise calculate
+        const priceCdf = pricesCdf && pricesCdf[spaceId] 
+          ? pricesCdf[spaceId] 
+          : (priceUsd as number) * exchangeRate;
+        
         await prisma.productPrice.create({
           data: {
             productId: params.id,
             spaceId: spaceId,
             priceUsd: priceUsd as number,
-            priceCdf: (priceUsd as number) * exchangeRate,
+            priceCdf: priceCdf,
             forUnit: product.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE",
           },
         });
@@ -102,11 +107,12 @@ export async function PUT(
     });
 
     if (cost > 0) {
+      const finalCostCdf = costCdf || cost * exchangeRate;
       await prisma.productCost.create({
         data: {
           productId: params.id,
           unitCostUsd: cost,
-          unitCostCdf: cost * exchangeRate,
+          unitCostCdf: finalCostCdf,
           forUnit: product.saleUnit,
         },
       });
@@ -117,7 +123,7 @@ export async function PUT(
           data: {
             productId: params.id,
             unitCostUsd: cost / 2,
-            unitCostCdf: (cost * exchangeRate) / 2,
+            unitCostCdf: finalCostCdf / 2,
             forUnit: "HALF_PLATE",
           },
         });

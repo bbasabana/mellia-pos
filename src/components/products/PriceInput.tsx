@@ -6,35 +6,50 @@ interface PriceInputProps {
   label: string;
   value: number; // USD value (stored in DB)
   onChange: (value: number) => void; // Returns USD value
+  onCdfChange?: (cdfValue: number) => void; // Returns CDF value directly
   exchangeRate: number;
   disabled?: boolean;
   required?: boolean;
-  onCdfChange?: (val: string) => void;
+  initialCdfValue?: number; // Optional: pass the exact CDF value from DB to avoid reconversion
 }
 
 export function PriceInput({
   label,
   value,
   onChange,
+  onCdfChange,
   exchangeRate,
   disabled = false,
   required = false,
+  initialCdfValue,
 }: PriceInputProps) {
   // CDF is now the primary input, USD is calculated
-  const [cdfValue, setCdfValue] = useState((value * exchangeRate).toFixed(0));
+  // Use initialCdfValue if provided (from DB), otherwise calculate from USD
+  const [cdfValue, setCdfValue] = useState(
+    initialCdfValue !== undefined 
+      ? initialCdfValue.toFixed(0)
+      : (value * exchangeRate).toFixed(0)
+  );
   const usdValue = (parseFloat(cdfValue || "0") / exchangeRate).toFixed(2);
 
   useEffect(() => {
     // When value prop changes (from parent), update CDF display
-    // Only update if the calculated CDF from prop significantly differs to avoid loop due to rounding
-    const currentCdf = parseFloat(cdfValue || "0");
-    const newCdf = value * exchangeRate;
-
-    // Allow small variance for float math, but basically if parent changes huge (like init) update
-    if (Math.abs(currentCdf - newCdf) > 1) {
-      setCdfValue(newCdf.toFixed(0));
+    // BUT: if initialCdfValue was provided, trust it and don't recalculate
+    // This prevents the 3000 -> 2992 issue
+    if (initialCdfValue !== undefined) {
+      // Use the exact CDF value from DB
+      setCdfValue(initialCdfValue.toFixed(0));
+    } else {
+      // Calculate from USD (for new products or when CDF not available)
+      const currentCdf = parseFloat(cdfValue || "0");
+      const newCdf = value * exchangeRate;
+      
+      // Allow small variance for float math
+      if (Math.abs(currentCdf - newCdf) > 1) {
+        setCdfValue(newCdf.toFixed(0));
+      }
     }
-  }, [value, exchangeRate, cdfValue]);
+  }, [value, exchangeRate, initialCdfValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newCdfValue = e.target.value;
@@ -44,8 +59,15 @@ export function PriceInput({
       // Calculate USD and send to parent
       const usdNum = cdfNum / exchangeRate;
       onChange(usdNum);
+      // IMPORTANT: Also send the exact CDF value to avoid precision loss
+      if (onCdfChange) {
+        onCdfChange(cdfNum);
+      }
     } else {
       onChange(0);
+      if (onCdfChange) {
+        onCdfChange(0);
+      }
     }
   };
 

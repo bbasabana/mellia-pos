@@ -60,7 +60,7 @@ export function ProductForm({
   const [purchaseUnit, setPurchaseUnit] = useState(product?.purchaseUnit || "");
   const [packingQuantity, setPackingQuantity] = useState(product?.packingQuantity || 1);
 
-  // Prices state (per space)
+  // Prices state (per space) - Store both USD and CDF to avoid reconversion issues
   const [prices, setPrices] = useState<Record<string, number>>(
     spaces.reduce((acc, space) => {
       const existingPrice = product?.prices?.find(
@@ -68,6 +68,19 @@ export function ProductForm({
       );
       acc[space.id] = existingPrice
         ? parseFloat(existingPrice.priceUsd)
+        : 0;
+      return acc;
+    }, {} as Record<string, number>)
+  );
+
+  // Store CDF prices separately to preserve exact values entered by user
+  const [pricesCdf, setPricesCdf] = useState<Record<string, number>>(
+    spaces.reduce((acc, space) => {
+      const existingPrice = product?.prices?.find(
+        (p: any) => p.spaceId === space.id && p.forUnit === (product?.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE")
+      );
+      acc[space.id] = existingPrice
+        ? parseFloat(existingPrice.priceCdf)
         : 0;
       return acc;
     }, {} as Record<string, number>)
@@ -102,6 +115,9 @@ export function ProductForm({
   // Cost state
   const [cost, setCost] = useState(
     product?.costs?.[0] ? parseFloat(product.costs[0].unitCostUsd) : 0
+  );
+  const [costCdf, setCostCdf] = useState<number>(
+    product?.costs?.[0] ? parseFloat(product.costs[0].unitCostCdf) : 0
   );
 
   // Enable measure pricing for whisky
@@ -212,9 +228,11 @@ export function ProductForm({
         body: JSON.stringify({
           product: productData,
           prices,
+          pricesCdf, // Send CDF prices directly to preserve exact values
           measurePrices: enableMeasurePrice ? measurePrices : null,
           halfPlatePrices: enableHalfPlate ? halfPlatePrices : null,
           cost,
+          costCdf, // Send CDF cost directly to preserve exact values
           exchangeRate,
         }),
       });
@@ -544,7 +562,9 @@ export function ProductForm({
                 label="Coût d'achat par unité"
                 value={cost}
                 onChange={setCost}
+                onCdfChange={setCostCdf}
                 exchangeRate={exchangeRate}
+                initialCdfValue={product?.costs?.[0]?.unitCostCdf}
                 required
               />
             </div>
@@ -566,7 +586,15 @@ export function ProductForm({
                     onChange={(value) =>
                       setPrices((prev) => ({ ...prev, [space.id]: value }))
                     }
+                    onCdfChange={(cdfValue) =>
+                      setPricesCdf((prev) => ({ ...prev, [space.id]: cdfValue }))
+                    }
                     exchangeRate={exchangeRate}
+                    initialCdfValue={product?.prices?.find(
+                      (p: any) => p.spaceId === space.id && p.forUnit === (product?.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE")
+                    )?.priceCdf ? parseFloat(product.prices.find(
+                      (p: any) => p.spaceId === space.id && p.forUnit === (product?.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE")
+                    ).priceCdf) : undefined}
                     required
                   />
 

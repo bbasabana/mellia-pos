@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { product, prices, measurePrices, halfPlatePrices, cost, exchangeRate } = body;
+    const { product, prices, pricesCdf, measurePrices, halfPlatePrices, cost, costCdf, exchangeRate } = body;
 
     // Create product
     const newProduct = await prisma.product.create({
@@ -131,15 +131,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Create prices for each space
+    // Create prices for each space - use pricesCdf directly to avoid precision loss
     for (const [spaceId, priceUsd] of Object.entries(prices)) {
       if ((priceUsd as number) > 0) {
+        // Use the exact CDF value from frontend if available, otherwise calculate
+        const priceCdf = pricesCdf && pricesCdf[spaceId] 
+          ? pricesCdf[spaceId] 
+          : (priceUsd as number) * exchangeRate;
+        
         await prisma.productPrice.create({
           data: {
             productId: newProduct.id,
             spaceId: spaceId,
             priceUsd: priceUsd as number,
-            priceCdf: (priceUsd as number) * exchangeRate,
+            priceCdf: priceCdf,
             forUnit: product.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE",
           },
         });
@@ -180,13 +185,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create cost
+    // Create cost - use costCdf directly if provided to avoid precision loss
     if (cost > 0) {
+      const finalCostCdf = costCdf || cost * exchangeRate;
       await prisma.productCost.create({
         data: {
           productId: newProduct.id,
           unitCostUsd: cost,
-          unitCostCdf: cost * exchangeRate,
+          unitCostCdf: finalCostCdf,
           forUnit: product.saleUnit, // FIX: Use the actual sale unit
         },
       });
@@ -197,7 +203,7 @@ export async function POST(request: NextRequest) {
           data: {
             productId: newProduct.id,
             unitCostUsd: cost / 2,
-            unitCostCdf: (cost * exchangeRate) / 2,
+            unitCostCdf: finalCostCdf / 2,
             forUnit: "HALF_PLATE",
           },
         });
