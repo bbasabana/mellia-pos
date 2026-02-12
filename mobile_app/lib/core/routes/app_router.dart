@@ -40,7 +40,7 @@ GoRouter appRouter(AppRouterRef ref) {
       }
 
       // Role Based initial landing
-      if (user!.role == 'KITCHEN' && state.uri.toString() == '/') {
+      if (user.role == 'KITCHEN' && state.uri.toString() == '/') {
         return '/kitchen';
       }
 

@@ -120,8 +120,9 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
                         initialItemCount: _displayedItems.length,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         itemBuilder: (context, index, animation) {
-                          if (index >= _displayedItems.length)
+                          if (index >= _displayedItems.length) {
                             return const SizedBox();
+                          }
                           return _buildItem(_displayedItems[index], animation);
                         },
                       ),
@@ -546,11 +547,12 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
                     await notifier.saveDraft();
                     ref.invalidate(draftsNotifierProvider);
                     notifier.clearCart();
-                    if (mounted)
+                    if (mounted) {
                       NotificationService.showInfo(
                         context,
                         "Mise en attente synchronisée.",
                       );
+                    }
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 18),

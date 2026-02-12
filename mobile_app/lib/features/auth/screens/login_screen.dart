@@ -103,8 +103,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       prefixIcon: Icons.email_outlined,
                       validator: (value) {
-                        if (value == null || value.isEmpty)
+                        if (value == null || value.isEmpty) {
                           return 'Email requis';
+                        }
                         return null;
                       },
                     ),
@@ -130,8 +131,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         },
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty)
+                        if (value == null || value.isEmpty) {
                           return 'Mot de passe requis';
+                        }
                         return null;
                       },
                     ),

@@ -92,7 +92,7 @@ class PrinterService extends _$PrinterService {
     required Map<String, dynamic> saleData,
     String? cashierName,
   }) async {
-    final bool? isConnected = await PrintBluetoothThermal.connectionStatus;
+    final bool isConnected = await PrintBluetoothThermal.connectionStatus;
     if (isConnected != true) {
       throw Exception("Imprimante non connectée");
     }

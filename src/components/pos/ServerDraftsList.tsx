@@ -89,9 +89,9 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
     const totalDraftsValueCdf = drafts.reduce((acc, curr) => acc + Number((curr as any).totalCdf || 0), 0);
 
     return (
-        <div className="space-y-3">
-            <div className="flex items-center justify-between px-2">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+        <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                     Brouillons ({drafts.length})
                 </h3>
                 <button
@@ -99,32 +99,34 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
                     className={`p-1 text-gray-400 hover:text-blue-600 transition-colors ${loading ? 'animate-spin' : ''}`}
                     title="Actualiser"
                 >
-                    <RefreshCw size={14} />
+                    <RefreshCw size={13} />
                 </button>
             </div>
 
             {/* TOTAL SUMMARY CARD */}
             {drafts.length > 0 && (
-                <div className="bg-orange-50 border border-orange-100 rounded-sm p-3 mx-1">
-                    <p className="text-[10px] text-orange-600 font-bold uppercase mb-1">Total en attente</p>
-                    <div className="flex items-end justify-between">
-                        <span className="text-orange-900 font-black text-lg">
-                            {totalDraftsValueCdf.toLocaleString()} FC
-                        </span>
-                        <span className="text-xs text-orange-500 font-medium">
-                            ${totalDraftsValue.toFixed(2)}
-                        </span>
+                <div className="bg-orange-50 border border-orange-100 rounded-sm p-2 mx-1">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-orange-600 font-bold uppercase">Total brouillons</p>
+                        <div className="text-right">
+                            <span className="text-orange-900 font-black text-sm block">
+                                {totalDraftsValueCdf.toLocaleString()} FC
+                            </span>
+                            <span className="text-[10px] text-orange-500 font-medium">
+                                ${totalDraftsValue.toFixed(2)}
+                            </span>
+                        </div>
                     </div>
                 </div>
             )}
 
             {drafts.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 bg-gray-50/50 rounded-sm mx-1 border border-dashed border-gray-200">
-                    <FileText className="mx-auto mb-2 opacity-30" size={32} />
-                    <p className="text-xs">Aucun brouillon en cours</p>
+                <div className="text-center py-4 text-gray-400 bg-gray-50/50 rounded-sm mx-1 border border-dashed border-gray-200">
+                    <FileText className="mx-auto mb-1.5 opacity-30" size={24} />
+                    <p className="text-xs">Aucun brouillon</p>
                 </div>
             ) : (
-                <div className="space-y-2 overflow-y-auto max-h-[40vh] px-1 scrollbar-thin scrollbar-thumb-gray-200">
+                <div className="space-y-2 overflow-y-auto max-h-[20vh] px-1 scrollbar-thin scrollbar-thumb-gray-200">
                     {drafts.map((draft) => {
                         const itemCount = draft.items.reduce((sum: number, item: any) => sum + Number(item.quantity), 0);
                         const createdDate = new Date(draft.createdAt);
@@ -132,68 +134,64 @@ export default function ServerDraftsList({ onLoad }: ServerDraftsListProps) {
                         return (
                             <div
                                 key={draft.id}
-                                className={`bg-white border rounded-sm p-3 transition-all cursor-pointer group hover:shadow-md
+                                onClick={() => currentDraftId !== draft.id && onLoad(draft)}
+                                className={`bg-white border rounded-sm p-2.5 transition-all cursor-pointer group hover:shadow-md
                                     ${currentDraftId === draft.id ? 'border-green-500 ring-1 ring-green-500 bg-green-50/30' : 'border-gray-200 hover:border-blue-300'}
                                 `}
                             >
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex-1">
+                                <div className="flex justify-between items-start mb-1.5">
+                                    <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-bold text-gray-800 text-sm">
+                                            <span className="font-bold text-gray-800 text-xs truncate">
                                                 {draft.ticketNum}
                                             </span>
                                             {currentDraftId === draft.id && (
-                                                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase">
+                                                <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">
                                                     Actif
                                                 </span>
                                             )}
                                         </div>
 
-                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                        <div className="flex items-center gap-2 text-[11px] text-gray-500">
                                             <div className="flex items-center gap-1" title={draft.orderType}>
                                                 {getOrderTypeIcon(draft.orderType)}
                                             </div>
                                             <span>•</span>
-                                            <span>{itemCount} article{itemCount > 1 ? 's' : ''}</span>
+                                            <span>{itemCount} art.</span>
                                         </div>
                                         {draft.client && (
-                                            <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
-                                                <User size={12} />
-                                                <span>{draft.client.name}</span>
+                                            <div className="flex items-center gap-1 text-[11px] text-blue-600 mt-0.5 truncate">
+                                                <User size={11} />
+                                                <span className="truncate">{draft.client.name}</span>
                                             </div>
                                         )}
                                     </div>
-                                    <button
-                                        onClick={(e) => handleDeleteClick(draft.id, e)}
-                                        className="p-1.5 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                        title="Supprimer"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
+                                    <div className="flex items-start gap-1 shrink-0">
+                                        <div className="text-right">
+                                            <span className="block font-bold text-gray-800 text-xs">
+                                                {Number((draft as any).totalCdf).toLocaleString()} FC
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={(e) => handleDeleteClick(draft.id, e)}
+                                            className="p-1 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Supprimer"
+                                        >
+                                            <Trash2 size={13} />
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-1">
-                                    <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                                <div className="flex items-center justify-between text-[10px] text-gray-400">
+                                    <div className="flex items-center gap-1">
                                         <Clock size={10} />
                                         <span>{createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                     </div>
-
-                                    <div className="text-right">
-                                        <span className="block font-bold text-gray-800 text-sm">
-                                            {Number((draft as any).totalCdf).toLocaleString()} FC
+                                    {currentDraftId !== draft.id && (
+                                        <span className="text-blue-600 font-bold">
+                                            Cliquer pour charger
                                         </span>
-                                        <span className="block text-[10px] text-gray-400 font-bold uppercase">
-                                            ${Number(draft.totalBrut).toFixed(2)}
-                                        </span>
-                                        {currentDraftId !== draft.id && (
-                                            <button
-                                                onClick={() => onLoad(draft)}
-                                                className="mt-1 text-[10px] font-bold text-blue-600 hover:underline"
-                                            >
-                                                Charger
-                                            </button>
-                                        )}
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         );

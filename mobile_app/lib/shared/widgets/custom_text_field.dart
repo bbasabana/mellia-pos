@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
 
 class CustomTextField extends StatelessWidget {
   final String label;

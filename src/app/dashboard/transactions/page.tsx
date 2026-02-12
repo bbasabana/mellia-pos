@@ -135,70 +135,76 @@ export default function TransactionsPage() {
         <DashboardLayout>
             <div className="flex flex-col h-full bg-gray-50/50">
                 {/* HEADER */}
-                <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-10 shadow-sm">
-                    <div>
-                        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <Receipt className="text-green-600" />
-                            Historique des Ventes
-                        </h1>
-                        <p className="text-sm text-gray-500">Consultez les ventes validées et payées</p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                        {/* Search */}
-                        <div className="relative group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#00d3fa] transition-colors" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Numéro ticket, client..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-sm text-sm outline-none focus:border-[#00d3fa] focus:ring-1 focus:ring-[#00d3fa]/20 transition-all w-64"
-                            />
+                <div className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 sticky top-0 z-10 shadow-sm">
+                    <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-2">
+                                    <Receipt className="text-green-600" size={20} />
+                                    <span className="hidden sm:inline">Historique des Ventes</span>
+                                    <span className="sm:hidden">Ventes</span>
+                                </h1>
+                                <p className="text-xs md:text-sm text-gray-500 hidden sm:block">Consultez les ventes validées et payées</p>
+                            </div>
                         </div>
 
-                        {/* Date Filters */}
-                        <div className="flex items-center gap-2 bg-white p-1 rounded-sm border border-gray-200 shadow-sm">
-                            <Calendar size={14} className="ml-2 text-gray-400" />
-                            <input
-                                type="date"
-                                value={dateRange.start}
-                                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                                className="bg-transparent border-none text-xs font-bold text-gray-800 outline-none p-1 cursor-pointer"
-                            />
-                            <span className="text-gray-300">/</span>
-                            <input
-                                type="date"
-                                value={dateRange.end}
-                                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                                className="bg-transparent border-none text-xs font-bold text-gray-800 outline-none p-1 cursor-pointer"
-                            />
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                            {/* Search */}
+                            <div className="relative group flex-1 sm:flex-initial">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#00d3fa] transition-colors" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Numéro ticket, client..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg md:rounded-sm text-sm outline-none focus:border-[#00d3fa] focus:ring-1 focus:ring-[#00d3fa]/20 transition-all"
+                                />
+                            </div>
+
+                            {/* Date Filters */}
+                            <div className="flex items-center gap-2 bg-gray-50 sm:bg-white p-2 sm:p-1 rounded-lg sm:rounded-sm border border-gray-200 shadow-sm">
+                                <Calendar size={14} className="ml-1 sm:ml-2 text-gray-400" />
+                                <input
+                                    type="date"
+                                    value={dateRange.start}
+                                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                                    className="bg-transparent border-none text-xs font-bold text-gray-800 outline-none p-1 cursor-pointer flex-1 sm:flex-initial"
+                                />
+                                <span className="text-gray-300">/</span>
+                                <input
+                                    type="date"
+                                    value={dateRange.end}
+                                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                                    className="bg-transparent border-none text-xs font-bold text-gray-800 outline-none p-1 cursor-pointer flex-1 sm:flex-initial"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6 space-y-6">
+                <div className="flex-1 overflow-auto p-3 md:p-6 space-y-4 md:space-y-6">
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="bg-white p-5 border border-gray-200 rounded-sm shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                        <div className="bg-white p-4 md:p-5 border border-gray-200 rounded-lg md:rounded-sm shadow-sm">
                             <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Total Ventes (Période)</p>
-                            <p className="text-2xl font-black text-gray-900 leading-none">
+                            <p className="text-xl md:text-2xl font-black text-gray-900 leading-none">
                                 {summary.totalCdf.toLocaleString()} <span className="text-xs font-bold opacity-50">FC</span>
                             </p>
                         </div>
-                        <div className="bg-white p-5 border border-gray-200 rounded-sm shadow-sm">
+                        <div className="bg-white p-4 md:p-5 border border-gray-200 rounded-lg md:rounded-sm shadow-sm">
                             <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Total en Dollars</p>
-                            <p className="text-2xl font-black text-green-600 leading-none">
+                            <p className="text-xl md:text-2xl font-black text-green-600 leading-none">
                                 {summary.totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-bold opacity-50">$</span>
                             </p>
                         </div>
-                        <div className="bg-gray-900 p-5 rounded-sm shadow-md text-white flex flex-col justify-center">
+                        <div className="bg-gray-900 p-4 md:p-5 rounded-lg md:rounded-sm shadow-md text-white flex flex-col justify-center sm:col-span-2 lg:col-span-1">
                             <p className="text-[10px] uppercase font-black tracking-widest opacity-60">Nombre d&apos;opérations</p>
-                            <p className="text-2xl font-black">{transactions.length > 0 ? (transactions.length + (page - 1) * 10).toLocaleString() : 0}</p>
+                            <p className="text-xl md:text-2xl font-black">{transactions.length > 0 ? (transactions.length + (page - 1) * 10).toLocaleString() : 0}</p>
                         </div>
                     </div>
 
-                    <div className="bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm">
+                    {/* Desktop Table View - Hidden on Mobile */}
+                    <div className="hidden md:block bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm">
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase font-bold tracking-wider">
                                 <tr>
@@ -306,20 +312,142 @@ export default function TransactionsPage() {
                         </table>
                     </div>
 
+                    {/* Mobile Card View - Visible on Mobile Only */}
+                    <div className="md:hidden space-y-3">
+                        {loading ? (
+                            <div className="text-center py-20">
+                                <div className="flex flex-col items-center gap-3">
+                                    <Loader2 className="animate-spin text-[#00d3fa]" size={32} />
+                                    <span className="text-sm font-medium text-gray-500">Chargement...</span>
+                                </div>
+                            </div>
+                        ) : transactions.length === 0 ? (
+                            <div className="text-center py-20">
+                                <div className="flex flex-col items-center gap-2 text-gray-400">
+                                    <Search size={40} strokeWidth={1.5} />
+                                    <p className="text-sm italic">Aucune transaction trouvée</p>
+                                </div>
+                            </div>
+                        ) : (
+                            transactions.map((tx) => (
+                                <div key={tx.id} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                                    {/* Card Header */}
+                                    <div className="bg-gradient-to-r from-gray-50 to-white px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                                        <div className="flex-1">
+                                            <div className="font-black text-gray-900 text-base">#{tx.ticketNum}</div>
+                                            <div className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">
+                                                {format(new Date(tx.createdAt), "dd MMM yyyy • HH:mm", { locale: fr })}
+                                            </div>
+                                        </div>
+                                        <div className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider ${
+                                            tx.status === "COMPLETED" ? "bg-green-50 text-green-600 border border-green-200" :
+                                            tx.status === "CANCELLED" ? "bg-red-50 text-red-600 border border-red-200" :
+                                            "bg-orange-50 text-orange-600 border border-orange-200"
+                                        }`}>
+                                            {tx.status}
+                                        </div>
+                                    </div>
+
+                                    {/* Card Content */}
+                                    <div className="px-4 py-3 space-y-3">
+                                        {/* Client Info */}
+                                        <div className="flex items-start gap-2">
+                                            <div className="bg-blue-50 p-2 rounded-lg">
+                                                <Receipt className="text-blue-600" size={16} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Client</div>
+                                                <div className="font-bold text-gray-900 text-sm truncate">{tx.client?.name || "Client de passage"}</div>
+                                                {tx.client?.phone && <div className="text-xs text-gray-500">{tx.client.phone}</div>}
+                                            </div>
+                                        </div>
+
+                                        {/* Items List */}
+                                        <div>
+                                            <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2">Articles</div>
+                                            <div className="space-y-1.5">
+                                                {tx.items?.map((item: any, idx: number) => (
+                                                    <div key={idx} className="flex items-center justify-between text-xs bg-gray-50 px-2 py-1.5 rounded">
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                            <span className="bg-white px-1.5 py-0.5 rounded font-bold text-[10px] text-gray-600 border border-gray-200">
+                                                                x{item.quantity}
+                                                            </span>
+                                                            <span className="text-gray-700 font-medium truncate">
+                                                                {JSON.parse(JSON.stringify(item.product?.name || "Produit"))}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Total & Cashier */}
+                                        <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Total</div>
+                                                <div className="font-black text-gray-900 text-lg leading-tight">
+                                                    {Number(tx.totalCdf) > 0
+                                                        ? Number(tx.totalCdf).toLocaleString()
+                                                        : Math.round(Number(tx.totalNet) * rate).toLocaleString()
+                                                    } <span className="text-xs opacity-60">FC</span>
+                                                </div>
+                                                <div className="text-xs text-gray-500 font-medium">
+                                                    ${Number(tx.totalNet).toFixed(2)} USD
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Caissier</div>
+                                                <div className="text-sm font-bold text-gray-700">{tx.user?.name.split(" ")[0]}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
+                                        <button
+                                            onClick={() => triggerPrint(tx)}
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-100 transition-all border border-gray-200"
+                                        >
+                                            <Printer size={14} /> Imprimer
+                                        </button>
+                                        {tx.status !== "CANCELLED" && isAdmin && (
+                                            <>
+                                                <button
+                                                    onClick={() => openEditModal(tx)}
+                                                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 transition-all border border-blue-200"
+                                                >
+                                                    <Edit size={14} /> Modifier
+                                                </button>
+                                                <button
+                                                    onClick={() => confirmDelete(tx.id)}
+                                                    className="p-2.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all border border-red-200"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
                     {/* Pagination */}
-                    <div className="flex justify-center items-center gap-4 mt-6">
+                    <div className="flex justify-center items-center gap-3 md:gap-4 mt-4 md:mt-6 pb-4 md:pb-0">
                         <button
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            className="p-2 border border-gray-200 rounded-full hover:bg-gray-100 disabled:opacity-50"
+                            className="p-2 md:p-2.5 border border-gray-200 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                             <ArrowLeft size={16} />
                         </button>
-                        <span className="text-sm font-bold text-gray-600">Page {page} / {totalPages}</span>
+                        <span className="text-xs md:text-sm font-bold text-gray-600 px-2">
+                            Page {page} / {totalPages}
+                        </span>
                         <button
                             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}
-                            className="p-2 border border-gray-200 rounded-full hover:bg-gray-100 disabled:opacity-50"
+                            className="p-2 md:p-2.5 border border-gray-200 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                             <ArrowRight size={16} />
                         </button>
