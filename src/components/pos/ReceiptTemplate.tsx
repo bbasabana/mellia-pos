@@ -23,8 +23,8 @@ export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: R
         backgroundColor: "white",
         color: "black",
         fontFamily: "'Courier New', Courier, monospace",
-        fontSize: "12px",
-        lineHeight: "1.2",
+        fontSize: "14px",
+        lineHeight: "1.3",
     };
 
     const separator = "------------------------------------------";
@@ -34,50 +34,56 @@ export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: R
         return rounded.toString();
     };
 
+    // Truncate long product names for better display
+    const truncateName = (name: string, maxLength: number = 28) => {
+        if (name.length <= maxLength) return name;
+        return name.substring(0, maxLength - 3) + "...";
+    };
+
     return (
         <div id="receipt-print-area" style={containerStyle} className="print-only">
             {/* Header */}
-            <div style={{ textAlign: "center", marginBottom: "10px" }}>
-                <h1 style={{ fontSize: "16px", fontWeight: "bold", margin: "0" }}>MELLIA RESTO & BAR</h1>
-                <p style={{ margin: "2px 0", fontSize: "10px" }}>Avenue Pumbu, Gombe, Kinshasa</p>
-                <p style={{ margin: "2px 0", fontSize: "10px" }}>Tel: +243 81 000 0000</p>
+            <div style={{ textAlign: "center", marginBottom: "12px" }}>
+                <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "0", letterSpacing: "1px" }}>MELLIA RESTO</h1>
+                <p style={{ margin: "4px 0", fontSize: "13px", fontStyle: "italic" }}>Mangez comme chez vous</p>
+                <p style={{ margin: "3px 0", fontSize: "12px" }}>10, ByPass, Selembao, Kinshasa</p>
             </div>
 
-            <div style={{ textAlign: "center", marginBottom: "5px" }}>
+            <div style={{ textAlign: "center", marginBottom: "8px" }}>
                 <p>{separator}</p>
-                <p style={{ fontWeight: "bold" }}>TICKET: {sale?.ticketNum}</p>
-                <p>{sale?.createdAt ? format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm", { locale: fr }) : ""}</p>
+                <p style={{ fontWeight: "bold", fontSize: "15px" }}>TICKET: {sale?.ticketNum}</p>
+                <p style={{ fontSize: "13px" }}>{sale?.createdAt ? format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm", { locale: fr }) : ""}</p>
                 <p>{separator}</p>
             </div>
 
             {/* Info */}
-            <div style={{ marginBottom: "5px", fontSize: "11px" }}>
-                <p>Caissier: {sale?.user?.name || "..."}</p>
-                {sale?.client && <p>Client: {sale.client.name}</p>}
-                <p>Espace: {sale?.orderType === "DINE_IN" ? "Sur Place" : (sale?.orderType || "...")}</p>
+            <div style={{ marginBottom: "8px", fontSize: "13px" }}>
+                <p style={{ wordWrap: "break-word", overflow: "hidden" }}>Caissier: {truncateName(sale?.user?.name || "...", 25)}</p>
+                {sale?.client && <p style={{ wordWrap: "break-word", overflow: "hidden" }}>Client: {truncateName(sale.client.name, 25)}</p>}
+                <p>Espace: {sale?.orderType === "DINE_IN" ? "Sur Place" : sale?.orderType === "DELIVERY" ? "Livraison" : sale?.orderType === "TAKEAWAY" ? "À Emporter" : (sale?.orderType || "...")}</p>
             </div>
 
             <p>{separator}</p>
 
             {/* Items */}
-            <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
+            <table style={{ width: "100%", fontSize: "13px", borderCollapse: "collapse" }}>
                 <thead>
                     <tr style={{ textAlign: "left" }}>
-                        <th style={{ paddingBottom: "5px" }}>Qte x Article</th>
-                        <th style={{ textAlign: "right", paddingBottom: "5px" }}>Total</th>
+                        <th style={{ paddingBottom: "6px", fontSize: "14px" }}>Qte x Article</th>
+                        <th style={{ textAlign: "right", paddingBottom: "6px", fontSize: "14px" }}>Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     {sale?.items?.map((item) => (
                         <tr key={item.id}>
-                            <td style={{ paddingBottom: "2px" }}>
-                                {Number(item.quantity)} x {item.product?.name || "???"}
+                            <td style={{ paddingBottom: "4px", wordWrap: "break-word", maxWidth: "60%" }}>
+                                {Number(item.quantity)} x {truncateName(item.product?.name || "???", 22)}
                                 <br />
-                                <span style={{ fontSize: "10px", color: "#444" }}>
+                                <span style={{ fontSize: "11px", color: "#444" }}>
                                     @{Math.round(Number(item.unitPriceCdf)).toLocaleString()} FC
                                 </span>
                             </td>
-                            <td style={{ textAlign: "right", verticalAlign: "top" }}>
+                            <td style={{ textAlign: "right", verticalAlign: "top", fontSize: "14px", fontWeight: "bold" }}>
                                 {(Math.round(Number(item.unitPriceCdf)) * Number(item.quantity)).toLocaleString()}
                             </td>
                         </tr>
@@ -88,34 +94,34 @@ export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: R
             <p>{separator}</p>
 
             {/* Totals */}
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginBottom: "2px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", marginBottom: "4px", fontSize: "16px" }}>
                 <span>TOTAL A PAYER:</span>
                 <span>{Math.round(Number(sale?.totalCdf || 0)).toLocaleString()} FC</span>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#666", marginBottom: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "12px" }}>
                 <span>(Ref USD: ${formatUsd(Number(sale.totalNet))})</span>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "12px" }}>
                 <span>Mode de paiement:</span>
-                <span>{formatPaymentMethod(sale?.paymentMethod || "")}</span>
+                <span style={{ fontWeight: "bold" }}>{formatPaymentMethod(sale?.paymentMethod || "")}</span>
             </div>
 
             {/* Loyalty */}
             {sale?.client && (
-                <div style={{ border: "1px dashed black", padding: "5px", marginBottom: "10px", textAlign: "center", fontSize: "10px" }}>
-                    <p style={{ margin: "0", fontWeight: "bold" }}>FIDELITE MELLIA</p>
-                    <p style={{ margin: "2px 0" }}>Points gagnés: +{sale?.pointsEarned || 0}</p>
-                    <p style={{ margin: "0" }}>SOLDE ACTUEL: {sale.client.points} pts</p>
+                <div style={{ border: "1px dashed black", padding: "6px", marginBottom: "12px", textAlign: "center", fontSize: "12px" }}>
+                    <p style={{ margin: "0", fontWeight: "bold", fontSize: "13px" }}>FIDELITE MELLIA</p>
+                    <p style={{ margin: "3px 0" }}>Points gagnés: +{sale?.pointsEarned || 0}</p>
+                    <p style={{ margin: "0", fontWeight: "bold" }}>SOLDE ACTUEL: {sale.client.points} pts</p>
                 </div>
             )}
 
             {/* Footer */}
-            <div style={{ textAlign: "center", marginTop: "15px", fontSize: "10px" }}>
-                <p>Merci de votre visite !</p>
-                <p>A bientôt chez Mellia.</p>
-                <p style={{ marginTop: "10px" }}>Logiciel: MelliaPOS v1.0</p>
+            <div style={{ textAlign: "center", marginTop: "15px", fontSize: "12px" }}>
+                <p style={{ fontWeight: "bold", fontSize: "14px" }}>Merci de votre visite !</p>
+                <p>A bientôt chez Mellia Resto.</p>
+                <p style={{ marginTop: "10px", fontSize: "11px" }}>Logiciel: MelliaPOS v1.0</p>
             </div>
             <style jsx global>{`
                 @media print {
