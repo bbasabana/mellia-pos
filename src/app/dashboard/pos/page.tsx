@@ -545,33 +545,35 @@ const ProductGrid = () => {
         <div className="flex flex-col h-full bg-gray-50/50">
 
             {/* Header POS */}
-            <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
-                <div>
-                    <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                        <Store className="text-[#00d3fa]" />
-                        Point de Vente
+            <div className="bg-white px-3 md:px-6 py-3 md:py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
+                <div className="flex-1 min-w-0">
+                    <h1 className="text-base md:text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <Store className="text-[#00d3fa]" size={18} />
+                        <span className="hidden sm:inline">Point de Vente</span>
+                        <span className="sm:hidden">POS</span>
                     </h1>
-                    <p className="text-xs text-gray-500">Caisse et prise de commande</p>
+                    <p className="text-[10px] md:text-xs text-gray-500 hidden sm:block">Caisse et prise de commande</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                     <a
                         href="/pos-light"
-                        className="flex items-center gap-2 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-sm text-xs font-bold border border-orange-200 hover:bg-orange-200 transition-all"
+                        className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg md:rounded-sm text-[10px] md:text-xs font-bold border border-orange-200 hover:bg-orange-200 transition-all"
                     >
-                        <ShoppingBag size={14} />
-                        Mode POS Light (Petit Écran)
+                        <ShoppingBag size={12} className="md:w-[14px] md:h-[14px]" />
+                        <span className="hidden sm:inline">Mode POS Light</span>
+                        <span className="sm:hidden">Light</span>
                     </a>
                 </div>
             </div>
 
             {/* Category Filter */}
-            <div className="flex items-center gap-2 px-6 py-3 overflow-x-auto pb-2 shrink-0 border-b border-gray-200 bg-white">
-                <Filter size={14} className="text-gray-400 shrink-0 mr-1" />
+            <div className="flex items-center gap-2 px-3 md:px-6 py-2 md:py-3 overflow-x-auto pb-2 shrink-0 border-b border-gray-200 bg-white scrollbar-thin scrollbar-thumb-gray-200">
+                <Filter size={12} className="text-gray-400 shrink-0 mr-0 md:mr-1" />
                 {categories.map((cat: any) => (
                     <button
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
-                        className={`px-4 py-2 rounded-sm text-xs font-bold whitespace-nowrap transition-all border ${activeCategory === cat
+                        className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-sm text-[10px] md:text-xs font-bold whitespace-nowrap transition-all border ${activeCategory === cat
                             ? "bg-gray-800 text-white border-gray-800 shadow-md"
                             : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                             }`}
@@ -582,8 +584,8 @@ const ProductGrid = () => {
             </div>
 
             {/* Product Grid */}
-            <div className="flex-1 overflow-y-auto p-3 md:p-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3">
+            <div className="flex-1 overflow-y-auto p-2 md:p-3 lg:p-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3">
                     {filtered.map((product) => {
                         const stock = getProductStock(product);
                         const isOutOfStock = stock <= 0;
@@ -594,27 +596,27 @@ const ProductGrid = () => {
                                 key={product.id}
                                 onClick={() => handleProductClick(product)}
                                 disabled={isOutOfStock}
-                                className={`flex flex-col items-center p-3 bg-white border border-gray-200 rounded-sm shadow-sm transition-all relative overflow-hidden group text-left
+                                className={`flex flex-col items-center p-2 md:p-3 bg-white border border-gray-200 rounded-lg md:rounded-sm shadow-sm transition-all relative overflow-hidden group text-left
                                     ${isOutOfStock ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:shadow-lg hover:border-[#00d3fa] active:scale-[0.98]'}
                                 `}
                             >
                                 {/* Stock Badge */}
-                                <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-sm text-[9px] font-bold uppercase tracking-wider ${isOutOfStock ? 'bg-red-50 text-red-600' :
+                                <div className={`absolute top-1 md:top-2 right-1 md:right-2 px-1.5 md:px-2 py-0.5 rounded text-[8px] md:text-[9px] font-bold uppercase tracking-wider ${isOutOfStock ? 'bg-red-50 text-red-600' :
                                     isLowStock ? 'bg-orange-50 text-orange-600' :
                                         'bg-green-50 text-green-600'
                                     }`}>
-                                    {isOutOfStock ? 'Épuisé' : `${stock} dispo`}
+                                    {isOutOfStock ? 'Épuisé' : `${stock}`}
                                 </div>
 
-                                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3 text-blue-600 group-hover:bg-[#00d3fa] group-hover:text-white transition-colors duration-300">
-                                    <span className="font-black text-lg">{product.name.charAt(0)}</span>
+                                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-50 flex items-center justify-center mb-2 md:mb-3 text-blue-600 group-hover:bg-[#00d3fa] group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <span className="font-black text-base md:text-lg">{product.name.charAt(0)}</span>
                                 </div>
 
-                                <span className="font-bold text-gray-800 text-center text-sm leading-tight mb-2 line-clamp-2 h-10 flex items-center justify-center w-full">
+                                <span className="font-bold text-gray-800 text-center text-xs md:text-sm leading-tight mb-1.5 md:mb-2 line-clamp-2 h-8 md:h-10 flex items-center justify-center w-full">
                                     {product.name}
                                 </span>
 
-                                <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded-sm w-full text-center group-hover:bg-gray-100 transition-colors">
+                                <span className="text-[10px] md:text-xs font-medium text-gray-500 bg-gray-50 px-1.5 md:px-2 py-0.5 md:py-1 rounded text-center w-full group-hover:bg-gray-100 transition-colors truncate">
                                     {product.prices?.length > 1
                                         ? `${product.prices.length} choix`
                                         : product.prices?.[0]?.priceCdf
@@ -696,11 +698,11 @@ export default function PosPage() {
                     {/* FAB for Mobile Cart */}
                     <button
                         onClick={() => setIsMobileCartOpen(true)}
-                        className="md:hidden absolute bottom-6 right-6 w-14 h-14 bg-[#000] text-white rounded-full shadow-xl flex items-center justify-center z-40 transition-transform active:scale-95"
+                        className="md:hidden fixed bottom-5 right-4 w-14 h-14 bg-black text-white rounded-full shadow-2xl flex items-center justify-center z-40 transition-all active:scale-90 hover:shadow-3xl border-2 border-white"
                     >
-                        <ShoppingCart size={24} />
+                        <ShoppingCart size={22} strokeWidth={2.5} />
                         {cart.length > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-white">
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] font-black px-2 py-1 rounded-full border-2 border-white shadow-lg min-w-[24px] flex items-center justify-center">
                                 {cart.length}
                             </span>
                         )}
