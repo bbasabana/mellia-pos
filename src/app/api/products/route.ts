@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/audit";
+import { cache } from "@/lib/cache";
+
+const PRODUCT_CACHE_KEY = "products:vendable";
+const PRODUCT_CACHE_TTL = 30_000; // 30 seconds
 
 // GET all products
 export async function GET(request: NextRequest) {
@@ -21,46 +25,41 @@ export async function GET(request: NextRequest) {
     let products;
 
     if (vendableOnly) {
-      products = await prisma.product.findMany({
-        where: {
-          ...(activeOnly && { active: true }),
-          vendable: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          beverageCategory: true,
-          foodCategory: true,
-          size: true, // Needed for POS logic
-          saleUnit: true,
-          active: true,
-          // Relations needed for POS only
-          prices: {
-            select: {
-              id: true,
-              priceUsd: true,
-              priceCdf: true,
-              forUnit: true,
-              space: {
-                select: {
-                  id: true,
-                  name: true,
+      products = await cache.get(
+        PRODUCT_CACHE_KEY,
+        () => prisma.product.findMany({
+          where: {
+            ...(activeOnly && { active: true }),
+            vendable: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            beverageCategory: true,
+            foodCategory: true,
+            size: true,
+            saleUnit: true,
+            active: true,
+            prices: {
+              select: {
+                id: true,
+                priceUsd: true,
+                priceCdf: true,
+                forUnit: true,
+                space: {
+                  select: { id: true, name: true },
                 },
               },
             },
+            stockItems: {
+              select: { location: true, quantity: true },
+            },
           },
-          stockItems: {
-            select: {
-              location: true,
-              quantity: true
-            }
-          },
-        },
-        orderBy: {
-          name: "asc",
-        },
-      });
+          orderBy: { name: "asc" },
+        }),
+        PRODUCT_CACHE_TTL
+      );
     } else {
       // Full data for Admin / Management
       products = await prisma.product.findMany({
@@ -135,10 +134,10 @@ export async function POST(request: NextRequest) {
     for (const [spaceId, priceUsd] of Object.entries(prices)) {
       if ((priceUsd as number) > 0) {
         // Use the exact CDF value from frontend if available, otherwise calculate
-        const priceCdf = pricesCdf && pricesCdf[spaceId] 
-          ? pricesCdf[spaceId] 
+        const priceCdf = pricesCdf && pricesCdf[spaceId]
+          ? pricesCdf[spaceId]
           : (priceUsd as number) * exchangeRate;
-        
+
         await prisma.productPrice.create({
           data: {
             productId: newProduct.id,
@@ -209,6 +208,9 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    // Bust product cache whenever a new product is created
+    cache.invalidate(PRODUCT_CACHE_KEY);
 
     // Audit log
     await createAuditLog({

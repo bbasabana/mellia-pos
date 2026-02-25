@@ -103,7 +103,6 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid data: Missing totalAmount or Items" }, { status: 400 });
         }
 
-        // Transaction: Create Investment + Stock Movements + Update StockItems
         const result = await prisma.$transaction(async (tx) => {
             let vendableTotalCdf = 0;
             let expectedRevenueCdf = 0;
@@ -271,7 +270,7 @@ export async function POST(req: Request) {
             }
 
             return investment;
-        });
+        }, { timeout: 30_000, maxWait: 10_000 });
 
         return NextResponse.json({ success: true, data: result });
 
@@ -476,7 +475,7 @@ export async function PUT(req: Request) {
             }
 
             return investment;
-        });
+        }, { timeout: 30_000, maxWait: 10_000 });
 
         return NextResponse.json({ success: true, data: result });
     } catch (error) {
@@ -525,7 +524,7 @@ export async function DELETE(req: Request) {
             // Ideally schema has onDelete: Cascade, but safe to delete movements explicitly
             await tx.stockMovement.deleteMany({ where: { investmentId: id } });
             await tx.investment.delete({ where: { id } });
-        });
+        }, { timeout: 30_000, maxWait: 10_000 });
 
         return NextResponse.json({ success: true });
 
