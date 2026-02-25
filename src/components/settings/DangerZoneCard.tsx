@@ -66,7 +66,10 @@ export function DangerZoneCard() {
                         </div>
 
                         <button
-                            onClick={() => setIsModalOpen(true)}
+                            onClick={() => {
+                                console.log("🔘 Reset button clicked");
+                                setIsModalOpen(true);
+                            }}
                             className="flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white font-bold rounded hover:bg-red-700 transition-all shadow-lg shadow-red-200 active:scale-95 whitespace-nowrap"
                         >
                             <RefreshCcw size={18} />
@@ -100,7 +103,7 @@ export function DangerZoneCard() {
                         <input
                             type="text"
                             value={confirmationText}
-                            onChange={(e) => setConfirmationText(e.target.value.toUpperCase())}
+                            onChange={(e) => setConfirmationText(e.target.value.trim().toUpperCase())}
                             disabled={isResetting}
                             placeholder="Tapez EFFACER ici"
                             className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-red-500 focus:ring-0 outline-none transition-colors text-center font-bold tracking-widest uppercase"
