@@ -2,6 +2,7 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ExchangeRateCard } from "@/components/settings/ExchangeRateCard";
+import { DangerZoneCard } from "@/components/settings/DangerZoneCard";
 import { AccountSettingsCard } from "@/components/settings/AccountSettingsCard";
 import { Settings, Tag, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -26,7 +27,7 @@ export default function SettingsPage() {
                 <div className="flex-1 p-8">
                     <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
                         {/* LEFT COLUMN (8 cols) */}
-                        <div className="md:col-span-8 space-y-6">
+                        <div className="md:col-span-8 space-y-8">
 
                             {/* Account Section */}
                             <section>
@@ -54,6 +55,11 @@ export default function SettingsPage() {
                                         <ChevronRight className="text-gray-300 group-hover:text-gray-500" size={20} />
                                     </Link>
                                 </div>
+                            </section>
+
+                            {/* Danger Zone */}
+                            <section className="pt-4">
+                                <DangerZoneCard />
                             </section>
                         </div>
 

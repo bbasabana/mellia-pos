@@ -21,6 +21,7 @@ export type AuditAction =
   | "STOCK_ADJUSTMENT"
   | "CREATE_LOSS"
   | "UPDATE_LOSS"
+  | "SYSTEM_RESET"
   | "CREATE"
   | "UPDATE"
   | "DELETE";
