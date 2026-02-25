@@ -88,7 +88,7 @@ export function DangerZoneCard() {
                         <div>
                             <p className="text-sm font-bold text-red-800">Attention : action irréversible</p>
                             <p className="text-xs text-red-700 mt-1">
-                                Toutes les données de vente, d'inventaire et les statistiques financières seront définitivement effacées.
+                                Toutes les données de vente, d&apos;inventaire et les statistiques financières seront définitivement effacées.
                             </p>
                         </div>
                     </div>
