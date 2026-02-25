@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
         }
 
         // Transaction to ensure data integrity
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prismaUnpooled.$transaction(async (tx) => {
             // 1. Create StockMovement Log
             const movement = await tx.stockMovement.create({
                 data: {

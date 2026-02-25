@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 
@@ -125,7 +125,7 @@ export async function PUT(req: Request) {
         if (!sessionId || !counts) return NextResponse.json({ error: "Missing data" }, { status: 400 });
 
         // Calculate Variance and Update
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prismaUnpooled.$transaction(async (tx) => {
             let totalVarianceValue = 0;
 
             for (const count of counts) {

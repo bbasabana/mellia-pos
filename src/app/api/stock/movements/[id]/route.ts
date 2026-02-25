@@ -1,6 +1,6 @@
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 
@@ -21,7 +21,7 @@ export async function DELETE(
         const movementId = params.id;
 
         // Transaction: Revert stock -> Delete movement
-        await prisma.$transaction(async (tx) => {
+        await prismaUnpooled.$transaction(async (tx) => {
             // 1. Get the movement
             const movement = await tx.stockMovement.findUnique({
                 where: { id: movementId }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
@@ -122,7 +122,7 @@ export async function PUT(req: NextRequest) {
             }
         }
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prismaUnpooled.$transaction(async (tx) => {
             // Get rate for fallback
             const rateObj = await tx.exchangeRate.findFirst({ where: { active: true }, orderBy: { effectiveDate: "desc" } });
             const rate = rateObj ? Number(rateObj.rateUsdToCdf) : 2800;
@@ -374,7 +374,7 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ success: false, error: "ID manquant" }, { status: 400 });
         }
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prismaUnpooled.$transaction(async (tx) => {
             // 1. Get Sale with items
             const sale = await tx.sale.findUnique({
                 where: { id },

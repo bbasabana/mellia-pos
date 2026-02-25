@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { deductStock } from "@/lib/stock-service";
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         }
 
         // Start Transaction with increased timeout
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prismaUnpooled.$transaction(async (tx) => {
             let totalBrut = 0;
             let totalCost = 0;
             let totalCdf = 0;

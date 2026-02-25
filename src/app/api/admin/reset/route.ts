@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
         // Perform reset in a transaction with an extended timeout (30 seconds)
         // because deleting large amounts of data on a serverless DB can be slow.
-        await prisma.$transaction(async (tx) => {
+        await prismaUnpooled.$transaction(async (tx) => {
             // 1. Clear Sales related data
             await tx.saleItem.deleteMany({});
             await tx.kitchenOrder.deleteMany({});

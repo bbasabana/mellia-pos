@@ -1,6 +1,6 @@
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
         }
 
         // 3. Create Payroll Record
-        const payroll = await prisma.$transaction(async (tx) => {
+        const payroll = await prismaUnpooled.$transaction(async (tx) => {
             const pr = await tx.payroll.create({
                 data: {
                     userId,

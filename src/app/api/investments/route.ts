@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { FundSource, StockLocation } from "@prisma/client";
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid data: Missing totalAmount or Items" }, { status: 400 });
         }
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prismaUnpooled.$transaction(async (tx) => {
             let vendableTotalCdf = 0;
             let expectedRevenueCdf = 0;
             let expectedRevenueVipCdf = 0;
@@ -299,7 +299,7 @@ export async function PUT(req: Request) {
             return NextResponse.json({ error: "Invalid data" }, { status: 400 });
         }
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prismaUnpooled.$transaction(async (tx) => {
             // 1. REVERSE OLD STOCK Changes
             const oldMovements = await tx.stockMovement.findMany({
                 where: { investmentId: id }
@@ -503,7 +503,7 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: "Investment not found" }, { status: 404 });
         }
 
-        await prisma.$transaction(async (tx) => {
+        await prismaUnpooled.$transaction(async (tx) => {
             // 1. Get movements to reverse
             const movements = await tx.stockMovement.findMany({
                 where: { investmentId: id }
