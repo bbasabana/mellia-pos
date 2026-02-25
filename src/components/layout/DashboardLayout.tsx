@@ -38,12 +38,6 @@ const menuItems = [
     roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
-    label: "POS Light (Optimisé)",
-    href: "/pos-light",
-    icon: ShoppingBag,
-    roles: ["ADMIN", "MANAGER", "CASHIER"],
-  },
-  {
     label: "Stock",
     href: "/dashboard/stock",
     icon: Package,

@@ -281,33 +281,31 @@ model StockMovement {
 }
 
 model Investment {
-  id                String          @id @default(cuid())
-  date              DateTime        @default(now())
-  source            FundSource      @default(OWNER_CAPITAL)
-  totalAmount       Decimal         @db.Decimal(12, 2)
-  vendableAmount    Decimal         @db.Decimal(12, 2)
-  nonVendableAmount Decimal         @db.Decimal(12, 2)
-  expectedRevenue   Decimal         @db.Decimal(12, 2)
-  expectedProfit    Decimal         @db.Decimal(12, 2)
-  expectedRevenueVip Decimal?        @db.Decimal(12, 2)
-  expectedProfitVip  Decimal?        @db.Decimal(12, 2)
-  description       String?
-  userId            String
-  createdAt         DateTime        @default(now())
-  exchangeRate      Decimal?        @db.Decimal(10, 2)
-  totalAmountCdf    Decimal?        @db.Decimal(15, 2)
-  
-  // CDF Source of Truth Fields
-  vendableAmountCdf Decimal?        @db.Decimal(15, 2)
-  nonVendableAmountCdf Decimal?     @db.Decimal(15, 2)
-  expectedRevenueCdf Decimal?       @db.Decimal(15, 2)
-  expectedProfitCdf  Decimal?       @db.Decimal(15, 2)
-  expectedRevenueVipCdf Decimal?    @db.Decimal(15, 2)
-  expectedProfitVipCdf  Decimal?    @db.Decimal(15, 2)
-  transportFeeCdf   Decimal?        @db.Decimal(15, 2)
-  transportFee      Decimal?        @db.Decimal(10, 2)
-  user              User            @relation(fields: [userId], references: [id])
-  movements         StockMovement[]
+  id                    String          @id @default(cuid())
+  date                  DateTime        @default(now())
+  source                FundSource      @default(OWNER_CAPITAL)
+  totalAmount           Decimal         @db.Decimal(12, 2)
+  vendableAmount        Decimal         @db.Decimal(12, 2)
+  nonVendableAmount     Decimal         @db.Decimal(12, 2)
+  expectedRevenue       Decimal         @db.Decimal(12, 2)
+  expectedProfit        Decimal         @db.Decimal(12, 2)
+  description           String?
+  userId                String
+  createdAt             DateTime        @default(now())
+  exchangeRate          Decimal?        @db.Decimal(10, 2)
+  totalAmountCdf        Decimal?        @db.Decimal(15, 2)
+  transportFee          Decimal?        @db.Decimal(10, 2)
+  expectedProfitCdf     Decimal?        @db.Decimal(15, 2)
+  expectedProfitVip     Decimal?        @db.Decimal(12, 2)
+  expectedProfitVipCdf  Decimal?        @db.Decimal(15, 2)
+  expectedRevenueCdf    Decimal?        @db.Decimal(15, 2)
+  expectedRevenueVip    Decimal?        @db.Decimal(12, 2)
+  expectedRevenueVipCdf Decimal?        @db.Decimal(15, 2)
+  nonVendableAmountCdf  Decimal?        @db.Decimal(15, 2)
+  transportFeeCdf       Decimal?        @db.Decimal(15, 2)
+  vendableAmountCdf     Decimal?        @db.Decimal(15, 2)
+  user                  User            @relation(fields: [userId], references: [id])
+  movements             StockMovement[]
 
   @@index([date])
   @@index([source])

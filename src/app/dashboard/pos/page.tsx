@@ -555,14 +555,6 @@ const ProductGrid = () => {
                     <p className="text-[10px] md:text-xs text-gray-500 hidden sm:block">Caisse et prise de commande</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                    <a
-                        href="/pos-light"
-                        className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg md:rounded-sm text-[10px] md:text-xs font-bold border border-orange-200 hover:bg-orange-200 transition-all"
-                    >
-                        <ShoppingBag size={12} className="md:w-[14px] md:h-[14px]" />
-                        <span className="hidden sm:inline">Mode POS Light</span>
-                        <span className="sm:hidden">Light</span>
-                    </a>
                 </div>
             </div>
 
@@ -659,18 +651,6 @@ export default function PosPage() {
         };
         fetchRate();
 
-        // Auto-detect small landscape height (standard for POS with 10" and reduced height)
-        const isSmallLandscape = window.innerHeight < 600 && window.innerWidth > 800;
-        if (isSmallLandscape) {
-            const hasNotified = localStorage.getItem('pos_light_suggestion_dismissed');
-            if (!hasNotified) {
-                if (confirm("Votre écran semble petit. Souhaitez-vous passer en mode 'POS Web Light' optimisé ?")) {
-                    window.location.href = "/pos-light";
-                } else {
-                    localStorage.setItem('pos_light_suggestion_dismissed', 'true');
-                }
-            }
-        }
     }, []);
 
     // Printing Logic
