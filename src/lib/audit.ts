@@ -41,6 +41,9 @@ export async function createAuditLog({
   entityId,
   metadata,
 }: CreateAuditLogParams) {
+  // Skip silently if no userId (unauthenticated calls or stale sessions).
+  if (!userId) return;
+
   try {
     await prisma.auditLog.create({
       data: {
@@ -51,9 +54,12 @@ export async function createAuditLog({
         metadata: metadata || null,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    // P2003 = Foreign key constraint - user no longer exists (e.g. DB reset with stale session).
+    // Swallow this silently; the operation itself succeeded so don't pollute logs.
+    if (error?.code === "P2003") return;
     console.error("Failed to create audit log:", error);
-    // Don't throw - audit logging should never break the app
+    // Never throw - audit logging should never break the app
   }
 }
 

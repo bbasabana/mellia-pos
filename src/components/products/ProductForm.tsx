@@ -35,6 +35,9 @@ export function ProductForm({
   const [productTypes, setProductTypes] = useState<any[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
 
+  // Live exchange rate - initialized from DB via prop, editable by user for this session
+  const [currentRate, setCurrentRate] = useState(exchangeRate);
+
   // Form state
   const [name, setName] = useState(product?.name || "");
   const [type, setType] = useState<string>(product?.type || "");
@@ -549,9 +552,31 @@ export function ProductForm({
         {vendable && !isNonVendable && (
           <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
             <div className="flex justify-between items-center mb-6 border-b pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Prix & Marges</h3>
-              <div className="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">
-                Taux: 1 USD = {exchangeRate.toLocaleString()} FC
+              <h3 className="text-lg font-semibold text-gray-900">Prix &amp; Marges</h3>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="text-gray-400 text-xs font-medium">1 USD =</span>
+                <input
+                  type="number"
+                  value={currentRate}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val) && val > 0) setCurrentRate(val);
+                  }}
+                  className="w-24 text-center font-bold text-gray-800 border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-[#00d3fa] focus:border-[#00d3fa] outline-none"
+                  min="1"
+                  step="50"
+                />
+                <span className="text-gray-400 text-xs font-medium">FC</span>
+                {currentRate !== exchangeRate && (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentRate(exchangeRate)}
+                    className="text-[10px] text-orange-500 border border-orange-200 px-1.5 py-0.5 rounded hover:bg-orange-50"
+                    title="Réinitialiser au taux du système"
+                  >
+                    Reset ({exchangeRate.toLocaleString()})
+                  </button>
+                )}
               </div>
             </div>
 
@@ -563,7 +588,7 @@ export function ProductForm({
                 value={cost}
                 onChange={setCost}
                 onCdfChange={setCostCdf}
-                exchangeRate={exchangeRate}
+                exchangeRate={currentRate}
                 initialCdfValue={product?.costs?.[0]?.unitCostCdf ? parseFloat(product.costs[0].unitCostCdf) : undefined}
                 required
               />
@@ -589,7 +614,7 @@ export function ProductForm({
                     onCdfChange={(cdfValue) =>
                       setPricesCdf((prev) => ({ ...prev, [space.id]: cdfValue }))
                     }
-                    exchangeRate={exchangeRate}
+                    exchangeRate={currentRate}
                     initialCdfValue={product?.prices?.find(
                       (p: any) => p.spaceId === space.id && p.forUnit === (product?.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE")
                     )?.priceCdf ? parseFloat(product.prices.find(
@@ -658,7 +683,7 @@ export function ProductForm({
                             [space.id]: value,
                           }))
                         }
-                        exchangeRate={exchangeRate}
+                        exchangeRate={currentRate}
                       />
                     ))}
                   </div>
@@ -697,7 +722,7 @@ export function ProductForm({
                               [space.id]: value,
                             }))
                           }
-                          exchangeRate={exchangeRate}
+                          exchangeRate={currentRate}
                         />
                         {/* Margin preview for half plate */}
                         <div className="flex justify-between px-2">

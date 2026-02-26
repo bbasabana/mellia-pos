@@ -558,8 +558,11 @@ enum SaleUnit {
   HALF_PLATE
   MEASURE
   PIECE
+  KG
+  LITER
+  BOX
+  PACK
 }
-
 enum Currency {
   CDF
   USD

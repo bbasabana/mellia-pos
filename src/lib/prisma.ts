@@ -13,17 +13,20 @@ const globalForPrisma = globalThis as unknown as {
   prismaUnpooled: PrismaClient | undefined;
 };
 
-const logLevel: ("error" | "warn" | "info" | "query")[] =
-  process.env.NODE_ENV === "development"
-    ? ["error", "warn"]
-    : ["error"];
+// In development only log errors/warnings. Never log queries — they produce
+// duplicate output when the middleware pattern is also used.
+const logLevel: ("error" | "warn" | "info" | "query")[] = ["error"];
 
-// Pooled client — use for all non-transactional reads/writes
+// Pooled client — use for all non-transactional reads/writes.
+// The global singleton pattern prevents creating a new client (and a new
+// connection pool) on every hot-module reload in development.
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({ log: logLevel });
 
-// Unpooled (direct) client — use exclusively for prisma.$transaction()
+// Unpooled (direct) client — use exclusively for prisma.$transaction().
+// PgBouncer in transaction-pooling mode does not support interactive
+// transactions (BEGIN/COMMIT), so transactions must bypass the pooler.
 export const prismaUnpooled =
   globalForPrisma.prismaUnpooled ??
   new PrismaClient({
@@ -35,22 +38,8 @@ export const prismaUnpooled =
     },
   });
 
-// Extend pooled client with query performance monitoring in development
-if (process.env.NODE_ENV === "development") {
-  prisma.$use(async (params, next) => {
-    const before = Date.now();
-    const result = await next(params);
-    const duration = Date.now() - before;
-    if (duration > 100) {
-      console.warn(`⚠️  Slow query: ${params.model}.${params.action} took ${duration}ms`);
-    }
-    return result;
-  });
-}
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-  globalForPrisma.prismaUnpooled = prismaUnpooled;
-}
+// Cache on globalThis so HMR reloads reuse the same client (and pool).
+globalForPrisma.prisma = prisma;
+globalForPrisma.prismaUnpooled = prismaUnpooled;
 
 export default prisma;
