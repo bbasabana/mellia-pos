@@ -3,6 +3,9 @@ import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 
+// Helper: sleep for ms milliseconds
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // GET: Fetch all stock items grouped by product (Matrix View)
 export async function GET() {
     try {
@@ -10,16 +13,31 @@ export async function GET() {
         if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         // Fetch products with their stock items
-        const products = await prisma.product.findMany({
-            where: { active: true },
-            include: {
-                stockItems: true,
-                costs: true // To calculate value
-            },
-            orderBy: { name: 'asc' }
-        });
+        // Retry up to 2 times to handle transient Neon cold-start connection errors
+        let products;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                products = await prisma.product.findMany({
+                    where: { active: true },
+                    include: {
+                        stockItems: true,
+                        costs: true // To calculate value
+                    },
+                    orderBy: { name: 'asc' }
+                });
+                break; // success — exit retry loop
+            } catch (err: any) {
+                if (attempt < 3) {
+                    console.warn(`Stock GET attempt ${attempt} failed, retrying in 1s...`, err.message);
+                    await sleep(1000);
+                } else {
+                    throw err; // exhausted retries
+                }
+            }
+        }
 
         // Transform into a matrix format for the UI
+        products = products!;
         const stockMatrix = products.map(p => {
             try {
                 const depot = p.stockItems.find(i => i.location === "DEPOT")?.quantity.toNumber() || 0;
@@ -100,6 +118,8 @@ export async function POST(req: Request) {
         }
 
         // Transaction to ensure data integrity
+        // Use a 15s timeout — Neon direct connections can be slow on cold starts.
+        // Default is 5s which is too tight for multi-step stock transactions.
         const result = await prismaUnpooled.$transaction(async (tx) => {
             // 1. Create StockMovement Log
             const movement = await tx.stockMovement.create({
@@ -145,7 +165,7 @@ export async function POST(req: Request) {
             }
 
             return movement;
-        });
+        }, { timeout: 15000 });
 
         return NextResponse.json({ success: true, data: result });
 
