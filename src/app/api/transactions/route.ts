@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
         const query = searchParams.get("query") || "";
         const startDate = searchParams.get("startDate");
         const endDate = searchParams.get("endDate");
+        const period = searchParams.get("period");
         const status = searchParams.get("status") || "COMPLETED"; // Default to COMPLETED
 
         const skip = (page - 1) * limit;
@@ -28,7 +29,29 @@ export async function GET(req: NextRequest) {
             ];
         }
 
-        if (startDate && endDate) {
+        // Date Filtering Logic
+        if (period && period !== "all") {
+            const now = new Date();
+            let start: Date;
+            if (period === "day") {
+                start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (period === "3days") {
+                start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+                start.setHours(0, 0, 0, 0);
+            } else if (period === "week") {
+                const day = now.getDay();
+                const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+                start = new Date(now.setDate(diff));
+                start.setHours(0, 0, 0, 0);
+            } else if (period === "month") {
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+            } else if (period === "year") {
+                start = new Date(now.getFullYear(), 0, 1);
+            } else {
+                start = new Date(0); // Fallback
+            }
+            where.createdAt = { gte: start };
+        } else if (startDate && endDate) {
             where.createdAt = {
                 gte: new Date(startDate),
                 lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),

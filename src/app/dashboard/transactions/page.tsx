@@ -23,6 +23,7 @@ export default function TransactionsPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [search, setSearch] = useState("");
     const [dateRange, setDateRange] = useState({ start: "", end: "" });
+    const [period, setPeriod] = useState("day");
 
     // Modals State
     const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
@@ -61,6 +62,7 @@ export default function TransactionsPage() {
                 page: page.toString(),
                 limit: "10",
                 query: search,
+                period: period,
             });
             if (dateRange.start) params.append("startDate", dateRange.start);
             if (dateRange.end) params.append("endDate", dateRange.end);
@@ -78,7 +80,7 @@ export default function TransactionsPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, search, dateRange]);
+    }, [page, search, dateRange, period]);
 
     // Auto-refresh polling (every 10 seconds)
     useEffect(() => {
@@ -162,21 +164,55 @@ export default function TransactionsPage() {
                             </div>
 
                             {/* Date Filters */}
-                            <div className="flex items-center gap-2 bg-gray-50 sm:bg-white p-2 sm:p-1 rounded-lg sm:rounded-sm border border-gray-200 shadow-sm">
-                                <Calendar size={14} className="ml-1 sm:ml-2 text-gray-400" />
-                                <input
-                                    type="date"
-                                    value={dateRange.start}
-                                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                                    className="bg-transparent border-none text-xs font-bold text-gray-800 outline-none p-1 cursor-pointer flex-1 sm:flex-initial"
-                                />
-                                <span className="text-gray-300">/</span>
-                                <input
-                                    type="date"
-                                    value={dateRange.end}
-                                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                                    className="bg-transparent border-none text-xs font-bold text-gray-800 outline-none p-1 cursor-pointer flex-1 sm:flex-initial"
-                                />
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex bg-gray-100 p-1 rounded-lg sm:rounded-sm shadow-sm overflow-x-auto whitespace-nowrap scrollbar-hide">
+                                    {[
+                                        { id: 'day', label: 'Auj.' },
+                                        { id: '3days', label: '3 Jours' },
+                                        { id: 'week', label: 'Semaine' },
+                                        { id: 'month', label: 'Mois' },
+                                        { id: 'year', label: 'Année' },
+                                        { id: 'all', label: 'Tout' }
+                                    ].map((p) => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => {
+                                                setPeriod(p.id);
+                                                setDateRange({ start: "", end: "" });
+                                            }}
+                                            className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-md transition-all ${
+                                                period === p.id 
+                                                    ? "bg-white text-[#71de00] shadow-sm" 
+                                                    : "text-gray-400 hover:text-gray-600"
+                                            }`}
+                                        >
+                                            {p.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-center gap-2 bg-gray-50 sm:bg-white p-2 sm:p-1 rounded-lg sm:rounded-sm border border-gray-200 shadow-sm">
+                                    <Calendar size={14} className="ml-1 sm:ml-2 text-gray-400" />
+                                    <input
+                                        type="date"
+                                        value={dateRange.start}
+                                        onChange={(e) => {
+                                            setDateRange({ ...dateRange, start: e.target.value });
+                                            setPeriod("");
+                                        }}
+                                        className="bg-transparent border-none text-xs font-bold text-gray-800 outline-none p-1 cursor-pointer flex-1 sm:flex-initial"
+                                    />
+                                    <span className="text-gray-300">/</span>
+                                    <input
+                                        type="date"
+                                        value={dateRange.end}
+                                        onChange={(e) => {
+                                            setDateRange({ ...dateRange, end: e.target.value });
+                                            setPeriod("");
+                                        }}
+                                        className="bg-transparent border-none text-xs font-bold text-gray-800 outline-none p-1 cursor-pointer flex-1 sm:flex-initial"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -186,7 +222,16 @@ export default function TransactionsPage() {
                     {/* Summary Stats */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                         <div className="bg-white p-4 md:p-5 border border-gray-200 rounded-lg md:rounded-sm shadow-sm">
-                            <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Total Ventes (Période)</p>
+                            <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">
+                                Ventes ({
+                                    period === 'day' ? "Aujourd'hui" :
+                                    period === '3days' ? "3 Jours" :
+                                    period === 'week' ? "Cette Semaine" :
+                                    period === 'month' ? "Ce Mois" :
+                                    period === 'year' ? "Cette Année" :
+                                    period === 'all' ? "Toutes" : "Période"
+                                })
+                            </p>
                             <p className="text-xl md:text-2xl font-black text-gray-900 leading-none">
                                 {summary.totalCdf.toLocaleString()} <span className="text-xs font-bold opacity-50">FC</span>
                             </p>

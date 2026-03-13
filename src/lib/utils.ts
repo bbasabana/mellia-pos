@@ -22,6 +22,14 @@ export function formatDate(date: Date): string {
   }).format(date);
 }
 
+export function formatDateUTC(date: Date): string {
+  return new Intl.DateTimeFormat("fr-CD", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 export function calculateLoyaltyPoints(amount: number): number {
   // 1 point = 20,000 FC
   return Math.floor(amount / 20000);

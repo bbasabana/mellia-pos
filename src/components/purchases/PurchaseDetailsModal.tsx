@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal } from "@/components/ui/Modal";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateUTC } from "@/lib/utils";
 import { Package, MapPin, Hash, User, Calendar } from "lucide-react";
 
 interface PurchaseDetailsModalProps {
@@ -22,7 +22,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                         <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Date</p>
                         <div className="flex items-center gap-2 text-sm text-gray-700">
                             <Calendar size={14} className="text-gray-400" />
-                            {formatDate(new Date(investment.date))}
+                            {formatDateUTC(new Date(investment.date))}
                         </div>
                     </div>
                     <div>

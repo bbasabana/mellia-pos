@@ -12,6 +12,7 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url);
         const id = searchParams.get("id");
+        const period = searchParams.get("period") || "month"; // day, week, month, year, all
 
         if (id) {
             const investment = await prisma.investment.findUnique({
@@ -37,19 +38,36 @@ export async function GET(req: Request) {
             return NextResponse.json({ success: true, data: investment });
         }
 
-        // 1. Get recent investments
+        // 0. Calculate Date Filter & Other Periods for Analytics
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfWeek = new Date(now);
+        const dayOfWeek = now.getDay();
+        const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        startOfWeek.setDate(diffToMonday);
+        startOfWeek.setHours(0, 0, 0, 0);
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+        let startDate: Date | undefined;
+        if (period === "day") startDate = startOfDay;
+        else if (period === "week") startDate = startOfWeek;
+        else if (period === "month") startDate = startOfMonth;
+        else if (period === "year") startDate = startOfYear;
+
+        const whereClause = startDate ? { date: { gte: startDate } } : {};
+
+        // 1. Get investments with filtering
         const investments = await prisma.investment.findMany({
-            take: 20,
+            where: whereClause,
+            take: period === "all" ? 100 : 50,
             orderBy: { date: 'desc' },
             include: { user: { select: { name: true } } }
         });
 
-        // 2. Calculate Aggregates (Month)
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        const monthlyInvestments = await prisma.investment.aggregate({
-            where: { date: { gte: startOfMonth } },
+        // 2. Calculate Aggregates for the selected period
+        const periodInvestments = await prisma.investment.aggregate({
+            where: whereClause,
             _sum: {
                 totalAmount: true,
                 expectedProfit: true,
@@ -58,15 +76,68 @@ export async function GET(req: Request) {
             }
         });
 
+        // 3. Analytics: Top Purchased Items (Frequency)
+        // We look at StockMovements of type IN that are linked to an Investment
+        const topMovements = await prisma.stockMovement.groupBy({
+            by: ['productId'],
+            where: {
+                type: 'IN',
+                investmentId: { not: null },
+                // Use a reasonable base period to find "top" candidates (e.g., this month or all time)
+                // Let's use the selected period if provided, otherwise the current month
+                createdAt: { gte: startDate || startOfMonth },
+            },
+            _count: {
+                productId: true
+            },
+            orderBy: {
+                _count: {
+                    productId: 'desc'
+                }
+            },
+            take: 10
+        });
+
+        // Fetch product names and multi-period counts for these top items
+        const topItems = await Promise.all(topMovements.map(async (m) => {
+            const product = await prisma.product.findUnique({
+                where: { id: m.productId },
+                select: { name: true, saleUnit: true }
+            });
+
+            // Calculate counts for other periods
+            const [countDay, countWeek, countMonth, countYear] = await Promise.all([
+                prisma.stockMovement.count({ where: { productId: m.productId, type: 'IN', investmentId: { not: null }, createdAt: { gte: startOfDay } } }),
+                prisma.stockMovement.count({ where: { productId: m.productId, type: 'IN', investmentId: { not: null }, createdAt: { gte: startOfWeek } } }),
+                prisma.stockMovement.count({ where: { productId: m.productId, type: 'IN', investmentId: { not: null }, createdAt: { gte: startOfMonth } } }),
+                prisma.stockMovement.count({ where: { productId: m.productId, type: 'IN', investmentId: { not: null }, createdAt: { gte: startOfYear } } }),
+            ]);
+
+            return {
+                productId: m.productId,
+                name: product?.name || "Inconnu",
+                unit: product?.saleUnit || "Unit",
+                counts: {
+                    day: countDay,
+                    week: countWeek,
+                    month: countMonth,
+                    year: countYear
+                }
+            };
+        }));
+
         return NextResponse.json({
             success: true,
             data: {
                 history: investments,
                 stats: {
-                    monthTotal: monthlyInvestments._sum.totalAmount || 0,
-                    monthVendable: monthlyInvestments._sum.vendableAmount || 0,
-                    monthNonVendable: monthlyInvestments._sum.nonVendableAmount || 0,
-                    monthExpectedProfit: monthlyInvestments._sum.expectedProfit || 0
+                    monthTotal: periodInvestments._sum.totalAmount || 0,
+                    monthVendable: periodInvestments._sum.vendableAmount || 0,
+                    monthNonVendable: periodInvestments._sum.nonVendableAmount || 0,
+                    monthExpectedProfit: periodInvestments._sum.expectedProfit || 0
+                },
+                analytics: {
+                    topItems
                 }
             }
         });

@@ -12,11 +12,12 @@ export default function PurchasesPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editId, setEditId] = useState<string | undefined>(undefined);
     const [stats, setStats] = useState<any>(null);
+    const [period, setPeriod] = useState("month");
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const fetchData = async () => {
         try {
-            const res = await fetch("/api/investments");
+            const res = await fetch(`/api/investments?period=${period}`);
             const data = await res.json();
             if (data.success) {
                 setStats(data.data.stats);
@@ -29,7 +30,7 @@ export default function PurchasesPage() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [period]);
 
     return (
         <DashboardLayout>
@@ -58,7 +59,7 @@ export default function PurchasesPage() {
                         </button>
 
                         <KpiCard
-                            title="Total Investi (Mois)"
+                            title={`Total Investi (${period === 'all' ? 'Tout' : period === 'day' ? 'Jour' : period === 'week' ? 'Semaine' : period === 'month' ? 'Mois' : 'Année'})`}
                             value={`${(stats?.monthTotal || 0).toLocaleString()} $`}
                             icon={<DollarSign />}
                             color="text-blue-500 bg-blue-50"
@@ -84,6 +85,8 @@ export default function PurchasesPage() {
                         </div>
                         <PurchaseHistoryList
                             key={refreshTrigger}
+                            period={period}
+                            setPeriod={setPeriod}
                             onEdit={(id) => {
                                 setEditId(id);
                                 setIsFormOpen(true);
