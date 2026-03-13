@@ -132,81 +132,78 @@ export async function POST(request: NextRequest) {
 
     // Create prices for each space - use pricesCdf directly to avoid precision loss
     for (const [spaceId, priceUsd] of Object.entries(prices)) {
-      if ((priceUsd as number) > 0) {
-        // Use the exact CDF value from frontend if available, otherwise calculate
-        const priceCdf = pricesCdf && pricesCdf[spaceId]
-          ? pricesCdf[spaceId]
-          : (priceUsd as number) * exchangeRate;
+      const pUsd = priceUsd !== null && priceUsd !== undefined ? (priceUsd as number) : 0;
+      // Use the exact CDF value from frontend if available, otherwise calculate
+      const priceCdf = pricesCdf && pricesCdf[spaceId] !== undefined
+        ? parseFloat(String(pricesCdf[spaceId]))
+        : pUsd * exchangeRate;
 
-        await prisma.productPrice.create({
-          data: {
-            productId: newProduct.id,
-            spaceId: spaceId,
-            priceUsd: priceUsd as number,
-            priceCdf: priceCdf,
-            forUnit: product.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE",
-          },
-        });
-      }
+      await prisma.productPrice.create({
+        data: {
+          productId: newProduct.id,
+          spaceId: spaceId,
+          priceUsd: pUsd,
+          priceCdf: priceCdf,
+          forUnit: product.saleUnit === "MEASURE" ? "MEASURE" : "BOTTLE",
+        },
+      });
     }
 
     // Create measure prices if applicable (whisky)
     if (measurePrices) {
       for (const [spaceId, priceUsd] of Object.entries(measurePrices)) {
-        if ((priceUsd as number) > 0) {
-          await prisma.productPrice.create({
-            data: {
-              productId: newProduct.id,
-              spaceId: spaceId,
-              priceUsd: priceUsd as number,
-              priceCdf: (priceUsd as number) * exchangeRate,
-              forUnit: "MEASURE",
-            },
-          });
-        }
+        const pUsd = priceUsd !== null && priceUsd !== undefined ? (priceUsd as number) : 0;
+        await prisma.productPrice.create({
+          data: {
+            productId: newProduct.id,
+            spaceId: spaceId,
+            priceUsd: pUsd,
+            priceCdf: pUsd * exchangeRate,
+            forUnit: "MEASURE",
+          },
+        });
       }
     }
 
     // Create half-plate prices if applicable (food)
     if (halfPlatePrices) {
       for (const [spaceId, priceUsd] of Object.entries(halfPlatePrices)) {
-        if ((priceUsd as number) > 0) {
-          await prisma.productPrice.create({
-            data: {
-              productId: newProduct.id,
-              spaceId: spaceId,
-              priceUsd: priceUsd as number,
-              priceCdf: (priceUsd as number) * exchangeRate,
-              forUnit: "HALF_PLATE",
-            },
-          });
-        }
-      }
-    }
-
-    // Create cost - use costCdf directly if provided to avoid precision loss
-    if (cost > 0) {
-      const finalCostCdf = costCdf || cost * exchangeRate;
-      await prisma.productCost.create({
-        data: {
-          productId: newProduct.id,
-          unitCostUsd: cost,
-          unitCostCdf: finalCostCdf,
-          forUnit: product.saleUnit, // FIX: Use the actual sale unit
-        },
-      });
-
-      // If needed, create cost for HALF_PLATE (50% of cost)
-      if (halfPlatePrices && Object.keys(halfPlatePrices).length > 0) {
-        await prisma.productCost.create({
+        const pUsd = priceUsd !== null && priceUsd !== undefined ? (priceUsd as number) : 0;
+        await prisma.productPrice.create({
           data: {
             productId: newProduct.id,
-            unitCostUsd: cost / 2,
-            unitCostCdf: finalCostCdf / 2,
+            spaceId: spaceId,
+            priceUsd: pUsd,
+            priceCdf: pUsd * exchangeRate,
             forUnit: "HALF_PLATE",
           },
         });
       }
+    }
+
+    // Create cost - always create or update cost
+    const finalCostUsd = cost !== null && cost !== undefined ? cost : 0;
+    const finalCostCdf = costCdf !== null && costCdf !== undefined ? costCdf : finalCostUsd * exchangeRate;
+    
+    await prisma.productCost.create({
+      data: {
+        productId: newProduct.id,
+        unitCostUsd: finalCostUsd,
+        unitCostCdf: finalCostCdf,
+        forUnit: product.saleUnit,
+      },
+    });
+
+    // If needed, create cost for HALF_PLATE (50% of cost)
+    if (halfPlatePrices && Object.keys(halfPlatePrices).length > 0) {
+      await prisma.productCost.create({
+        data: {
+          productId: newProduct.id,
+          unitCostUsd: finalCostUsd / 2,
+          unitCostCdf: finalCostCdf / 2,
+          forUnit: "HALF_PLATE",
+        },
+      });
     }
 
     // Bust product cache whenever a new product is created
