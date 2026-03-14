@@ -19,7 +19,12 @@ export default function TransactionsPage() {
     const [transactions, setTransactions] = useState<any[]>([]);
     const [summary, setSummary] = useState({ totalCdf: 0, totalUsd: 0 });
     const [loading, setLoading] = useState(true);
+    const [isMounted, setIsMounted] = useState(false);
     const [page, setPage] = useState(1);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
     const [totalPages, setTotalPages] = useState(1);
     const [search, setSearch] = useState("");
     const [dateRange, setDateRange] = useState({ start: "", end: "" });
@@ -133,6 +138,16 @@ export default function TransactionsPage() {
         setPrintSale(tx);
     };
 
+    if (!isMounted) {
+        return (
+            <DashboardLayout>
+                <div className="flex items-center justify-center h-full">
+                    <Loader2 className="animate-spin text-[#00d3fa]" size={40} />
+                </div>
+            </DashboardLayout>
+        );
+    }
+
     return (
         <DashboardLayout>
             <div className="flex flex-col h-full bg-gray-50/50">
@@ -233,18 +248,18 @@ export default function TransactionsPage() {
                                 })
                             </p>
                             <p className="text-xl md:text-2xl font-black text-gray-900 leading-none">
-                                {summary.totalCdf.toLocaleString()} <span className="text-xs font-bold opacity-50">FC</span>
+                                {summary.totalCdf.toLocaleString('fr-FR')} <span className="text-xs font-bold opacity-50">FC</span>
                             </p>
                         </div>
                         <div className="bg-white p-4 md:p-5 border border-gray-200 rounded-lg md:rounded-sm shadow-sm">
                             <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Total en Dollars</p>
                             <p className="text-xl md:text-2xl font-black text-green-600 leading-none">
-                                {summary.totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-bold opacity-50">$</span>
+                                {summary.totalUsd.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-bold opacity-50">$</span>
                             </p>
                         </div>
                         <div className="bg-gray-900 p-4 md:p-5 rounded-lg md:rounded-sm shadow-md text-white flex flex-col justify-center sm:col-span-2 lg:col-span-1">
                             <p className="text-[10px] uppercase font-black tracking-widest opacity-60">Nombre d&apos;opérations</p>
-                            <p className="text-xl md:text-2xl font-black">{transactions.length > 0 ? (transactions.length + (page - 1) * 10).toLocaleString() : 0}</p>
+                            <p className="text-xl md:text-2xl font-black">{transactions.length > 0 ? (transactions.length + (page - 1) * 10).toLocaleString('fr-FR') : 0}</p>
                         </div>
                     </div>
 
@@ -312,8 +327,8 @@ export default function TransactionsPage() {
                                             <td className="px-6 py-4 text-right align-top w-40">
                                                 <div className="font-black text-gray-900 text-base">
                                                     {Number(tx.totalCdf) > 0
-                                                        ? Number(tx.totalCdf).toLocaleString()
-                                                        : Math.round(Number(tx.totalNet) * rate).toLocaleString()
+                                                        ? Number(tx.totalCdf).toLocaleString('fr-FR')
+                                                        : Math.round(Number(tx.totalNet) * rate).toLocaleString('fr-FR')
                                                     } FC
                                                 </div>
                                                 <div className="text-xs text-gray-400 font-medium">
@@ -432,8 +447,8 @@ export default function TransactionsPage() {
                                                 <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Total</div>
                                                 <div className="font-black text-gray-900 text-lg leading-tight">
                                                     {Number(tx.totalCdf) > 0
-                                                        ? Number(tx.totalCdf).toLocaleString()
-                                                        : Math.round(Number(tx.totalNet) * rate).toLocaleString()
+                                                        ? Number(tx.totalCdf).toLocaleString('fr-FR')
+                                                        : Math.round(Number(tx.totalNet) * rate).toLocaleString('fr-FR')
                                                     } <span className="text-xs opacity-60">FC</span>
                                                 </div>
                                                 <div className="text-xs text-gray-500 font-medium">

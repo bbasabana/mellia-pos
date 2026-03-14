@@ -14,6 +14,11 @@ export default function PurchasesPage() {
     const [stats, setStats] = useState<any>(null);
     const [period, setPeriod] = useState("month");
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     const fetchData = async () => {
         try {
@@ -31,6 +36,8 @@ export default function PurchasesPage() {
     useEffect(() => {
         fetchData();
     }, [period]);
+
+    if (!isMounted) return null;
 
     return (
         <DashboardLayout>
@@ -60,19 +67,19 @@ export default function PurchasesPage() {
 
                         <KpiCard
                             title={`Total Investi (${period === 'all' ? 'Tout' : period === 'day' ? 'Jour' : period === 'week' ? 'Semaine' : period === 'month' ? 'Mois' : 'Année'})`}
-                            value={`${(stats?.monthTotal || 0).toLocaleString()} $`}
+                            value={`${(stats?.monthTotal || 0).toLocaleString('fr-FR')} $`}
                             icon={<DollarSign />}
                             color="text-blue-500 bg-blue-50"
                         />
                         <KpiCard
                             title="Stock Revendable"
-                            value={`${(stats?.monthVendable || 0).toLocaleString()} $`}
+                            value={`${(stats?.monthVendable || 0).toLocaleString('fr-FR')} $`}
                             icon={<TrendingUp />}
                             color="text-green-500 bg-green-50"
                         />
                         <KpiCard
                             title="Charges (Consommables)"
-                            value={`${(stats?.monthNonVendable || 0).toLocaleString()} $`}
+                            value={`${(stats?.monthNonVendable || 0).toLocaleString('fr-FR')} $`}
                             icon={<Coins />}
                             color="text-orange-500 bg-orange-50"
                         />
