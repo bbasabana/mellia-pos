@@ -23,51 +23,46 @@ export function PriceInput({
   required = false,
   initialCdfValue,
 }: PriceInputProps) {
-  // CDF is now the primary input, USD is calculated
-  // Use initialCdfValue if provided (from DB), otherwise calculate from USD
-  const [cdfValue, setCdfValue] = useState(
+  // Use a string state for the raw input to handle typing, selection, and clearing naturally
+  const [cdfString, setCdfString] = useState(
     initialCdfValue !== undefined 
       ? initialCdfValue.toFixed(0)
       : (value * exchangeRate).toFixed(0)
   );
-  const usdValue = (parseFloat(cdfValue || "0") / exchangeRate).toFixed(2);
 
+  // Derived USD value for display only
+  const usdValue = (parseFloat(cdfString || "0") / exchangeRate).toFixed(2);
+
+  // Sync with prop ONLY when the initial value from DB changes (identity change)
+  // This prevents the "re-fixing" bug during typing
   useEffect(() => {
-    // When value prop changes (from parent), update CDF display
-    // BUT: if initialCdfValue was provided, trust it and don't recalculate
-    // This prevents the 3000 -> 2992 issue
     if (initialCdfValue !== undefined) {
-      // Use the exact CDF value from DB
-      setCdfValue(initialCdfValue.toFixed(0));
+      setCdfString(initialCdfValue.toFixed(0));
     } else {
-      // Calculate from USD (for new products or when CDF not available)
-      const currentCdf = parseFloat(cdfValue || "0");
-      const newCdf = value * exchangeRate;
-      
-      // Allow small variance for float math
-      if (Math.abs(currentCdf - newCdf) > 1) {
-        setCdfValue(newCdf.toFixed(0));
+      // For new products or where CDF isn't available, sync from USD value if it significantly diverges
+      const currentCdf = parseFloat(cdfString || "0");
+      const propCdf = value * exchangeRate;
+      if (Math.abs(currentCdf - propCdf) > 1) {
+        setCdfString(propCdf.toFixed(0));
       }
     }
-  }, [value, exchangeRate, initialCdfValue]);
+  }, [initialCdfValue, exchangeRate]); // Removed 'value' from deps to avoid circularity
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newCdfValue = e.target.value;
-    setCdfValue(newCdfValue);
-    const cdfNum = parseFloat(newCdfValue);
-    if (!isNaN(cdfNum)) {
-      // Calculate USD and send to parent
-      const usdNum = cdfNum / exchangeRate;
-      onChange(usdNum);
-      // IMPORTANT: Also send the exact CDF value to avoid precision loss
-      if (onCdfChange) {
-        onCdfChange(cdfNum);
-      }
-    } else {
-      onChange(0);
-      if (onCdfChange) {
-        onCdfChange(0);
-      }
+    // Only allow digits (cleaner than type="number" behavior)
+    const rawValue = e.target.value.replace(/[^0-9]/g, "");
+    
+    // Update local string state immediately for smooth UI
+    setCdfString(rawValue);
+
+    // If empty string, treat as 0 for calculations but keep string empty for user
+    const cdfNum = rawValue === "" ? 0 : parseFloat(rawValue);
+    
+    // Push updates to parent
+    const usdNum = cdfNum / exchangeRate;
+    onChange(usdNum);
+    if (onCdfChange) {
+      onCdfChange(cdfNum);
     }
   };
 
@@ -78,20 +73,19 @@ export function PriceInput({
       </label>
 
       <div className="flex gap-4 items-center">
-        {/* CDF Input */}
+        {/* CDF Input (Text based for stability) */}
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <span className="text-gray-500 font-medium">FC</span>
           </div>
           <input
-            type="number"
-            step="50" // standard step for currency
-            min="0"
-            value={cdfValue}
+            type="text"
+            inputMode="numeric"
+            value={cdfString}
             onChange={handleChange}
             disabled={disabled}
             required={required}
-            className="block w-full rounded-md border-gray-300 pl-10 pr-12 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border h-10"
+            className="block w-full rounded-md border-gray-300 pl-10 pr-12 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border h-10 font-bold"
             placeholder="0"
           />
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -102,16 +96,16 @@ export function PriceInput({
         {/* Display USD equivalent */}
         <div className="relative w-1/3 min-w-[120px]">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <span className="text-gray-500">$</span>
+            <span className="text-gray-500 font-bold">$</span>
           </div>
           <input
             type="text"
             readOnly
             value={usdValue}
-            className="block w-full rounded-md border-gray-200 bg-gray-50 pl-7 py-2 text-gray-500 shadow-sm sm:text-sm border h-10"
+            className="block w-full rounded-md border-gray-200 bg-gray-50 pl-7 py-2 text-gray-500 shadow-sm sm:text-sm border h-10 font-medium"
           />
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-            <span className="text-gray-400 sm:text-sm">USD</span>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[10px] font-bold text-gray-400">
+            USD
           </div>
         </div>
       </div>

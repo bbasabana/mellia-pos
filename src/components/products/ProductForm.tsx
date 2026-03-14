@@ -628,7 +628,15 @@ export function ProductForm({
                     {(() => {
                       const price = prices[space.id] || 0;
                       const margin = price - cost;
-                      const marginPercent = price > 0 ? ((margin / price) * 100).toFixed(1) : "0";
+                      
+                      // Handle extreme values or near-zero prices for Percentage
+                      let marginPercent = "0";
+                      if (price > 0.01) {
+                        const percentVal = (margin / price) * 100;
+                        // Limit display to -999% to +999% to avoid UI breakage
+                        marginPercent = percentVal > 999 ? "999+" : (percentVal < -999 ? "-999+" : percentVal.toFixed(1));
+                      }
+                      
                       const isPositive = margin > 0;
                       const marginColor = isPositive ? 'text-green-600' : 'text-red-600';
                       const marginBg = isPositive ? 'bg-green-50' : 'bg-red-50';
@@ -641,7 +649,7 @@ export function ProductForm({
                               {margin.toLocaleString('fr-FR', { style: 'currency', currency: 'USD' })}
                             </span>
                           </div>
-                          <div className={`px-2 py-1 rounded text-xs font-bold ${marginBg} ${marginColor} border border-current opacity-80`}>
+                          <div className={`px-2 py-1 rounded text-xs font-bold ${marginBg} ${marginColor} border border-current opacity-80 min-w-[45px] text-center`}>
                             {marginPercent}%
                           </div>
                         </div>
