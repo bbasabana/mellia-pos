@@ -33,6 +33,20 @@ function getPeriodStartDate(period: Period): Date | undefined {
   return new Date(now.getFullYear(), 0, 1);
 }
 
+function getDefaultTargetDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getDayRange(targetDate: string) {
+  const start = new Date(`${targetDate}T00:00:00`);
+  const end = new Date(`${targetDate}T23:59:59.999`);
+  return { start, end };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -44,13 +58,18 @@ export async function GET(req: NextRequest) {
     const period = (searchParams.get("period") || "week") as Period;
     const productFilter = (searchParams.get("productFilter") || "all") as ProductFilter;
     const query = (searchParams.get("query") || "").trim();
-    const threshold = Number(searchParams.get("threshold") || "5");
+    const productId = (searchParams.get("productId") || "").trim();
+    const thresholdRaw = Number(searchParams.get("threshold") || "5");
+    const threshold = Number.isFinite(thresholdRaw) && thresholdRaw >= 0 ? thresholdRaw : 5;
+    const targetDate = searchParams.get("targetDate") || getDefaultTargetDateString();
 
     const startDate = getPeriodStartDate(period);
+    const { start: targetDateStart, end: targetDateEnd } = getDayRange(targetDate);
 
     const products = await prisma.product.findMany({
       where: {
         active: true,
+        ...(productId ? { id: productId } : {}),
         ...(productFilter === "vendable" ? { vendable: true } : {}),
         ...(productFilter === "non_vendable" ? { vendable: false } : {}),
         ...(query
@@ -83,6 +102,7 @@ export async function GET(req: NextRequest) {
         data: {
           period,
           startDate,
+          targetDate,
           threshold,
           summary: {
             totalProducts: 0,
@@ -91,6 +111,9 @@ export async function GET(req: NextRequest) {
             purchasedInPeriod: 0,
             soldInPeriod: 0,
             totalCurrentStock: 0,
+            purchasedOnDate: 0,
+            soldOnDate: 0,
+            remainingOnDate: 0,
           },
           rows: [],
         },
@@ -99,7 +122,16 @@ export async function GET(req: NextRequest) {
 
     const productIds = products.map((p) => p.id);
 
-    const [periodPurchases, totalPurchases, periodSales, totalSales] = await Promise.all([
+    const [
+      periodPurchases,
+      totalPurchases,
+      periodSales,
+      totalSales,
+      datePurchases,
+      dateSales,
+      purchasesUntilDate,
+      salesUntilDate,
+    ] = await Promise.all([
       prisma.stockMovement.groupBy({
         by: ["productId"],
         where: {
@@ -141,6 +173,58 @@ export async function GET(req: NextRequest) {
         },
         _sum: { quantity: true },
       }),
+      prisma.stockMovement.groupBy({
+        by: ["productId"],
+        where: {
+          productId: { in: productIds },
+          type: "IN",
+          investmentId: { not: null },
+          createdAt: {
+            gte: targetDateStart,
+            lte: targetDateEnd,
+          },
+        },
+        _sum: { quantity: true },
+      }),
+      prisma.saleItem.groupBy({
+        by: ["productId"],
+        where: {
+          productId: { in: productIds },
+          sale: {
+            status: "COMPLETED",
+            createdAt: {
+              gte: targetDateStart,
+              lte: targetDateEnd,
+            },
+          },
+        },
+        _sum: { quantity: true },
+      }),
+      prisma.stockMovement.groupBy({
+        by: ["productId"],
+        where: {
+          productId: { in: productIds },
+          type: "IN",
+          investmentId: { not: null },
+          createdAt: {
+            lte: targetDateEnd,
+          },
+        },
+        _sum: { quantity: true },
+      }),
+      prisma.saleItem.groupBy({
+        by: ["productId"],
+        where: {
+          productId: { in: productIds },
+          sale: {
+            status: "COMPLETED",
+            createdAt: {
+              lte: targetDateEnd,
+            },
+          },
+        },
+        _sum: { quantity: true },
+      }),
     ]);
 
     const periodPurchaseMap = new Map(
@@ -159,6 +243,16 @@ export async function GET(req: NextRequest) {
     const totalSalesMap = new Map(
       totalSales.map((item) => [item.productId, Number(item._sum.quantity || 0)])
     );
+    const datePurchasesMap = new Map(
+      datePurchases.map((item) => [item.productId, Number(item._sum.quantity || 0)])
+    );
+    const dateSalesMap = new Map(dateSales.map((item) => [item.productId, Number(item._sum.quantity || 0)]));
+    const purchasesUntilDateMap = new Map(
+      purchasesUntilDate.map((item) => [item.productId, Number(item._sum.quantity || 0)])
+    );
+    const salesUntilDateMap = new Map(
+      salesUntilDate.map((item) => [item.productId, Number(item._sum.quantity || 0)])
+    );
 
     const rows = products.map((product) => {
       const currentStock = product.stockItems.reduce(
@@ -173,6 +267,11 @@ export async function GET(req: NextRequest) {
       const expectedStock = purchasedTotal - soldTotal;
       const stockGap = currentStock - expectedStock;
       const lastPurchaseAt = lastPurchaseDateMap.get(product.id) || null;
+      const purchasedOnDate = datePurchasesMap.get(product.id) || 0;
+      const soldOnDate = dateSalesMap.get(product.id) || 0;
+      const purchasedToDate = purchasesUntilDateMap.get(product.id) || 0;
+      const soldToDate = salesUntilDateMap.get(product.id) || 0;
+      const remainingOnDate = purchasedToDate - soldToDate;
 
       return {
         id: product.id,
@@ -188,6 +287,9 @@ export async function GET(req: NextRequest) {
         currentStock,
         stockGap,
         lastPurchaseAt,
+        purchasedOnDate,
+        soldOnDate,
+        remainingOnDate,
         needsRestock: currentStock <= threshold,
       };
     });
@@ -199,6 +301,9 @@ export async function GET(req: NextRequest) {
       purchasedInPeriod: rows.reduce((sum, row) => sum + row.purchasedInPeriod, 0),
       soldInPeriod: rows.reduce((sum, row) => sum + row.soldInPeriod, 0),
       totalCurrentStock: rows.reduce((sum, row) => sum + row.currentStock, 0),
+      purchasedOnDate: rows.reduce((sum, row) => sum + row.purchasedOnDate, 0),
+      soldOnDate: rows.reduce((sum, row) => sum + row.soldOnDate, 0),
+      remainingOnDate: rows.reduce((sum, row) => sum + row.remainingOnDate, 0),
     };
 
     return NextResponse.json({
@@ -206,6 +311,7 @@ export async function GET(req: NextRequest) {
       data: {
         period,
         startDate,
+        targetDate,
         threshold,
         summary,
         rows: rows.sort((a, b) => a.currentStock - b.currentStock || a.name.localeCompare(b.name)),
