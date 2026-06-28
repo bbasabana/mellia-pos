@@ -44,6 +44,12 @@ const menuItems = [
     roles: ["ADMIN", "MANAGER"],
   },
   {
+    label: "Mini Inventaire",
+    href: "/dashboard/mini-inventory",
+    icon: Package,
+    roles: ["ADMIN", "MANAGER", "CASHIER"],
+  },
+  {
     label: "Cuisine (KDS)",
     href: "/dashboard/kitchen",
     icon: Flame,
