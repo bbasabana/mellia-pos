@@ -24,7 +24,8 @@ import {
   Flame,
   FileText,
   TrendingUp,
-  Receipt
+  Receipt,
+  Sparkles
 } from "lucide-react";
 import "@/styles/theme.scss";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,12 @@ const menuItems = [
     href: "/dashboard/mini-inventory",
     icon: Package,
     roles: ["ADMIN", "MANAGER", "CASHIER"],
+  },
+  {
+    label: "Amélie",
+    href: "/dashboard/amelie",
+    icon: Sparkles,
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     label: "Cuisine (KDS)",
