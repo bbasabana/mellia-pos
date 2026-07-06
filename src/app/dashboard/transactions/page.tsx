@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useSession } from "next-auth/react";
-import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, FileText, Trash2, Edit, Receipt } from "lucide-react";
+import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, Trash2, Edit, Receipt, Wine, UtensilsCrossed } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useReactToPrint } from "react-to-print";
@@ -17,7 +17,15 @@ export default function TransactionsPage() {
     const isAdmin = (session?.user as any)?.role === "ADMIN";
 
     const [transactions, setTransactions] = useState<any[]>([]);
-    const [summary, setSummary] = useState({ totalCdf: 0, totalUsd: 0 });
+    const [summary, setSummary] = useState({
+        totalCdf: 0,
+        totalUsd: 0,
+        beverageCdf: 0,
+        beverageUsd: 0,
+        foodCdf: 0,
+        foodUsd: 0,
+    });
+    const [showCategorySplit, setShowCategorySplit] = useState(true);
     const [loading, setLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
     const [page, setPage] = useState(1);
@@ -77,7 +85,14 @@ export default function TransactionsPage() {
 
             if (data.success) {
                 setTransactions(data.data);
-                setSummary(data.summary || { totalCdf: 0, totalUsd: 0 });
+                setSummary(data.summary || {
+                    totalCdf: 0,
+                    totalUsd: 0,
+                    beverageCdf: 0,
+                    beverageUsd: 0,
+                    foodCdf: 0,
+                    foodUsd: 0,
+                });
                 setTotalPages(data.pagination.totalPages);
             }
         } catch (error) {
@@ -229,13 +244,25 @@ export default function TransactionsPage() {
                                     />
                                 </div>
                             </div>
+
+                            <label className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg sm:rounded-sm shadow-sm cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={showCategorySplit}
+                                    onChange={(e) => setShowCategorySplit(e.target.checked)}
+                                    className="rounded border-gray-300 text-[#71de00] focus:ring-[#71de00]"
+                                />
+                                <span className="text-[10px] font-black uppercase text-gray-600 whitespace-nowrap">
+                                    Boisson / Nourriture
+                                </span>
+                            </label>
                         </div>
                     </div>
                 </div>
 
                 <div className="flex-1 overflow-auto p-3 md:p-6 space-y-4 md:space-y-6">
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 ${showCategorySplit ? "lg:grid-cols-5" : "lg:grid-cols-3"} gap-3 md:gap-4`}>
                         <div className="bg-white p-4 md:p-5 border border-gray-200 rounded-lg md:rounded-sm shadow-sm">
                             <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">
                                 Ventes ({
@@ -257,6 +284,32 @@ export default function TransactionsPage() {
                                 {summary.totalUsd.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-bold opacity-50">$</span>
                             </p>
                         </div>
+                        {showCategorySplit && (
+                            <>
+                                <div className="bg-blue-50 p-4 md:p-5 border border-blue-100 rounded-lg md:rounded-sm shadow-sm">
+                                    <p className="text-[10px] text-blue-600 uppercase font-black tracking-widest mb-1 flex items-center gap-1">
+                                        <Wine size={12} /> Boisson
+                                    </p>
+                                    <p className="text-xl md:text-2xl font-black text-blue-700 leading-none">
+                                        {summary.beverageCdf.toLocaleString('fr-FR')} <span className="text-xs font-bold opacity-50">FC</span>
+                                    </p>
+                                    <p className="text-xs text-blue-500 font-bold mt-1">
+                                        ${summary.beverageUsd.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                <div className="bg-orange-50 p-4 md:p-5 border border-orange-100 rounded-lg md:rounded-sm shadow-sm">
+                                    <p className="text-[10px] text-orange-600 uppercase font-black tracking-widest mb-1 flex items-center gap-1">
+                                        <UtensilsCrossed size={12} /> Nourriture
+                                    </p>
+                                    <p className="text-xl md:text-2xl font-black text-orange-700 leading-none">
+                                        {summary.foodCdf.toLocaleString('fr-FR')} <span className="text-xs font-bold opacity-50">FC</span>
+                                    </p>
+                                    <p className="text-xs text-orange-500 font-bold mt-1">
+                                        ${summary.foodUsd.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                            </>
+                        )}
                         <div className="bg-gray-900 p-4 md:p-5 rounded-lg md:rounded-sm shadow-md text-white flex flex-col justify-center sm:col-span-2 lg:col-span-1">
                             <p className="text-[10px] uppercase font-black tracking-widest opacity-60">Nombre d&apos;opérations</p>
                             <p className="text-xl md:text-2xl font-black">{transactions.length > 0 ? (transactions.length + (page - 1) * 10).toLocaleString('fr-FR') : 0}</p>
@@ -324,7 +377,7 @@ export default function TransactionsPage() {
                                                     ))}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-right align-top w-40">
+                                            <td className="px-6 py-4 text-right align-top w-48">
                                                 <div className="font-black text-gray-900 text-base">
                                                     {Number(tx.totalCdf) > 0
                                                         ? Number(tx.totalCdf).toLocaleString('fr-FR')
@@ -334,6 +387,9 @@ export default function TransactionsPage() {
                                                 <div className="text-xs text-gray-400 font-medium">
                                                     ${Number(tx.totalNet).toFixed(2)} USD
                                                 </div>
+                                                {showCategorySplit && tx.categoryBreakdown && (
+                                                    <CategorySplitBreakdown breakdown={tx.categoryBreakdown} />
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-center text-xs text-gray-500 align-top w-32">
                                                 <div className="font-bold">{tx.user?.name.split(" ")[0]}</div>
@@ -454,6 +510,11 @@ export default function TransactionsPage() {
                                                 <div className="text-xs text-gray-500 font-medium">
                                                     ${Number(tx.totalNet).toFixed(2)} USD
                                                 </div>
+                                                {showCategorySplit && tx.categoryBreakdown && (
+                                                    <div className="mt-2">
+                                                        <CategorySplitBreakdown breakdown={tx.categoryBreakdown} />
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Caissier</div>
@@ -542,5 +603,42 @@ export default function TransactionsPage() {
                 </div>
             </div>
         </DashboardLayout>
+    );
+}
+
+function CategorySplitBreakdown({
+    breakdown,
+}: {
+    breakdown: {
+        beverage: { usd: number; cdf: number };
+        food: { usd: number; cdf: number };
+    };
+}) {
+    const hasBeverage = breakdown.beverage.cdf > 0 || breakdown.beverage.usd > 0;
+    const hasFood = breakdown.food.cdf > 0 || breakdown.food.usd > 0;
+
+    if (!hasBeverage && !hasFood) return null;
+
+    return (
+        <div className="mt-2 space-y-1 text-right">
+            {hasBeverage && (
+                <div className="text-[10px] font-bold text-blue-600">
+                    <Wine size={10} className="inline mr-0.5 -mt-px" />
+                    {breakdown.beverage.cdf.toLocaleString('fr-FR')} FC
+                    <span className="text-blue-400 font-medium ml-1">
+                        (${breakdown.beverage.usd.toFixed(2)})
+                    </span>
+                </div>
+            )}
+            {hasFood && (
+                <div className="text-[10px] font-bold text-orange-600">
+                    <UtensilsCrossed size={10} className="inline mr-0.5 -mt-px" />
+                    {breakdown.food.cdf.toLocaleString('fr-FR')} FC
+                    <span className="text-orange-400 font-medium ml-1">
+                        (${breakdown.food.usd.toFixed(2)})
+                    </span>
+                </div>
+            )}
+        </div>
     );
 }

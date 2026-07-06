@@ -4,6 +4,11 @@ import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { deductStock, restoreStock } from "@/lib/stock-service";
+import {
+    computeSaleCategoryBreakdown,
+    emptyCategoryBreakdown,
+    mergeCategoryBreakdowns,
+} from "@/lib/sale-category-breakdown";
 
 export async function GET(req: NextRequest) {
     try {
@@ -62,7 +67,7 @@ export async function GET(req: NextRequest) {
             };
         }
 
-        const [sales, total, aggregates] = await Promise.all([
+        const [sales, total, aggregates, periodSaleItems] = await Promise.all([
             prisma.sale.findMany({
                 where,
                 include: {
@@ -85,15 +90,43 @@ export async function GET(req: NextRequest) {
                     totalCdf: true,
                     totalNet: true,
                 }
-            })
+            }),
+            prisma.saleItem.findMany({
+                where: { sale: where },
+                select: {
+                    totalPrice: true,
+                    unitPriceCdf: true,
+                    quantity: true,
+                    product: {
+                        select: {
+                            type: true,
+                        },
+                    },
+                },
+            }),
         ]);
+
+        const categorySummary = periodSaleItems.reduce(
+            (acc, item) =>
+                mergeCategoryBreakdowns(acc, computeSaleCategoryBreakdown([item])),
+            emptyCategoryBreakdown()
+        );
+
+        const salesWithBreakdown = sales.map((sale) => ({
+            ...sale,
+            categoryBreakdown: computeSaleCategoryBreakdown(sale.items),
+        }));
 
         return NextResponse.json({
             success: true,
-            data: sales,
+            data: salesWithBreakdown,
             summary: {
                 totalCdf: Number(aggregates._sum.totalCdf || 0),
                 totalUsd: Number(aggregates._sum.totalNet || 0),
+                beverageCdf: categorySummary.beverage.cdf,
+                beverageUsd: categorySummary.beverage.usd,
+                foodCdf: categorySummary.food.cdf,
+                foodUsd: categorySummary.food.usd,
             },
             pagination: {
                 total,
