@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { AlertTriangle, Package, Search, ShoppingBasket, TrendingDown } from "lucide-react";
+import { AlertTriangle, DollarSign, Package, Search, ShoppingBasket, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Period = "day" | "week" | "month" | "year" | "all";
@@ -22,6 +22,13 @@ type MiniInventoryRow = {
   currentStock: number;
   stockGap: number;
   lastPurchaseAt: string | null;
+  lastPurchaseQuantity: number;
+  soldSinceLastPurchase: number;
+  remainingFromLastPurchase: number;
+  remainingRevenueTerraceUsd: number;
+  remainingRevenueVipUsd: number;
+  remainingProfitTerraceUsd: number;
+  remainingProfitVipUsd: number;
   purchasedOnDate: number;
   soldOnDate: number;
   remainingOnDate: number;
@@ -44,6 +51,32 @@ type MiniInventoryResponse = {
     soldOnDate: number;
     remainingOnDate: number;
   };
+  financialSummary: {
+    investedCdfTotal: number;
+    investedCdfBeverage: number;
+    investedCdfFood: number;
+    soldUsdTotal: number;
+    soldUsdBeverage: number;
+    soldUsdFood: number;
+    remainingRevenueTerraceUsd: number;
+    remainingProfitTerraceUsd: number;
+    remainingRevenueVipUsd: number;
+    remainingProfitVipUsd: number;
+  };
+  lastInvestment: {
+    id: string;
+    date: string;
+    investedCdfTotal: number;
+    investedCdfBeverage: number;
+    investedCdfFood: number;
+    expectedRevenueTerraceCdf: number;
+    expectedRevenueVipCdf: number;
+    expectedProfitTerraceCdf: number;
+    expectedProfitVipCdf: number;
+    salesSincePurchaseUsdTotal: number;
+    salesSincePurchaseUsdBeverage: number;
+    salesSincePurchaseUsdFood: number;
+  } | null;
   rows: MiniInventoryRow[];
 };
 
@@ -80,6 +113,23 @@ function formatDateOnly(value: string | null): string {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function formatCurrencyUsd(value: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value || 0);
+}
+
+function formatCurrencyCdf(value: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "CDF",
+    maximumFractionDigits: 0,
+  }).format(value || 0);
 }
 
 function getTodayString() {
@@ -265,6 +315,69 @@ export default function MiniInventoryPage() {
             />
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <FinanceCard
+              title="Investi période (CDF)"
+              value={loading ? "..." : formatCurrencyCdf(data?.financialSummary.investedCdfTotal || 0)}
+              details={[
+                `Boisson: ${formatCurrencyCdf(data?.financialSummary.investedCdfBeverage || 0)}`,
+                `Nourriture: ${formatCurrencyCdf(data?.financialSummary.investedCdfFood || 0)}`,
+              ]}
+              color="text-blue-600 bg-blue-50"
+            />
+            <FinanceCard
+              title="Vendu période (USD)"
+              value={loading ? "..." : formatCurrencyUsd(data?.financialSummary.soldUsdTotal || 0)}
+              details={[
+                `Boisson: ${formatCurrencyUsd(data?.financialSummary.soldUsdBeverage || 0)}`,
+                `Nourriture: ${formatCurrencyUsd(data?.financialSummary.soldUsdFood || 0)}`,
+              ]}
+              color="text-emerald-600 bg-emerald-50"
+            />
+            <FinanceCard
+              title="Potentiel restant Terrasse"
+              value={loading ? "..." : formatCurrencyUsd(data?.financialSummary.remainingRevenueTerraceUsd || 0)}
+              details={[`Bénéfice: ${formatCurrencyUsd(data?.financialSummary.remainingProfitTerraceUsd || 0)}`]}
+              color="text-purple-600 bg-purple-50"
+            />
+            <FinanceCard
+              title="Potentiel restant VIP"
+              value={loading ? "..." : formatCurrencyUsd(data?.financialSummary.remainingRevenueVipUsd || 0)}
+              details={[`Bénéfice: ${formatCurrencyUsd(data?.financialSummary.remainingProfitVipUsd || 0)}`]}
+              color="text-orange-600 bg-orange-50"
+            />
+          </div>
+
+          {data?.lastInvestment && (
+            <div className="bg-white border border-gray-200 rounded-sm p-4 space-y-2">
+              <div className="text-sm font-bold text-gray-800">Dernier achat enregistré ({formatDateOnly(data.lastInvestment.date)})</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div className="bg-gray-50 rounded p-3">
+                  <div className="text-gray-500 uppercase font-bold">Investi</div>
+                  <div className="font-bold text-gray-800 mt-1">{formatCurrencyCdf(data.lastInvestment.investedCdfTotal)}</div>
+                  <div className="text-gray-500 mt-1">Boisson: {formatCurrencyCdf(data.lastInvestment.investedCdfBeverage)}</div>
+                  <div className="text-gray-500">Nourriture: {formatCurrencyCdf(data.lastInvestment.investedCdfFood)}</div>
+                </div>
+                <div className="bg-gray-50 rounded p-3">
+                  <div className="text-gray-500 uppercase font-bold">Projection Terrasse</div>
+                  <div className="font-bold text-gray-800 mt-1">{formatCurrencyCdf(data.lastInvestment.expectedRevenueTerraceCdf)}</div>
+                  <div className="text-gray-500 mt-1">Bénéfice: {formatCurrencyCdf(data.lastInvestment.expectedProfitTerraceCdf)}</div>
+                </div>
+                <div className="bg-gray-50 rounded p-3">
+                  <div className="text-gray-500 uppercase font-bold">Projection VIP</div>
+                  <div className="font-bold text-gray-800 mt-1">{formatCurrencyCdf(data.lastInvestment.expectedRevenueVipCdf)}</div>
+                  <div className="text-gray-500 mt-1">Bénéfice: {formatCurrencyCdf(data.lastInvestment.expectedProfitVipCdf)}</div>
+                </div>
+                <div className="bg-gray-50 rounded p-3">
+                  <div className="text-gray-500 uppercase font-bold">Vendu depuis cet achat</div>
+                  <div className="font-bold text-gray-800 mt-1">{formatCurrencyUsd(data.lastInvestment.salesSincePurchaseUsdTotal)}</div>
+                  <div className="text-gray-500 mt-1">Boisson: {formatCurrencyUsd(data.lastInvestment.salesSincePurchaseUsdBeverage)}</div>
+                  <div className="text-gray-500">Nourriture: {formatCurrencyUsd(data.lastInvestment.salesSincePurchaseUsdFood)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="bg-blue-50 border border-blue-100 rounded-sm px-4 py-3 text-xs text-blue-700">
             Le {selectedDateLabel} : achats ={" "}
             <span className="font-bold">{formatQuantity(data?.summary.purchasedOnDate || 0)}</span>, ventes ={" "}
@@ -287,6 +400,11 @@ export default function MiniInventoryPage() {
                       <th className="px-4 py-3 text-right">Achat ({selectedDateLabel})</th>
                       <th className="px-4 py-3 text-right">Vente ({selectedDateLabel})</th>
                       <th className="px-4 py-3 text-right">Reste ({selectedDateLabel})</th>
+                      <th className="px-4 py-3 text-right">Dernier achat (Qté)</th>
+                      <th className="px-4 py-3 text-right">Vendu depuis dernier achat</th>
+                      <th className="px-4 py-3 text-right">Reste depuis dernier achat</th>
+                      <th className="px-4 py-3 text-right">Potentiel Terrasse</th>
+                      <th className="px-4 py-3 text-right">Potentiel VIP</th>
                       <th className="px-4 py-3 text-right">Achats période</th>
                       <th className="px-4 py-3 text-right">Ventes période</th>
                       <th className="px-4 py-3 text-right">Achats total</th>
@@ -315,6 +433,17 @@ export default function MiniInventoryPage() {
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-blue-700">
                           {formatQuantity(row.remainingOnDate)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-700">{formatQuantity(row.lastPurchaseQuantity)}</td>
+                        <td className="px-4 py-3 text-right text-orange-700">{formatQuantity(row.soldSinceLastPurchase)}</td>
+                        <td className="px-4 py-3 text-right text-blue-700">{formatQuantity(row.remainingFromLastPurchase)}</td>
+                        <td className="px-4 py-3 text-right text-purple-700">
+                          <div>{formatCurrencyUsd(row.remainingRevenueTerraceUsd)}</div>
+                          <div className="text-[10px] text-gray-500">Profit: {formatCurrencyUsd(row.remainingProfitTerraceUsd)}</div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-indigo-700">
+                          <div>{formatCurrencyUsd(row.remainingRevenueVipUsd)}</div>
+                          <div className="text-[10px] text-gray-500">Profit: {formatCurrencyUsd(row.remainingProfitVipUsd)}</div>
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-green-700">
                           {formatQuantity(row.purchasedInPeriod)}
@@ -366,6 +495,39 @@ export default function MiniInventoryPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+function FinanceCard({
+  title,
+  value,
+  details,
+  color,
+}: {
+  title: string;
+  value: string;
+  details: string[];
+  color: string;
+}) {
+  return (
+    <div className="bg-white p-4 border border-gray-200 rounded-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-gray-500 uppercase font-bold">{title}</p>
+          <p className="text-lg font-bold text-gray-800 mt-1">{value}</p>
+        </div>
+        <div className={cn("p-2 rounded-full", color)}>
+          <DollarSign size={16} />
+        </div>
+      </div>
+      <div className="mt-2 space-y-1">
+        {details.map((line) => (
+          <p key={line} className="text-xs text-gray-500">
+            {line}
+          </p>
+        ))}
+      </div>
+    </div>
   );
 }
 

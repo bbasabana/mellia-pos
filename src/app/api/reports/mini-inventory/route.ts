@@ -47,6 +47,26 @@ function getDayRange(targetDate: string) {
   return { start, end };
 }
 
+function toNumberSafe(value: any): number {
+  if (value === null || value === undefined) return 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getTerracePriceUsd(prices: Array<{ priceUsd: any; space: { name: string } }>): number {
+  const standardPrice = prices.find((p) => {
+    const name = p.space.name.toLowerCase().trim();
+    return name === "terrasse" || name === "salle" || name === "standard";
+  });
+  const fallback = prices.find((p) => !p.space.name.toLowerCase().includes("vip"));
+  return toNumberSafe(standardPrice?.priceUsd ?? fallback?.priceUsd ?? 0);
+}
+
+function getVipPriceUsd(prices: Array<{ priceUsd: any; space: { name: string } }>, terracePrice: number): number {
+  const vipPrice = prices.find((p) => p.space.name.toLowerCase().includes("vip"));
+  return toNumberSafe(vipPrice?.priceUsd ?? terracePrice);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -92,6 +112,23 @@ export async function GET(req: NextRequest) {
             quantity: true,
           },
         },
+        costs: {
+          select: {
+            forUnit: true,
+            unitCostUsd: true,
+          },
+        },
+        prices: {
+          select: {
+            forUnit: true,
+            priceUsd: true,
+            space: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { name: "asc" },
     });
@@ -115,6 +152,19 @@ export async function GET(req: NextRequest) {
             soldOnDate: 0,
             remainingOnDate: 0,
           },
+          financialSummary: {
+            investedCdfTotal: 0,
+            investedCdfBeverage: 0,
+            investedCdfFood: 0,
+            soldUsdTotal: 0,
+            soldUsdBeverage: 0,
+            soldUsdFood: 0,
+            remainingRevenueTerraceUsd: 0,
+            remainingProfitTerraceUsd: 0,
+            remainingRevenueVipUsd: 0,
+            remainingProfitVipUsd: 0,
+          },
+          lastInvestment: null,
           rows: [],
         },
       });
@@ -131,6 +181,10 @@ export async function GET(req: NextRequest) {
       dateSales,
       purchasesUntilDate,
       salesUntilDate,
+      periodPurchaseMovements,
+      periodSaleItems,
+      allPurchasesDesc,
+      latestInvestment,
     ] = await Promise.all([
       prisma.stockMovement.groupBy({
         by: ["productId"],
@@ -225,6 +279,78 @@ export async function GET(req: NextRequest) {
         },
         _sum: { quantity: true },
       }),
+      prisma.stockMovement.findMany({
+        where: {
+          productId: { in: productIds },
+          type: "IN",
+          investmentId: { not: null },
+          ...(startDate ? { createdAt: { gte: startDate } } : {}),
+        },
+        select: {
+          productId: true,
+          costValue: true,
+          product: {
+            select: {
+              type: true,
+            },
+          },
+        },
+      }),
+      prisma.saleItem.findMany({
+        where: {
+          productId: { in: productIds },
+          sale: {
+            status: "COMPLETED",
+            ...(startDate ? { createdAt: { gte: startDate } } : {}),
+          },
+        },
+        select: {
+          productId: true,
+          totalPrice: true,
+          product: {
+            select: {
+              type: true,
+            },
+          },
+        },
+      }),
+      prisma.stockMovement.findMany({
+        where: {
+          productId: { in: productIds },
+          type: "IN",
+          investmentId: { not: null },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          productId: true,
+          quantity: true,
+          createdAt: true,
+        },
+      }),
+      prisma.investment.findFirst({
+        orderBy: { date: "desc" },
+        select: {
+          id: true,
+          date: true,
+          totalAmountCdf: true,
+          expectedRevenueCdf: true,
+          expectedRevenueVipCdf: true,
+          expectedProfitCdf: true,
+          expectedProfitVipCdf: true,
+          movements: {
+            where: { type: "IN" },
+            select: {
+              quantity: true,
+              costValue: true,
+              product: {
+                select: {
+                  type: true,
+                },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     const periodPurchaseMap = new Map(
@@ -254,6 +380,56 @@ export async function GET(req: NextRequest) {
       salesUntilDate.map((item) => [item.productId, Number(item._sum.quantity || 0)])
     );
 
+    const lastPurchaseByProduct = new Map<
+      string,
+      { createdAt: Date; quantity: number }
+    >();
+    for (const movement of allPurchasesDesc) {
+      if (!lastPurchaseByProduct.has(movement.productId)) {
+        lastPurchaseByProduct.set(movement.productId, {
+          createdAt: movement.createdAt,
+          quantity: toNumberSafe(movement.quantity),
+        });
+      }
+    }
+
+    let earliestLastPurchaseDate: Date | null = null;
+    for (const entry of lastPurchaseByProduct.values()) {
+      if (!earliestLastPurchaseDate || entry.createdAt < earliestLastPurchaseDate) {
+        earliestLastPurchaseDate = entry.createdAt;
+      }
+    }
+
+    const saleItemsSinceEarliest = earliestLastPurchaseDate
+      ? await prisma.saleItem.findMany({
+          where: {
+            productId: { in: productIds },
+            sale: {
+              status: "COMPLETED",
+              createdAt: { gte: earliestLastPurchaseDate },
+            },
+          },
+          select: {
+            productId: true,
+            quantity: true,
+            sale: {
+              select: {
+                createdAt: true,
+              },
+            },
+          },
+        })
+      : [];
+
+    const soldSinceLastPurchaseMap = new Map<string, number>();
+    for (const item of saleItemsSinceEarliest) {
+      const lastPurchase = lastPurchaseByProduct.get(item.productId);
+      if (!lastPurchase) continue;
+      if (item.sale.createdAt < lastPurchase.createdAt) continue;
+      const current = soldSinceLastPurchaseMap.get(item.productId) || 0;
+      soldSinceLastPurchaseMap.set(item.productId, current + toNumberSafe(item.quantity));
+    }
+
     const rows = products.map((product) => {
       const currentStock = product.stockItems.reduce(
         (sum, stockItem) => sum + Number(stockItem.quantity || 0),
@@ -272,6 +448,19 @@ export async function GET(req: NextRequest) {
       const purchasedToDate = purchasesUntilDateMap.get(product.id) || 0;
       const soldToDate = salesUntilDateMap.get(product.id) || 0;
       const remainingOnDate = purchasedToDate - soldToDate;
+      const lastPurchaseMeta = lastPurchaseByProduct.get(product.id);
+      const lastPurchaseQuantity = lastPurchaseMeta?.quantity || 0;
+      const soldSinceLastPurchase = soldSinceLastPurchaseMap.get(product.id) || 0;
+      const remainingFromLastPurchase = lastPurchaseQuantity - soldSinceLastPurchase;
+      const costForUnit =
+        product.costs.find((cost) => cost.forUnit === product.saleUnit) || product.costs[0];
+      const unitCostUsd = toNumberSafe(costForUnit?.unitCostUsd || 0);
+      const terracePriceUsd = getTerracePriceUsd(product.prices as any);
+      const vipPriceUsd = getVipPriceUsd(product.prices as any, terracePriceUsd);
+      const remainingRevenueTerraceUsd = currentStock * terracePriceUsd;
+      const remainingRevenueVipUsd = currentStock * vipPriceUsd;
+      const remainingProfitTerraceUsd = remainingRevenueTerraceUsd - currentStock * unitCostUsd;
+      const remainingProfitVipUsd = remainingRevenueVipUsd - currentStock * unitCostUsd;
 
       return {
         id: product.id,
@@ -287,6 +476,13 @@ export async function GET(req: NextRequest) {
         currentStock,
         stockGap,
         lastPurchaseAt,
+        lastPurchaseQuantity,
+        soldSinceLastPurchase,
+        remainingFromLastPurchase,
+        remainingRevenueTerraceUsd,
+        remainingRevenueVipUsd,
+        remainingProfitTerraceUsd,
+        remainingProfitVipUsd,
         purchasedOnDate,
         soldOnDate,
         remainingOnDate,
@@ -306,6 +502,115 @@ export async function GET(req: NextRequest) {
       remainingOnDate: rows.reduce((sum, row) => sum + row.remainingOnDate, 0),
     };
 
+    const financialSummary = {
+      investedCdfTotal: 0,
+      investedCdfBeverage: 0,
+      investedCdfFood: 0,
+      soldUsdTotal: 0,
+      soldUsdBeverage: 0,
+      soldUsdFood: 0,
+      remainingRevenueTerraceUsd: rows.reduce((sum, row) => sum + row.remainingRevenueTerraceUsd, 0),
+      remainingProfitTerraceUsd: rows.reduce((sum, row) => sum + row.remainingProfitTerraceUsd, 0),
+      remainingRevenueVipUsd: rows.reduce((sum, row) => sum + row.remainingRevenueVipUsd, 0),
+      remainingProfitVipUsd: rows.reduce((sum, row) => sum + row.remainingProfitVipUsd, 0),
+    };
+
+    for (const movement of periodPurchaseMovements) {
+      const amount = toNumberSafe(movement.costValue);
+      financialSummary.investedCdfTotal += amount;
+      if (movement.product.type === "BEVERAGE") {
+        financialSummary.investedCdfBeverage += amount;
+      } else if (movement.product.type === "FOOD") {
+        financialSummary.investedCdfFood += amount;
+      }
+    }
+
+    for (const item of periodSaleItems) {
+      const revenue = toNumberSafe(item.totalPrice);
+      financialSummary.soldUsdTotal += revenue;
+      if (item.product.type === "BEVERAGE") {
+        financialSummary.soldUsdBeverage += revenue;
+      } else if (item.product.type === "FOOD") {
+        financialSummary.soldUsdFood += revenue;
+      }
+    }
+
+    let lastInvestmentSummary: {
+      id: string;
+      date: Date;
+      investedCdfTotal: number;
+      investedCdfBeverage: number;
+      investedCdfFood: number;
+      expectedRevenueTerraceCdf: number;
+      expectedRevenueVipCdf: number;
+      expectedProfitTerraceCdf: number;
+      expectedProfitVipCdf: number;
+      salesSincePurchaseUsdTotal: number;
+      salesSincePurchaseUsdBeverage: number;
+      salesSincePurchaseUsdFood: number;
+    } | null = null;
+
+    if (latestInvestment) {
+      let investedCdfBeverage = 0;
+      let investedCdfFood = 0;
+
+      for (const movement of latestInvestment.movements) {
+        const amount = toNumberSafe(movement.costValue);
+        if (movement.product.type === "BEVERAGE") {
+          investedCdfBeverage += amount;
+        } else if (movement.product.type === "FOOD") {
+          investedCdfFood += amount;
+        }
+      }
+
+      const salesSinceLatestInvestment = await prisma.saleItem.findMany({
+        where: {
+          productId: { in: productIds },
+          sale: {
+            status: "COMPLETED",
+            createdAt: { gte: latestInvestment.date },
+          },
+        },
+        select: {
+          totalPrice: true,
+          product: {
+            select: {
+              type: true,
+            },
+          },
+        },
+      });
+
+      let salesSincePurchaseUsdTotal = 0;
+      let salesSincePurchaseUsdBeverage = 0;
+      let salesSincePurchaseUsdFood = 0;
+
+      for (const saleItem of salesSinceLatestInvestment) {
+        const amount = toNumberSafe(saleItem.totalPrice);
+        salesSincePurchaseUsdTotal += amount;
+        if (saleItem.product.type === "BEVERAGE") {
+          salesSincePurchaseUsdBeverage += amount;
+        } else if (saleItem.product.type === "FOOD") {
+          salesSincePurchaseUsdFood += amount;
+        }
+      }
+
+      lastInvestmentSummary = {
+        id: latestInvestment.id,
+        date: latestInvestment.date,
+        investedCdfTotal: toNumberSafe(latestInvestment.totalAmountCdf),
+        investedCdfBeverage,
+        investedCdfFood,
+        expectedRevenueTerraceCdf: toNumberSafe(latestInvestment.expectedRevenueCdf),
+        expectedRevenueVipCdf: toNumberSafe(latestInvestment.expectedRevenueVipCdf),
+        expectedProfitTerraceCdf: toNumberSafe(latestInvestment.expectedProfitCdf),
+        expectedProfitVipCdf: toNumberSafe(latestInvestment.expectedProfitVipCdf),
+        salesSincePurchaseUsdTotal,
+        salesSincePurchaseUsdBeverage,
+        salesSincePurchaseUsdFood,
+      };
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -314,6 +619,8 @@ export async function GET(req: NextRequest) {
         targetDate,
         threshold,
         summary,
+        financialSummary,
+        lastInvestment: lastInvestmentSummary,
         rows: rows.sort((a, b) => a.currentStock - b.currentStock || a.name.localeCompare(b.name)),
       },
     });
