@@ -9,6 +9,13 @@ import {
     emptyCategoryBreakdown,
     mergeCategoryBreakdowns,
 } from "@/lib/sale-category-breakdown";
+import {
+    computeTheoreticalBalance,
+    getCashPeriodTotals,
+    getLastCashClosure,
+    getOpeningBalance,
+    resolveTransactionsDateRange,
+} from "@/lib/cash-period";
 
 export async function GET(req: NextRequest) {
     try {
@@ -117,16 +124,35 @@ export async function GET(req: NextRequest) {
             categoryBreakdown: computeSaleCategoryBreakdown(sale.items),
         }));
 
+        const cashRange = resolveTransactionsDateRange(period, startDate, endDate);
+        const lastClosure = await getLastCashClosure();
+        const openingBalance = getOpeningBalance(lastClosure);
+        const openStart = lastClosure?.closedAt ?? new Date(0);
+        const effectiveCashRange = cashRange ?? { gte: openStart, lte: new Date() };
+
+        const cashTotals = await getCashPeriodTotals(effectiveCashRange);
+
+        const totalSalesCdf = Number(aggregates._sum.totalCdf || 0);
+        const cashInHand = computeTheoreticalBalance(openingBalance, {
+            totalSales: cashTotals.totalSales,
+            totalExpenses: cashTotals.totalExpenses,
+            totalPurchases: cashTotals.totalPurchases,
+        });
+
         return NextResponse.json({
             success: true,
             data: salesWithBreakdown,
             summary: {
-                totalCdf: Number(aggregates._sum.totalCdf || 0),
+                totalCdf: totalSalesCdf,
                 totalUsd: Number(aggregates._sum.totalNet || 0),
                 beverageCdf: categorySummary.beverage.cdf,
                 beverageUsd: categorySummary.beverage.usd,
                 foodCdf: categorySummary.food.cdf,
                 foodUsd: categorySummary.food.usd,
+                openingBalanceCdf: openingBalance,
+                expensesCdf: cashTotals.totalExpenses,
+                purchasesCdf: cashTotals.totalPurchases,
+                cashInHandCdf: cashInHand,
             },
             pagination: {
                 total,

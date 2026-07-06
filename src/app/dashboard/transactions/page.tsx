@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useSession } from "next-auth/react";
-import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, Trash2, Edit, Receipt, Wine, UtensilsCrossed } from "lucide-react";
+import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, Trash2, Edit, Receipt, Wine, UtensilsCrossed, Wallet, TrendingDown, TrendingUp, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useReactToPrint } from "react-to-print";
@@ -24,6 +24,10 @@ export default function TransactionsPage() {
         beverageUsd: 0,
         foodCdf: 0,
         foodUsd: 0,
+        openingBalanceCdf: 0,
+        expensesCdf: 0,
+        purchasesCdf: 0,
+        cashInHandCdf: 0,
     });
     const [showCategorySplit, setShowCategorySplit] = useState(true);
     const [loading, setLoading] = useState(true);
@@ -92,6 +96,10 @@ export default function TransactionsPage() {
                     beverageUsd: 0,
                     foodCdf: 0,
                     foodUsd: 0,
+                    openingBalanceCdf: 0,
+                    expensesCdf: 0,
+                    purchasesCdf: 0,
+                    cashInHandCdf: 0,
                 });
                 setTotalPages(data.pagination.totalPages);
             }
@@ -313,6 +321,52 @@ export default function TransactionsPage() {
                         <div className="bg-gray-900 p-4 md:p-5 rounded-lg md:rounded-sm shadow-md text-white flex flex-col justify-center sm:col-span-2 lg:col-span-1">
                             <p className="text-[10px] uppercase font-black tracking-widest opacity-60">Nombre d&apos;opérations</p>
                             <p className="text-xl md:text-2xl font-black">{transactions.length > 0 ? (transactions.length + (page - 1) * 10).toLocaleString('fr-FR') : 0}</p>
+                        </div>
+                    </div>
+
+                    {/* Trésorerie caisse */}
+                    <div className="bg-white border border-gray-200 rounded-lg md:rounded-sm shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-gray-700 flex items-center gap-2">
+                                <Wallet size={14} className="text-[#00d3fa]" />
+                                Trésorerie caisse — après dépenses & achats
+                            </h3>
+                        </div>
+                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                            {summary.openingBalanceCdf > 0 && (
+                                <TreasuryLine
+                                    label="Solde reporté"
+                                    value={summary.openingBalanceCdf}
+                                    tone="indigo"
+                                />
+                            )}
+                            <TreasuryLine
+                                label="Ventes encaissées"
+                                value={summary.totalCdf}
+                                tone="green"
+                                prefix="+"
+                            />
+                            <TreasuryLine
+                                label="Dépenses caisse"
+                                value={summary.expensesCdf}
+                                tone="red"
+                                prefix="−"
+                            />
+                            <TreasuryLine
+                                label="Achats (menu Achat)"
+                                value={summary.purchasesCdf}
+                                tone="orange"
+                                prefix="−"
+                            />
+                            <div className="bg-[#00d3fa]/10 border-2 border-[#00d3fa] rounded-lg md:rounded-sm p-4 flex flex-col justify-center">
+                                <p className="text-[10px] uppercase font-black text-[#00d3fa] tracking-wider mb-1">En main (FC)</p>
+                                <p className="text-xl md:text-2xl font-black text-[#00d3fa] leading-none">
+                                    {summary.cashInHandCdf.toLocaleString("fr-FR")} <span className="text-xs opacity-60">FC</span>
+                                </p>
+                                <p className="text-[10px] text-gray-500 mt-1 font-medium">
+                                    Ventes − Dépenses − Achats{summary.openingBalanceCdf > 0 ? " + Report" : ""}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -603,6 +657,43 @@ export default function TransactionsPage() {
                 </div>
             </div>
         </DashboardLayout>
+    );
+}
+
+function TreasuryLine({
+    label,
+    value,
+    tone,
+    prefix = "",
+}: {
+    label: string;
+    value: number;
+    tone: "green" | "red" | "orange" | "indigo";
+    prefix?: string;
+}) {
+    const styles = {
+        green: "bg-green-50 border-green-100 text-green-800",
+        red: "bg-red-50 border-red-100 text-red-800",
+        orange: "bg-orange-50 border-orange-100 text-orange-800",
+        indigo: "bg-indigo-50 border-indigo-100 text-indigo-800",
+    };
+    const icons = {
+        green: TrendingUp,
+        red: TrendingDown,
+        orange: ShoppingCart,
+        indigo: Wallet,
+    };
+    const Icon = icons[tone];
+
+    return (
+        <div className={`border rounded-lg md:rounded-sm p-4 ${styles[tone]}`}>
+            <p className="text-[10px] uppercase font-black tracking-wider opacity-70 flex items-center gap-1 mb-1">
+                <Icon size={12} /> {label}
+            </p>
+            <p className="text-lg font-black leading-none">
+                {prefix}{value.toLocaleString("fr-FR")} <span className="text-xs opacity-50">FC</span>
+            </p>
+        </div>
     );
 }
 

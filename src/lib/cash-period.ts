@@ -100,6 +100,49 @@ export function resolveSummaryDateRange(
   return { gte, lte };
 }
 
+export function resolveTransactionsDateRange(
+  period: string | null | undefined,
+  startDate: string | null | undefined,
+  endDate: string | null | undefined
+): { gte: Date; lte: Date } | null {
+  const now = new Date();
+
+  if (period && period !== "all") {
+    let start: Date;
+    if (period === "day") {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (period === "3days") {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+      start.setHours(0, 0, 0, 0);
+    } else if (period === "week") {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      start = new Date(now.getFullYear(), now.getMonth(), diff);
+      start.setHours(0, 0, 0, 0);
+    } else if (period === "month") {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (period === "year") {
+      start = new Date(now.getFullYear(), 0, 1);
+    } else {
+      start = new Date(0);
+    }
+    return { gte: start, lte: now };
+  }
+
+  if (startDate && endDate) {
+    return {
+      gte: new Date(startDate),
+      lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+    };
+  }
+
+  if (startDate) {
+    return { gte: new Date(startDate), lte: now };
+  }
+
+  return null;
+}
+
 export async function getCashPeriodTotals(range: CashPeriodRange): Promise<CashPeriodTotals> {
   const dateFilter = { gte: range.gte, lte: range.lte };
 
