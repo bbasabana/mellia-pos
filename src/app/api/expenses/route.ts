@@ -12,16 +12,27 @@ export async function GET(req: Request) {
         }
 
         const { searchParams } = new URL(req.url);
-        const period = searchParams.get("period") || "all"; // all, today, week, month, year, custom
+        const period = searchParams.get("period") || "current"; // current, all, today, week, month, year, custom
         const start = searchParams.get("start");
         const end = searchParams.get("end");
 
         let whereClause: any = {};
 
         const now = new Date();
+        const lastClosure = await prisma.cashMonthClosure.findFirst({
+            orderBy: { closedAt: "desc" },
+            select: { closedAt: true },
+        });
+        const openPeriodStart = lastClosure?.closedAt ?? null;
+
         if (period === "all") {
-            // No date filter - fetch all expenses
             whereClause = {};
+        } else if (period === "current") {
+            if (openPeriodStart) {
+                whereClause = { date: { gte: openPeriodStart, lte: now } };
+            } else {
+                whereClause = {};
+            }
         } else if (period === "today") {
             const gte = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const lte = new Date();

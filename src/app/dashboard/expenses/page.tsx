@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useSession } from "next-auth/react";
 import {
     Plus, Filter, Calendar, TrendingUp, TrendingDown,
     ShoppingCart, Wallet, Loader2, DollarSign, X,
-    Edit, Trash2, PieChart, AlertCircle, Calculator
+    Edit, Trash2, PieChart, AlertCircle, Calculator, Lock
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -19,6 +20,25 @@ interface Summary {
     balance: number;
     totalExpensesBoss: number;
     period: string;
+    openingBalance: number;
+    openPeriodStart: string | null;
+    lastClosure: {
+        label: string;
+        closedAt: string;
+        totalSalesCdf: number;
+        closingBalanceCdf: number;
+    } | null;
+}
+
+interface ClosurePreview {
+    openingBalance: number;
+    currentPeriod: {
+        totalSales: number;
+        totalExpenses: number;
+        totalPurchases: number;
+        theoreticalBalance: number;
+    };
+    lastClosure: Summary["lastClosure"];
 }
 
 interface Category {
@@ -37,8 +57,11 @@ interface Expense {
 }
 
 export default function ExpensesPage() {
+    const { data: session } = useSession();
+    const isManager = ["ADMIN", "MANAGER"].includes((session?.user as { role?: string })?.role || "");
+
     const [loading, setLoading] = useState(true);
-    const [period, setPeriod] = useState("all");
+    const [period, setPeriod] = useState("current");
     const [summary, setSummary] = useState<Summary | null>(null);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -52,7 +75,11 @@ export default function ExpensesPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+    const [showClosureModal, setShowClosureModal] = useState(false);
     const [actualCash, setActualCash] = useState("");
+    const [closingCash, setClosingCash] = useState("");
+    const [closureNotes, setClosureNotes] = useState("");
+    const [closurePreview, setClosurePreview] = useState<ClosurePreview | null>(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -169,6 +196,66 @@ export default function ExpensesPage() {
         }
     };
 
+    const fetchClosurePreview = useCallback(async () => {
+        try {
+            const res = await fetch("/api/expenses/month-closure");
+            const data = await res.json();
+            if (data.success) {
+                setClosurePreview(data.data);
+                setClosingCash(String(data.data.currentPeriod.theoreticalBalance));
+            }
+        } catch (error) {
+            console.error("Failed to fetch closure preview", error);
+        }
+    }, []);
+
+    const openClosureModal = () => {
+        fetchClosurePreview();
+        setClosureNotes("");
+        setShowClosureModal(true);
+    };
+
+    const handleMonthClosure = async () => {
+        const closingBalanceCdf = Number(closingCash);
+        if (!Number.isFinite(closingBalanceCdf) || closingBalanceCdf < 0) {
+            showToast("Montant de clôture invalide", "error");
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const res = await fetch("/api/expenses/month-closure", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    closingBalanceCdf,
+                    notes: closureNotes,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`Mois clôturé — ${formatCurrency(data.data.closingBalanceCdf)} reportés`, "success");
+                setShowClosureModal(false);
+                fetchData();
+            } else {
+                showToast(data.error || "Erreur de clôture", "error");
+            }
+        } catch {
+            showToast("Erreur réseau", "error");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const getPeriodLabel = () => {
+        if (period === "current") return "Période en cours";
+        if (period === "all") return "Depuis le début";
+        if (period === "today") return "Aujourd'hui";
+        if (period === "week") return "Cette semaine";
+        if (period === "month") return "Ce mois";
+        return "Cette année";
+    };
+
     const formatCurrency = (val: number) => {
         return new Intl.NumberFormat('fr-CD', {
             style: 'currency',
@@ -214,6 +301,7 @@ export default function ExpensesPage() {
                                 onChange={(e) => setPeriod(e.target.value)}
                                 className="bg-transparent border-l border-gray-100 px-3 py-1.5 text-xs font-bold text-gray-800 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
                             >
+                                <option value="current">Période en cours</option>
                                 <option value="all">Toutes</option>
                                 <option value="today">Aujourd&apos;hui</option>
                                 <option value="week">Cette Semaine</option>
@@ -221,6 +309,15 @@ export default function ExpensesPage() {
                                 <option value="year">Cette Année</option>
                             </select>
                         </div>
+                        {isManager && (
+                            <button
+                                className="bg-[#00d3fa] text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-[#00b8e0] transition-all shadow-md active:scale-95"
+                                onClick={openClosureModal}
+                            >
+                                <Lock size={16} />
+                                Clôturer le mois
+                            </button>
+                        )}
                         <button
                             className="bg-black text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-gray-800 transition-all shadow-md active:scale-95"
                             onClick={() => { setEditingExpense(null); setShowModal(true); }}
@@ -240,9 +337,17 @@ export default function ExpensesPage() {
                         </div>
                     ) : (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                                {(summary?.openingBalance || 0) > 0 && (
+                                    <KpiCard
+                                        title="Solde reporté (clôture)"
+                                        value={formatCurrency(summary?.openingBalance || 0)}
+                                        icon={<Lock size={20} />}
+                                        color="bg-indigo-50 text-indigo-600 border-indigo-100"
+                                    />
+                                )}
                                 <KpiCard
-                                    title="Total Ventes (Caisse)"
+                                    title={`Ventes — ${getPeriodLabel()}`}
                                     value={formatCurrency(summary?.totalSales || 0)}
                                     icon={<TrendingUp size={20} />}
                                     color="bg-green-50 text-green-600 border-green-100"
@@ -281,6 +386,21 @@ export default function ExpensesPage() {
                                 </div>
                             </div>
 
+                            {summary?.lastClosure && (
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-[10px] uppercase font-black text-indigo-500 tracking-wider">Dernière clôture</p>
+                                        <p className="font-bold text-indigo-900 text-sm mt-1">{summary.lastClosure.label}</p>
+                                        <p className="text-xs text-indigo-600 mt-0.5">
+                                            Recettes : {formatCurrency(summary.lastClosure.totalSalesCdf)} · Reporté : {formatCurrency(summary.lastClosure.closingBalanceCdf)}
+                                        </p>
+                                    </div>
+                                    <p className="text-[10px] text-indigo-400 font-medium">
+                                        {format(new Date(summary.lastClosure.closedAt), "dd MMM yyyy HH:mm", { locale: fr })}
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Cash Flow Breakdown */}
                             <div className="bg-white border border-gray-200 rounded-sm shadow-sm p-6">
                                 <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -289,6 +409,18 @@ export default function ExpensesPage() {
                                 </h3>
                                 
                                 <div className="space-y-3">
+                                    {(summary?.openingBalance || 0) > 0 && (
+                                        <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-4">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm text-indigo-700 font-medium flex items-center gap-1">
+                                                    <Lock size={12} className="text-indigo-500" />
+                                                    Solde reporté (après dernière clôture)
+                                                </span>
+                                                <span className="text-lg font-black text-indigo-800">{formatCurrency(summary?.openingBalance || 0)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Entries */}
                                     <div className="bg-green-50 border border-green-100 rounded-sm p-4">
                                         <div className="flex items-center justify-between mb-2">
@@ -365,10 +497,7 @@ export default function ExpensesPage() {
                                                     {formatCurrency(summary?.balance || 0)}
                                                 </div>
                                                 <div className="text-[10px] text-gray-500 font-medium mt-1">
-                                                    {period === "all" ? "Depuis le début" : 
-                                                     period === "today" ? "Aujourd'hui" :
-                                                     period === "week" ? "Cette semaine" :
-                                                     period === "month" ? "Ce mois" : "Cette année"}
+                                                    {getPeriodLabel()}
                                                 </div>
                                             </div>
                                         </div>
@@ -379,10 +508,10 @@ export default function ExpensesPage() {
                                         <div className="flex items-start gap-2">
                                             <AlertCircle size={14} className="text-blue-600 mt-0.5 shrink-0" />
                                             <div className="text-xs text-blue-700 leading-relaxed">
-                                                <strong>Formule:</strong> Solde Caisse = Ventes (CASH) - Dépenses (Caisse) - Achats (Caisse)
+                                                <strong>Formule:</strong> Solde = Report clôture + Ventes - Dépenses - Achats
                                                 <br />
                                                 <span className="text-[10px] text-blue-600 mt-1 inline-block">
-                                                    Les dépenses payées par le Boss et les ventes à crédit ne sont pas déduites du solde caisse.
+                                                    Utilisez « Clôturer le mois » pour archiver les recettes et démarrer une nouvelle période avec le solde réel en caisse.
                                                 </span>
                                             </div>
                                         </div>
@@ -780,6 +909,91 @@ export default function ExpensesPage() {
                                     className="w-full bg-gray-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-black transition-all shadow-lg active:scale-95"
                                 >
                                     {submitting ? "Traitement..." : "Confirmer l'ajustement"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* Month Closure Modal */}
+                {showClosureModal && closurePreview && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+                            <div className="px-6 py-4 border-b border-gray-100 bg-indigo-900 text-white flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
+                                        <Lock size={16} /> Clôturer la période
+                                    </h3>
+                                    <p className="text-[10px] opacity-70 mt-1">Archive les recettes et démarre une nouvelle période</p>
+                                </div>
+                                <button onClick={() => setShowClosureModal(false)}><X size={20} /></button>
+                            </div>
+                            <div className="p-6 space-y-5">
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div className="bg-gray-50 p-3 rounded-sm border border-gray-100">
+                                        <p className="text-[10px] uppercase font-bold text-gray-400">Solde reporté</p>
+                                        <p className="font-black text-indigo-700 mt-1">{formatCurrency(closurePreview.openingBalance)}</p>
+                                    </div>
+                                    <div className="bg-green-50 p-3 rounded-sm border border-green-100">
+                                        <p className="text-[10px] uppercase font-bold text-green-600">Recettes période</p>
+                                        <p className="font-black text-green-800 mt-1">{formatCurrency(closurePreview.currentPeriod.totalSales)}</p>
+                                    </div>
+                                    <div className="bg-red-50 p-3 rounded-sm border border-red-100">
+                                        <p className="text-[10px] uppercase font-bold text-red-600">Dépenses caisse</p>
+                                        <p className="font-black text-red-800 mt-1">{formatCurrency(closurePreview.currentPeriod.totalExpenses)}</p>
+                                    </div>
+                                    <div className="bg-orange-50 p-3 rounded-sm border border-orange-100">
+                                        <p className="text-[10px] uppercase font-bold text-orange-600">Achats caisse</p>
+                                        <p className="font-black text-orange-800 mt-1">{formatCurrency(closurePreview.currentPeriod.totalPurchases)}</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 p-4 border border-gray-200 rounded-sm">
+                                    <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                                        <span>Solde théorique</span>
+                                        <span>Argent réel en caisse</span>
+                                    </div>
+                                    <div className="flex justify-between items-center gap-4">
+                                        <span className="text-sm font-bold text-gray-600">{formatCurrency(closurePreview.currentPeriod.theoreticalBalance)}</span>
+                                        <input
+                                            type="number"
+                                            value={closingCash}
+                                            onChange={(e) => setClosingCash(e.target.value)}
+                                            className="bg-white border-2 border-indigo-900 rounded-sm px-3 py-2 w-36 text-right font-black text-lg outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                {Number(closingCash) !== closurePreview.currentPeriod.theoreticalBalance && (
+                                    <div className="p-3 rounded-sm border bg-amber-50 border-amber-200 text-amber-800 flex items-start gap-2">
+                                        <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                        <p className="text-xs font-bold">
+                                            Un ajustement de {formatCurrency(Math.abs(Number(closingCash) - closurePreview.currentPeriod.theoreticalBalance))} sera enregistré automatiquement avant la clôture.
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-gray-400">Note (optionnel)</label>
+                                    <input
+                                        type="text"
+                                        value={closureNotes}
+                                        onChange={(e) => setClosureNotes(e.target.value)}
+                                        placeholder="Ex: Clôture fin juin 2026"
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-3 text-xs text-indigo-800">
+                                    <strong>Après clôture :</strong> les recettes ({formatCurrency(closurePreview.currentPeriod.totalSales)}) seront archivées.
+                                    La nouvelle période démarrera avec <strong>{formatCurrency(Number(closingCash) || 0)}</strong> en caisse.
+                                </div>
+
+                                <button
+                                    onClick={handleMonthClosure}
+                                    disabled={submitting}
+                                    className="w-full bg-indigo-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-indigo-950 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                >
+                                    {submitting ? "Clôture en cours..." : "Confirmer la clôture du mois"}
                                 </button>
                             </div>
                         </div>

@@ -32,6 +32,7 @@ model User {
   sales                 Sale[]
   sessions              Session[]
   stockMovements        StockMovement[]
+  cashMonthClosures     CashMonthClosure[]
 
   @@index([email])
   @@index([role])
@@ -582,6 +583,27 @@ enum StockMovementType {
   TRANSFER
   LOSS
   ADJUSTMENT
+}
+
+model CashMonthClosure {
+  id                    String   @id @default(cuid())
+  closedAt              DateTime @default(now())
+  periodStart           DateTime
+  periodEnd             DateTime
+  label                 String
+  totalSalesCdf         Decimal  @db.Decimal(15, 2)
+  totalExpensesCdf      Decimal  @db.Decimal(15, 2)
+  totalPurchasesCdf     Decimal  @db.Decimal(15, 2)
+  openingBalanceCdf     Decimal  @default(0) @db.Decimal(15, 2)
+  theoreticalBalanceCdf Decimal  @db.Decimal(15, 2)
+  closingBalanceCdf     Decimal  @db.Decimal(15, 2)
+  adjustmentCdf         Decimal  @default(0) @db.Decimal(15, 2)
+  notes                 String?
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id])
+
+  @@index([closedAt])
+  @@map("cash_month_closures")
 }
 
 enum FundSource {
