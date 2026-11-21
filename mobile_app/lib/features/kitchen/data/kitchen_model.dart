@@ -3,6 +3,11 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'kitchen_model.freezed.dart';
 part 'kitchen_model.g.dart';
 
+/// Prisma Decimals arrive as strings ("2"), Ints as numbers: accept both.
+double _toDouble(Object? v) =>
+    v is num ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0;
+int _toInt(Object? v) => v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? 0;
+
 @freezed
 abstract class KitchenOrder with _$KitchenOrder {
   const factory KitchenOrder({
@@ -10,7 +15,7 @@ abstract class KitchenOrder with _$KitchenOrder {
     required String orderType,
     required String status, // PENDING, IN_PREPARATION, READY, DELIVERED
     required DateTime createdAt,
-    required int priority,
+    @JsonKey(fromJson: _toInt) @Default(0) int priority,
     required KitchenSale sale,
   }) = _KitchenOrder;
 
@@ -24,6 +29,8 @@ abstract class KitchenSale with _$KitchenSale {
     required String ticketNum,
     required List<KitchenItem> items,
     KitchenClient? client,
+    // Cashier who took the order (the API sends {name}).
+    KitchenClient? user,
   }) = _KitchenSale;
 
   factory KitchenSale.fromJson(Map<String, dynamic> json) =>
@@ -35,7 +42,7 @@ abstract class KitchenItem with _$KitchenItem {
   const factory KitchenItem({
     required String id,
     required KitchenProduct product,
-    required double quantity,
+    @JsonKey(fromJson: _toDouble) required double quantity,
   }) = _KitchenItem;
 
   factory KitchenItem.fromJson(Map<String, dynamic> json) =>

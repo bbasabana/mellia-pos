@@ -28,6 +28,36 @@ class KitchenRepository {
   Future<void> deleteOrder(String orderId) async {
     await _dio.delete('/api/kitchen/orders/$orderId');
   }
+
+  /// Deletes the given orders. With [all], first asks the server to clear the whole kitchen in
+  /// one call; a server without that route gets the orders deleted one by one (8 at a time).
+  /// Returns how many were deleted.
+  Future<int> deleteMany(List<String> ids, {bool all = false}) async {
+    if (all) {
+      try {
+        final res = await _dio.delete(
+          '/api/kitchen/orders',
+          queryParameters: {'scope': 'all'},
+        );
+        final n = res.data is Map ? res.data['count'] : null;
+        return n is num ? n.toInt() : ids.length;
+      } on DioException catch (e) {
+        final code = e.response?.statusCode;
+        if (code != 404 && code != 405) rethrow;
+      }
+    }
+    var done = 0;
+    for (var i = 0; i < ids.length; i += 8) {
+      final batch = ids.skip(i).take(8);
+      await Future.wait(
+        batch.map((id) async {
+          await deleteOrder(id);
+          done++;
+        }),
+      );
+    }
+    return done;
+  }
 }
 
 @riverpod

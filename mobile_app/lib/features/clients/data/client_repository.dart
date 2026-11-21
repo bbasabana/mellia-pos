@@ -44,7 +44,10 @@ class ClientRepository {
         data: {"name": name, "phone": phone},
       );
       return Client.fromJson(response.data);
-    } catch (e) {
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        throw Exception("Un client avec ce téléphone existe déjà.");
+      }
       throw Exception("Impossible de créer le client");
     }
   }

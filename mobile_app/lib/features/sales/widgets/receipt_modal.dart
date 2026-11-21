@@ -3,18 +3,27 @@ import 'package:intl/intl.dart';
 import 'package:mellia_pos_mobile/core/constants/app_assets.dart';
 import 'package:mellia_pos_mobile/features/auth/providers/auth_provider.dart';
 import 'package:mellia_pos_mobile/core/services/printer_service.dart';
+import 'package:mellia_pos_mobile/core/services/receipt_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mellia_pos_mobile/core/constants/api_constants.dart';
+import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
+import 'package:mellia_pos_mobile/shared/widgets/motion.dart';
 
 class ReceiptModal extends ConsumerStatefulWidget {
   final Map<String, dynamic> saleData;
   final String paymentMethod;
   final double amountPaid;
 
+  /// Currency the customer paid with: 'CDF' (francs) or 'USD'.
+  final String paidCurrency;
+
   const ReceiptModal({
     super.key,
     required this.saleData,
     required this.paymentMethod,
     required this.amountPaid,
+    this.paidCurrency = 'CDF',
   });
 
   @override
@@ -54,13 +63,16 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
             cashierName: user?.name,
             paymentMethod: paymentMethod,
             amountPaid: amountPaid,
+            paidCurrency: widget.paidCurrency,
           );
       if (mounted) setState(() => _printed = true);
     } catch (e) {
       if (mounted) {
         final reason = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(auto ? "Ticket non imprimé : $reason" : reason)),
+          SnackBar(
+            content: Text(auto ? "Ticket non imprimé : $reason" : reason),
+          ),
         );
       }
     } finally {
@@ -83,148 +95,248 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
     final ticketNum = saleData['ticketNum'] ?? "N/A";
     final clientName = saleData['client']?['name'] ?? "Passant";
 
+    final saleId = saleData['id']?.toString() ?? '';
+    final fcFormat = NumberFormat.decimalPattern('fr');
+    String fc(num v) => '${fcFormat.format(v.round())} FC';
+    final cashier = receiptCashier(ref.watch(receiptNameProvider), user?.name);
+    const methodLabels = {
+      'CASH': 'Espèces',
+      'CARD': 'Carte',
+      'MOBILE_MONEY': 'Mobile Money',
+    };
+
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: AppTheme.canvas,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header
-            Image.asset(AppAssets.logo, height: 60),
-            const SizedBox(height: 12),
-            const Text(
-              "MELLIA RESTO",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const Text(
-              "10, Bypass, Mont-ngafula, Kinshasa",
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            const Divider(height: 32, thickness: 1),
-
-            // Info
-            _buildInfoRow("Ticket", "#$ticketNum"),
-            _buildInfoRow("Date", dateFormat.format(createdAt)),
-            _buildInfoRow("Caissier", user?.name ?? "N/A"),
-            _buildInfoRow("Client", clientName),
-            const Divider(height: 32, thickness: 1),
-
-            // Items
-            ...items.map((item) {
-              final product = item['product'] ?? {};
-              final qty = double.tryParse(item['quantity'].toString()) ?? 1.0;
-              final price =
-                  double.tryParse(item['unitPrice'].toString()) ?? 0.0;
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product['name'] ?? "Inconnu",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            "${qty.toInt()} x \$${price.toStringAsFixed(2)}",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      "\$${(qty * price).toStringAsFixed(2)}",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+          child: Column(
+            children: [
+              Container(
+                width: 38,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppTheme.line,
+                  borderRadius: BorderRadius.circular(3),
                 ),
-              );
-            }),
-
-            const Divider(height: 32, thickness: 1),
-
-            // Totals
-            _buildTotalRow("SOUS-TOTAL", "\$${totalUsd.toStringAsFixed(2)}"),
-            _buildTotalRow("TVA (0%)", "\$0.00"),
-            const SizedBox(height: 12),
-            _buildTotalRow(
-              "TOTAL",
-              "\$${totalUsd.toStringAsFixed(2)}",
-              isBold: true,
-            ),
-            _buildTotalRow(
-              "TOTAL (FC)",
-              "${NumberFormat("#,###").format(totalCdf)} FC",
-              isBold: true,
-            ),
-
-            const Divider(height: 32, thickness: 1),
-            _buildInfoRow("Mode de Paiement", paymentMethod),
-            _buildInfoRow("Montant Reçu", "\$${amountPaid.toStringAsFixed(2)}"),
-            _buildInfoRow(
-              "Rendu",
-              "\$${(amountPaid - totalUsd).toStringAsFixed(2)}",
-            ),
-
-            const SizedBox(height: 40),
-            const Text(
-              "MERCI DE VOTRE VISITE !",
-              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              "Mangez comme chez vous",
-              style: TextStyle(
-                fontStyle: FontStyle.italic,
-                color: Colors.black87,
               ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              "Facture certifiée par Mellia API",
-              style: TextStyle(fontSize: 10, color: Colors.grey),
-            ),
-
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _printing ? null : () => _print(),
-                icon: _printing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.print),
-                label: Text(_printing
-                    ? "IMPRESSION..."
-                    : (_printed ? "RÉIMPRIMER LE REÇU" : "IMPRIMER REÇU")),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 18),
+              const _SuccessBadge(),
+              const SizedBox(height: 12),
+              const FadeSlideIn(
+                index: 2,
+                child: Text(
+                  'Vente enregistrée',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-          ],
+              FadeSlideIn(
+                index: 3,
+                child: Text(
+                  '${fc(totalCdf)}  ·  \$${totalUsd.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: AppTheme.muted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // The receipt itself
+              FadeSlideIn(
+                index: 4,
+                offset: 24,
+                child: SoftCard(
+                  radius: 20,
+                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+                  child: Column(
+                    children: [
+                      Image.asset(AppAssets.logo, height: 48),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '10, Bypass, Mont-Ngafula, Kinshasa',
+                        style: TextStyle(color: AppTheme.muted, fontSize: 11.5),
+                      ),
+                      const _Dashed(),
+                      _buildInfoRow('Ticket', '#$ticketNum'),
+                      _buildInfoRow('Date', dateFormat.format(createdAt)),
+                      _buildInfoRow('Caissier', cashier ?? '—'),
+                      _buildInfoRow('Client', clientName),
+                      const _Dashed(),
+                      ...items.map((item) {
+                        final product = item['product'] ?? {};
+                        final qty =
+                            double.tryParse(item['quantity'].toString()) ?? 1.0;
+                        final price =
+                            double.tryParse(item['unitPriceCdf'].toString()) ??
+                            0.0;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(
+                                  right: 10,
+                                  top: 1,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.canvas,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${qty.toInt()}×',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  product['name'] ?? 'Article',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                fc(qty * price),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const _Dashed(),
+                      _buildTotalRow('Total', fc(totalCdf), isBold: true),
+                      _buildTotalRow(
+                        'Soit',
+                        '\$${totalUsd.toStringAsFixed(2)}',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        'Paiement',
+                        methodLabels[paymentMethod] ?? paymentMethod,
+                      ),
+                      if (amountPaid > 0)
+                        _buildInfoRow(
+                          'Reçu',
+                          widget.paidCurrency == 'USD'
+                              ? '\$${amountPaid.toStringAsFixed(2)}'
+                              : fc(amountPaid),
+                        ),
+                      if (saleId.isNotEmpty) ...[
+                        const _Dashed(),
+                        QrImageView(
+                          data: '${ApiConstants.baseUrl}/v/$saleId',
+                          size: 120,
+                          padding: EdgeInsets.zero,
+                          eyeStyle: const QrEyeStyle(
+                            eyeShape: QrEyeShape.square,
+                            color: AppTheme.ink,
+                          ),
+                          dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleShape: QrDataModuleShape.square,
+                            color: AppTheme.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Scannez pour vérifier l\'authenticité',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppTheme.muted,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Merci de votre visite !',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const Text(
+                        'Mangez comme chez vous',
+                        style: TextStyle(
+                          fontStyle: FontStyle.italic,
+                          color: AppTheme.muted,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              FadeSlideIn(
+                index: 6,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(52),
+                        ),
+                        child: const Text('Nouvelle vente'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _printing ? null : () => _print(),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                        ),
+                        icon: AnimatedSwitcher(
+                          duration: AppTheme.fast,
+                          child: _printing
+                              ? const SizedBox(
+                                  key: ValueKey('p'),
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Icon(
+                                  _printed
+                                      ? Icons.check_rounded
+                                      : Icons.print_rounded,
+                                  key: ValueKey(_printed),
+                                  size: 20,
+                                ),
+                        ),
+                        label: Text(
+                          _printing
+                              ? 'Impression…'
+                              : (_printed ? 'Réimprimer' : 'Imprimer'),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -236,7 +348,10 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          Text(
+            label,
+            style: const TextStyle(color: AppTheme.muted, fontSize: 13),
+          ),
           Text(
             value,
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -255,18 +370,129 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
           Text(
             label,
             style: TextStyle(
-              fontWeight: isBold ? FontWeight.w900 : FontWeight.normal,
-              fontSize: isBold ? 18 : 14,
+              fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+              fontSize: isBold ? 17 : 13.5,
+              color: isBold ? AppTheme.ink : AppTheme.muted,
             ),
           ),
           Text(
             value,
             style: TextStyle(
-              fontWeight: isBold ? FontWeight.w900 : FontWeight.bold,
-              fontSize: isBold ? 18 : 14,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+              fontSize: isBold ? 17 : 13.5,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Green check that pops in, then its ring fades out (sale confirmed).
+class _SuccessBadge extends StatefulWidget {
+  const _SuccessBadge();
+
+  @override
+  State<_SuccessBadge> createState() => _SuccessBadgeState();
+}
+
+class _SuccessBadgeState extends State<_SuccessBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..forward();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pop = CurvedAnimation(
+      parent: _c,
+      curve: const Interval(0, 0.55, curve: Curves.easeOutBack),
+    );
+    final ring = CurvedAnimation(
+      parent: _c,
+      curve: const Interval(0.3, 1, curve: Curves.easeOut),
+    );
+    return SizedBox(
+      width: 84,
+      height: 84,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) => Stack(
+          alignment: Alignment.center,
+          children: [
+            Transform.scale(
+              scale: 0.8 + ring.value * 0.45,
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.lime.withValues(
+                    alpha: 0.35 * (1 - ring.value),
+                  ),
+                ),
+              ),
+            ),
+            Transform.scale(
+              scale: pop.value,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppTheme.lime, AppTheme.limeDark],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.limeDark.withValues(alpha: 0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 34,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dashed separator, like the tear line of a paper receipt.
+class _Dashed extends StatelessWidget {
+  const _Dashed();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final n = (c.maxWidth / 8).floor();
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(
+              n,
+              (_) => Container(width: 4, height: 1.2, color: AppTheme.line),
+            ),
+          );
+        },
       ),
     );
   }

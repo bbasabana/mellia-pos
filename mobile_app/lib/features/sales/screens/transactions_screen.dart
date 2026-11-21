@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mellia_pos_mobile/shared/widgets/motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
@@ -23,18 +24,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppTheme.canvas,
       appBar: AppBar(
-        title: const Text(
-          "Transactions",
-          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black),
-        ),
-        backgroundColor: Colors.white,
+        title: const Text("Historique des ventes"),
         elevation: 0,
         actions: [
           IconButton(
             onPressed: () => _selectDate(context),
-            icon: const Icon(Icons.calendar_today, color: Colors.black),
+            icon: const Icon(Icons.calendar_month_rounded),
           ),
           IconButton(
             onPressed: () => ref.invalidate(transactionsProvider),
@@ -66,7 +63,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         itemCount: sales.length,
                         itemBuilder: (context, index) {
                           final sale = sales[index];
-                          return _TransactionCard(sale: sale);
+                          return FadeSlideIn(
+                            index: index,
+                            child: _TransactionCard(sale: sale),
+                          );
                         },
                       ),
               ),
@@ -99,14 +99,14 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppTheme.primaryBlue, Color(0xFF1E293B)],
+          colors: [Color(0xFF1B2638), AppTheme.ink],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryBlue.withOpacity(0.3),
+            color: AppTheme.ink.withValues(alpha: 0.22),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

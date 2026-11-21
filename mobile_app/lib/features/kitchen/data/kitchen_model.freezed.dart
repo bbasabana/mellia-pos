@@ -16,7 +16,7 @@ T _$identity<T>(T value) => value;
 mixin _$KitchenOrder {
 
  String get id; String get orderType; String get status;// PENDING, IN_PREPARATION, READY, DELIVERED
- DateTime get createdAt; int get priority; KitchenSale get sale;
+ DateTime get createdAt;@JsonKey(fromJson: _toInt) int get priority; KitchenSale get sale;
 /// Create a copy of KitchenOrder
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -49,7 +49,7 @@ abstract mixin class $KitchenOrderCopyWith<$Res>  {
   factory $KitchenOrderCopyWith(KitchenOrder value, $Res Function(KitchenOrder) _then) = _$KitchenOrderCopyWithImpl;
 @useResult
 $Res call({
- String id, String orderType, String status, DateTime createdAt, int priority, KitchenSale sale
+ String id, String orderType, String status, DateTime createdAt,@JsonKey(fromJson: _toInt) int priority, KitchenSale sale
 });
 
 
@@ -168,7 +168,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String orderType,  String status,  DateTime createdAt,  int priority,  KitchenSale sale)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String orderType,  String status,  DateTime createdAt, @JsonKey(fromJson: _toInt)  int priority,  KitchenSale sale)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _KitchenOrder() when $default != null:
 return $default(_that.id,_that.orderType,_that.status,_that.createdAt,_that.priority,_that.sale);case _:
@@ -189,7 +189,7 @@ return $default(_that.id,_that.orderType,_that.status,_that.createdAt,_that.prio
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String orderType,  String status,  DateTime createdAt,  int priority,  KitchenSale sale)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String orderType,  String status,  DateTime createdAt, @JsonKey(fromJson: _toInt)  int priority,  KitchenSale sale)  $default,) {final _that = this;
 switch (_that) {
 case _KitchenOrder():
 return $default(_that.id,_that.orderType,_that.status,_that.createdAt,_that.priority,_that.sale);case _:
@@ -209,7 +209,7 @@ return $default(_that.id,_that.orderType,_that.status,_that.createdAt,_that.prio
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String orderType,  String status,  DateTime createdAt,  int priority,  KitchenSale sale)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String orderType,  String status,  DateTime createdAt, @JsonKey(fromJson: _toInt)  int priority,  KitchenSale sale)?  $default,) {final _that = this;
 switch (_that) {
 case _KitchenOrder() when $default != null:
 return $default(_that.id,_that.orderType,_that.status,_that.createdAt,_that.priority,_that.sale);case _:
@@ -224,7 +224,7 @@ return $default(_that.id,_that.orderType,_that.status,_that.createdAt,_that.prio
 @JsonSerializable()
 
 class _KitchenOrder implements KitchenOrder {
-  const _KitchenOrder({required this.id, required this.orderType, required this.status, required this.createdAt, required this.priority, required this.sale});
+  const _KitchenOrder({required this.id, required this.orderType, required this.status, required this.createdAt, @JsonKey(fromJson: _toInt) this.priority = 0, required this.sale});
   factory _KitchenOrder.fromJson(Map<String, dynamic> json) => _$KitchenOrderFromJson(json);
 
 @override final  String id;
@@ -232,7 +232,7 @@ class _KitchenOrder implements KitchenOrder {
 @override final  String status;
 // PENDING, IN_PREPARATION, READY, DELIVERED
 @override final  DateTime createdAt;
-@override final  int priority;
+@override@JsonKey(fromJson: _toInt) final  int priority;
 @override final  KitchenSale sale;
 
 /// Create a copy of KitchenOrder
@@ -268,7 +268,7 @@ abstract mixin class _$KitchenOrderCopyWith<$Res> implements $KitchenOrderCopyWi
   factory _$KitchenOrderCopyWith(_KitchenOrder value, $Res Function(_KitchenOrder) _then) = __$KitchenOrderCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String orderType, String status, DateTime createdAt, int priority, KitchenSale sale
+ String id, String orderType, String status, DateTime createdAt,@JsonKey(fromJson: _toInt) int priority, KitchenSale sale
 });
 
 
@@ -313,7 +313,8 @@ $KitchenSaleCopyWith<$Res> get sale {
 /// @nodoc
 mixin _$KitchenSale {
 
- String get ticketNum; List<KitchenItem> get items; KitchenClient? get client;
+ String get ticketNum; List<KitchenItem> get items; KitchenClient? get client;// Cashier who took the order (the API sends {name}).
+ KitchenClient? get user;
 /// Create a copy of KitchenSale
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -326,16 +327,16 @@ $KitchenSaleCopyWith<KitchenSale> get copyWith => _$KitchenSaleCopyWithImpl<Kitc
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is KitchenSale&&(identical(other.ticketNum, ticketNum) || other.ticketNum == ticketNum)&&const DeepCollectionEquality().equals(other.items, items)&&(identical(other.client, client) || other.client == client));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is KitchenSale&&(identical(other.ticketNum, ticketNum) || other.ticketNum == ticketNum)&&const DeepCollectionEquality().equals(other.items, items)&&(identical(other.client, client) || other.client == client)&&(identical(other.user, user) || other.user == user));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,ticketNum,const DeepCollectionEquality().hash(items),client);
+int get hashCode => Object.hash(runtimeType,ticketNum,const DeepCollectionEquality().hash(items),client,user);
 
 @override
 String toString() {
-  return 'KitchenSale(ticketNum: $ticketNum, items: $items, client: $client)';
+  return 'KitchenSale(ticketNum: $ticketNum, items: $items, client: $client, user: $user)';
 }
 
 
@@ -346,11 +347,11 @@ abstract mixin class $KitchenSaleCopyWith<$Res>  {
   factory $KitchenSaleCopyWith(KitchenSale value, $Res Function(KitchenSale) _then) = _$KitchenSaleCopyWithImpl;
 @useResult
 $Res call({
- String ticketNum, List<KitchenItem> items, KitchenClient? client
+ String ticketNum, List<KitchenItem> items, KitchenClient? client, KitchenClient? user
 });
 
 
-$KitchenClientCopyWith<$Res>? get client;
+$KitchenClientCopyWith<$Res>? get client;$KitchenClientCopyWith<$Res>? get user;
 
 }
 /// @nodoc
@@ -363,11 +364,12 @@ class _$KitchenSaleCopyWithImpl<$Res>
 
 /// Create a copy of KitchenSale
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? ticketNum = null,Object? items = null,Object? client = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? ticketNum = null,Object? items = null,Object? client = freezed,Object? user = freezed,}) {
   return _then(_self.copyWith(
 ticketNum: null == ticketNum ? _self.ticketNum : ticketNum // ignore: cast_nullable_to_non_nullable
 as String,items: null == items ? _self.items : items // ignore: cast_nullable_to_non_nullable
 as List<KitchenItem>,client: freezed == client ? _self.client : client // ignore: cast_nullable_to_non_nullable
+as KitchenClient?,user: freezed == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
 as KitchenClient?,
   ));
 }
@@ -382,6 +384,18 @@ $KitchenClientCopyWith<$Res>? get client {
 
   return $KitchenClientCopyWith<$Res>(_self.client!, (value) {
     return _then(_self.copyWith(client: value));
+  });
+}/// Create a copy of KitchenSale
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$KitchenClientCopyWith<$Res>? get user {
+    if (_self.user == null) {
+    return null;
+  }
+
+  return $KitchenClientCopyWith<$Res>(_self.user!, (value) {
+    return _then(_self.copyWith(user: value));
   });
 }
 }
@@ -465,10 +479,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String ticketNum,  List<KitchenItem> items,  KitchenClient? client)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String ticketNum,  List<KitchenItem> items,  KitchenClient? client,  KitchenClient? user)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _KitchenSale() when $default != null:
-return $default(_that.ticketNum,_that.items,_that.client);case _:
+return $default(_that.ticketNum,_that.items,_that.client,_that.user);case _:
   return orElse();
 
 }
@@ -486,10 +500,10 @@ return $default(_that.ticketNum,_that.items,_that.client);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String ticketNum,  List<KitchenItem> items,  KitchenClient? client)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String ticketNum,  List<KitchenItem> items,  KitchenClient? client,  KitchenClient? user)  $default,) {final _that = this;
 switch (_that) {
 case _KitchenSale():
-return $default(_that.ticketNum,_that.items,_that.client);case _:
+return $default(_that.ticketNum,_that.items,_that.client,_that.user);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -506,10 +520,10 @@ return $default(_that.ticketNum,_that.items,_that.client);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String ticketNum,  List<KitchenItem> items,  KitchenClient? client)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String ticketNum,  List<KitchenItem> items,  KitchenClient? client,  KitchenClient? user)?  $default,) {final _that = this;
 switch (_that) {
 case _KitchenSale() when $default != null:
-return $default(_that.ticketNum,_that.items,_that.client);case _:
+return $default(_that.ticketNum,_that.items,_that.client,_that.user);case _:
   return null;
 
 }
@@ -521,7 +535,7 @@ return $default(_that.ticketNum,_that.items,_that.client);case _:
 @JsonSerializable()
 
 class _KitchenSale implements KitchenSale {
-  const _KitchenSale({required this.ticketNum, required final  List<KitchenItem> items, this.client}): _items = items;
+  const _KitchenSale({required this.ticketNum, required final  List<KitchenItem> items, this.client, this.user}): _items = items;
   factory _KitchenSale.fromJson(Map<String, dynamic> json) => _$KitchenSaleFromJson(json);
 
 @override final  String ticketNum;
@@ -533,6 +547,8 @@ class _KitchenSale implements KitchenSale {
 }
 
 @override final  KitchenClient? client;
+// Cashier who took the order (the API sends {name}).
+@override final  KitchenClient? user;
 
 /// Create a copy of KitchenSale
 /// with the given fields replaced by the non-null parameter values.
@@ -547,16 +563,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _KitchenSale&&(identical(other.ticketNum, ticketNum) || other.ticketNum == ticketNum)&&const DeepCollectionEquality().equals(other._items, _items)&&(identical(other.client, client) || other.client == client));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _KitchenSale&&(identical(other.ticketNum, ticketNum) || other.ticketNum == ticketNum)&&const DeepCollectionEquality().equals(other._items, _items)&&(identical(other.client, client) || other.client == client)&&(identical(other.user, user) || other.user == user));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,ticketNum,const DeepCollectionEquality().hash(_items),client);
+int get hashCode => Object.hash(runtimeType,ticketNum,const DeepCollectionEquality().hash(_items),client,user);
 
 @override
 String toString() {
-  return 'KitchenSale(ticketNum: $ticketNum, items: $items, client: $client)';
+  return 'KitchenSale(ticketNum: $ticketNum, items: $items, client: $client, user: $user)';
 }
 
 
@@ -567,11 +583,11 @@ abstract mixin class _$KitchenSaleCopyWith<$Res> implements $KitchenSaleCopyWith
   factory _$KitchenSaleCopyWith(_KitchenSale value, $Res Function(_KitchenSale) _then) = __$KitchenSaleCopyWithImpl;
 @override @useResult
 $Res call({
- String ticketNum, List<KitchenItem> items, KitchenClient? client
+ String ticketNum, List<KitchenItem> items, KitchenClient? client, KitchenClient? user
 });
 
 
-@override $KitchenClientCopyWith<$Res>? get client;
+@override $KitchenClientCopyWith<$Res>? get client;@override $KitchenClientCopyWith<$Res>? get user;
 
 }
 /// @nodoc
@@ -584,11 +600,12 @@ class __$KitchenSaleCopyWithImpl<$Res>
 
 /// Create a copy of KitchenSale
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? ticketNum = null,Object? items = null,Object? client = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? ticketNum = null,Object? items = null,Object? client = freezed,Object? user = freezed,}) {
   return _then(_KitchenSale(
 ticketNum: null == ticketNum ? _self.ticketNum : ticketNum // ignore: cast_nullable_to_non_nullable
 as String,items: null == items ? _self._items : items // ignore: cast_nullable_to_non_nullable
 as List<KitchenItem>,client: freezed == client ? _self.client : client // ignore: cast_nullable_to_non_nullable
+as KitchenClient?,user: freezed == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
 as KitchenClient?,
   ));
 }
@@ -605,6 +622,18 @@ $KitchenClientCopyWith<$Res>? get client {
   return $KitchenClientCopyWith<$Res>(_self.client!, (value) {
     return _then(_self.copyWith(client: value));
   });
+}/// Create a copy of KitchenSale
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$KitchenClientCopyWith<$Res>? get user {
+    if (_self.user == null) {
+    return null;
+  }
+
+  return $KitchenClientCopyWith<$Res>(_self.user!, (value) {
+    return _then(_self.copyWith(user: value));
+  });
 }
 }
 
@@ -612,7 +641,7 @@ $KitchenClientCopyWith<$Res>? get client {
 /// @nodoc
 mixin _$KitchenItem {
 
- String get id; KitchenProduct get product; double get quantity;
+ String get id; KitchenProduct get product;@JsonKey(fromJson: _toDouble) double get quantity;
 /// Create a copy of KitchenItem
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -645,7 +674,7 @@ abstract mixin class $KitchenItemCopyWith<$Res>  {
   factory $KitchenItemCopyWith(KitchenItem value, $Res Function(KitchenItem) _then) = _$KitchenItemCopyWithImpl;
 @useResult
 $Res call({
- String id, KitchenProduct product, double quantity
+ String id, KitchenProduct product,@JsonKey(fromJson: _toDouble) double quantity
 });
 
 
@@ -761,7 +790,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  KitchenProduct product,  double quantity)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  KitchenProduct product, @JsonKey(fromJson: _toDouble)  double quantity)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _KitchenItem() when $default != null:
 return $default(_that.id,_that.product,_that.quantity);case _:
@@ -782,7 +811,7 @@ return $default(_that.id,_that.product,_that.quantity);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  KitchenProduct product,  double quantity)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  KitchenProduct product, @JsonKey(fromJson: _toDouble)  double quantity)  $default,) {final _that = this;
 switch (_that) {
 case _KitchenItem():
 return $default(_that.id,_that.product,_that.quantity);case _:
@@ -802,7 +831,7 @@ return $default(_that.id,_that.product,_that.quantity);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  KitchenProduct product,  double quantity)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  KitchenProduct product, @JsonKey(fromJson: _toDouble)  double quantity)?  $default,) {final _that = this;
 switch (_that) {
 case _KitchenItem() when $default != null:
 return $default(_that.id,_that.product,_that.quantity);case _:
@@ -817,12 +846,12 @@ return $default(_that.id,_that.product,_that.quantity);case _:
 @JsonSerializable()
 
 class _KitchenItem implements KitchenItem {
-  const _KitchenItem({required this.id, required this.product, required this.quantity});
+  const _KitchenItem({required this.id, required this.product, @JsonKey(fromJson: _toDouble) required this.quantity});
   factory _KitchenItem.fromJson(Map<String, dynamic> json) => _$KitchenItemFromJson(json);
 
 @override final  String id;
 @override final  KitchenProduct product;
-@override final  double quantity;
+@override@JsonKey(fromJson: _toDouble) final  double quantity;
 
 /// Create a copy of KitchenItem
 /// with the given fields replaced by the non-null parameter values.
@@ -857,7 +886,7 @@ abstract mixin class _$KitchenItemCopyWith<$Res> implements $KitchenItemCopyWith
   factory _$KitchenItemCopyWith(_KitchenItem value, $Res Function(_KitchenItem) _then) = __$KitchenItemCopyWithImpl;
 @override @useResult
 $Res call({
- String id, KitchenProduct product, double quantity
+ String id, KitchenProduct product,@JsonKey(fromJson: _toDouble) double quantity
 });
 
 

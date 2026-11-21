@@ -6,9 +6,16 @@ part of 'printer_service.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$printerServiceHash() => r'dfedce686548081f1ad72807b00c296d22158eab';
+String _$printerServiceHash() => r'5ccd79726c8b9697e533d8dfbad83bb4992cac98';
 
-/// See also [PrinterService].
+/// The receipt printer of this device.
+///
+/// On a Sunmi POS terminal the built-in printer is driven directly through Sunmi's printer
+/// service (native bridge "mellia/printer", same approach as the Mihos POS app): no pairing,
+/// accents print, the paper width is read from the printer.
+/// On any other phone or tablet, a Bluetooth thermal printer paired in Android settings is used.
+///
+/// Copied from [PrinterService].
 @ProviderFor(PrinterService)
 final printerServiceProvider =
     AsyncNotifierProvider<PrinterService, void>.internal(

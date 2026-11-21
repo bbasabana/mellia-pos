@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
+import 'package:mellia_pos_mobile/core/constants/api_constants.dart';
+import 'package:mellia_pos_mobile/core/services/receipt_name.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
@@ -24,6 +27,7 @@ class PrinterService extends _$PrinterService {
   static const _channel = MethodChannel('mellia/printer');
   static const _prefKey = 'mellia_printer';
   static const _prefAutoPrint = 'mellia_auto_print';
+  static const _prefReceiptName = ReceiptNameNotifier.prefKey;
 
   PrinterKind kind = PrinterKind.none;
   String? _btMac;
@@ -34,6 +38,9 @@ class PrinterService extends _$PrinterService {
 
   /// Print the receipt as soon as a sale is paid.
   bool autoPrint = true;
+
+  /// Logo for the ticket header, as ESC/POS raster bytes (built once, then reused).
+  List<int>? _logoRaster;
 
   bool sunmiAvailable = false;
   bool _loaded = false;
@@ -47,10 +54,10 @@ class PrinterService extends _$PrinterService {
   }
 
   String get printerName => switch (kind) {
-        PrinterKind.sunmi => 'Imprimante intégrée Sunmi',
-        PrinterKind.bluetooth => _btName.isEmpty ? 'Imprimante Bluetooth' : _btName,
-        PrinterKind.none => 'Aucune imprimante',
-      };
+    PrinterKind.sunmi => 'Imprimante intégrée Sunmi',
+    PrinterKind.bluetooth => _btName.isEmpty ? 'Imprimante Bluetooth' : _btName,
+    PrinterKind.none => 'Aucune imprimante',
+  };
 
   // ---------------------------------------------------------------- setup
 
@@ -96,6 +103,55 @@ class PrinterService extends _$PrinterService {
     }
   }
 
+  /// Loads assets/images/receipt_logo.png (black & white, 184 px wide) and turns it into a
+  /// GS v 0 raster image. Returns an empty list if anything goes wrong: the ticket then
+  /// prints with the text header only.
+  Future<List<int>> _logo() async {
+    if (_logoRaster != null) return _logoRaster!;
+    try {
+      final data = await rootBundle.load('assets/images/receipt_logo.png');
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final image = (await codec.getNextFrame()).image;
+      final rgba = (await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
+      final w = image.width, h = image.height;
+      final bytesPerRow = (w + 7) ~/ 8;
+      final out = <int>[
+        0x1D,
+        0x76,
+        0x30,
+        0x00,
+        bytesPerRow & 0xFF,
+        bytesPerRow >> 8,
+        h & 0xFF,
+        h >> 8,
+      ];
+      for (var y = 0; y < h; y++) {
+        for (var bx = 0; bx < bytesPerRow; bx++) {
+          var byte = 0;
+          for (var bit = 0; bit < 8; bit++) {
+            final x = bx * 8 + bit;
+            if (x >= w) continue;
+            final i = (y * w + x) * 4;
+            final r = rgba.getUint8(i),
+                g = rgba.getUint8(i + 1),
+                b = rgba.getUint8(i + 2),
+                a = rgba.getUint8(i + 3);
+            final dark = a > 127 && (r * 299 + g * 587 + b * 114) < 128000;
+            if (dark) byte |= 0x80 >> bit;
+          }
+          out.add(byte);
+        }
+      }
+      out.add(0x0A);
+      image.dispose();
+      return _logoRaster = out;
+    } catch (_) {
+      return _logoRaster = const [];
+    }
+  }
+
   Future<void> setAutoPrint(bool value) async {
     autoPrint = value;
     final prefs = await SharedPreferences.getInstance();
@@ -115,7 +171,10 @@ class PrinterService extends _$PrinterService {
 
   Future<bool> _bluetoothPermission() async {
     if (!Platform.isAndroid) return true;
-    final statuses = await [Permission.bluetoothConnect, Permission.bluetoothScan].request();
+    final statuses = await [
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+    ].request();
     // On Android 11 and older these permissions do not exist and come back as granted.
     return statuses.values.every((s) => s.isGranted || s.isLimited);
   }
@@ -133,14 +192,18 @@ class PrinterService extends _$PrinterService {
   Future<bool> connect(BluetoothInfo device) async {
     try {
       if (!await _bluetoothPermission()) return false;
-      final ok = await PrintBluetoothThermal.connect(macPrinterAddress: device.macAdress)
-          .timeout(const Duration(seconds: 10));
+      final ok = await PrintBluetoothThermal.connect(
+        macPrinterAddress: device.macAdress,
+      ).timeout(const Duration(seconds: 10));
       if (ok) {
         kind = PrinterKind.bluetooth;
         _btMac = device.macAdress;
         _btName = device.name;
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_prefKey, 'bt:${device.macAdress}|${device.name}');
+        await prefs.setString(
+          _prefKey,
+          'bt:${device.macAdress}|${device.name}',
+        );
       }
       return ok;
     } catch (e) {
@@ -162,7 +225,16 @@ class PrinterService extends _$PrinterService {
     }
     final devices = await getBondedDevices();
     if (devices.isEmpty) return null;
-    const printerNames = ['inner', 'pos', 'printer', 'imin', 'mpt', 'xp-', 'rpp', 'thermal'];
+    const printerNames = [
+      'inner',
+      'pos',
+      'printer',
+      'imin',
+      'mpt',
+      'xp-',
+      'rpp',
+      'thermal',
+    ];
     BluetoothInfo? target;
     for (final d in devices) {
       final name = d.name.toLowerCase();
@@ -182,8 +254,10 @@ class PrinterService extends _$PrinterService {
       if (kind == PrinterKind.none) {
         return "Échec : aucune imprimante trouvée (ni Sunmi intégrée, ni Bluetooth jumelée)";
       }
-      final ok = await _send(_testBytes());
-      return ok ? 'Test imprimé sur $printerName' : 'Échec : ${lastError ?? "impression impossible"}';
+      final ok = await _send(_testBytes(await _logo()));
+      return ok
+          ? 'Test imprimé sur $printerName'
+          : 'Échec : ${lastError ?? "impression impossible"}';
     } catch (e) {
       return 'Erreur auto-connect: $e';
     }
@@ -199,8 +273,9 @@ class PrinterService extends _$PrinterService {
         return false;
       }
       if (await PrintBluetoothThermal.connectionStatus) return true;
-      return await PrintBluetoothThermal.connect(macPrinterAddress: mac)
-          .timeout(const Duration(seconds: 8));
+      return await PrintBluetoothThermal.connect(
+        macPrinterAddress: mac,
+      ).timeout(const Duration(seconds: 8));
     } catch (_) {
       return false;
     }
@@ -214,17 +289,24 @@ class PrinterService extends _$PrinterService {
     String? cashierName,
     String? paymentMethod,
     double? amountPaid,
+    String paidCurrency = 'CDF',
   }) async {
     await _load();
     if (kind == PrinterKind.none) await autoConnect();
     if (kind == PrinterKind.none) {
       throw Exception('Aucune imprimante configurée (Paramètres > Imprimante)');
     }
+    final logo = await _logo();
+    // Read at print time: a name changed in Settings applies to the very next ticket.
+    final prefs = await SharedPreferences.getInstance();
+    final custom = prefs.getString(_prefReceiptName) ?? '';
     final bytes = _receiptBytes(
+      logo: logo,
       saleData: saleData,
-      cashierName: cashierName,
+      cashierName: receiptCashier(custom, cashierName),
       paymentMethod: paymentMethod,
       amountPaid: amountPaid,
+      paidCurrency: paidCurrency,
     );
     if (!await _send(bytes)) {
       throw Exception(lastError ?? 'Impression impossible');
@@ -236,12 +318,14 @@ class PrinterService extends _$PrinterService {
     switch (kind) {
       case PrinterKind.sunmi:
         try {
-          final reply = await _channel.invokeMapMethod<String, dynamic>(
-            'raw',
-            {'bytes': Uint8List.fromList(bytes)},
-          ).timeout(const Duration(seconds: 12));
+          final reply = await _channel
+              .invokeMapMethod<String, dynamic>('raw', {
+                'bytes': Uint8List.fromList(bytes),
+              })
+              .timeout(const Duration(seconds: 12));
           if (reply?['ok'] == true) return true;
-          lastError = _sunmiState(reply?['state'] ?? reply?['code']) ??
+          lastError =
+              _sunmiState(reply?['state'] ?? reply?['code']) ??
               'Impression refusée (${reply?['code']} ${reply?['message'] ?? ''})';
           return false;
         } catch (e) {
@@ -250,7 +334,8 @@ class PrinterService extends _$PrinterService {
         }
       case PrinterKind.bluetooth:
         if (!await _bluetoothReady()) {
-          lastError ??= "L'imprimante Bluetooth ne répond pas : allumée et jumelée ?";
+          lastError ??=
+              "L'imprimante Bluetooth ne répond pas : allumée et jumelée ?";
           return false;
         }
         try {
@@ -268,22 +353,26 @@ class PrinterService extends _$PrinterService {
   }
 
   static String? _sunmiState(Object? state) => switch (state) {
-        2 => "L'imprimante démarre, réessayez dans un instant.",
-        3 => "L'imprimante signale une erreur.",
-        4 => 'Plus de papier : remettez un rouleau.',
-        5 => "L'imprimante a trop chauffé, attendez un peu.",
-        6 => "Le capot de l'imprimante est ouvert : refermez-le.",
-        7 => 'Le massicot est bloqué.',
-        505 => 'Aucune imprimante sur ce terminal.',
-        _ => null,
-      };
+    2 => "L'imprimante démarre, réessayez dans un instant.",
+    3 => "L'imprimante signale une erreur.",
+    4 => 'Plus de papier : remettez un rouleau.',
+    5 => "L'imprimante a trop chauffé, attendez un peu.",
+    6 => "Le capot de l'imprimante est ouvert : refermez-le.",
+    7 => 'Le massicot est bloqué.',
+    505 => 'Aucune imprimante sur ce terminal.',
+    _ => null,
+  };
 
   // ------------------------------------------------------------ ESC/POS
 
   bool get _utf8 => kind == PrinterKind.sunmi;
 
   /// Sunmi printers take UTF-8 (FS C 0xFF); other thermal printers take Windows-1252 (ESC t 16).
-  List<int> get _init => [0x1B, 0x40, ...(_utf8 ? const [0x1C, 0x43, 0xFF] : const [0x1B, 0x74, 0x10])];
+  List<int> get _init => [
+    0x1B,
+    0x40,
+    ...(_utf8 ? const [0x1C, 0x43, 0xFF] : const [0x1B, 0x74, 0x10]),
+  ];
 
   List<int> _encode(String text) {
     final clean = text.replaceAll(' ', ' ').replaceAll(' ', ' ');
@@ -300,17 +389,24 @@ class PrinterService extends _$PrinterService {
   static const _sizeOff = [0x1D, 0x21, 0x00];
   static const _cut = [0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x42, 0x00];
 
-  List<int> _testBytes() {
+  /// Test page: the same header logo and QR code size as a real receipt.
+  List<int> _testBytes([List<int> logo = const []]) {
     final rule = '-' * paperColumns;
     return [
       ..._init,
       ..._center,
-      ..._boldOn,
-      ..._encode('MELLIA RESTO\n'),
-      ..._boldOff,
+      if (logo.isNotEmpty)
+        ...logo
+      else ...[
+        ..._boldOn,
+        ..._encode('MELLIA RESTO\n'),
+        ..._boldOff,
+      ],
       ..._encode('$rule\nTest d\'impression\nAccents : é è à ç ô\n'),
       ..._encode('${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}\n'),
       ..._encode('$printerName - $paperColumns colonnes\n$rule\n'),
+      ..._qr('${ApiConstants.baseUrl}/v/test'),
+      ..._encode('Scannez pour vérifier\n\n'),
       ..._left,
       ..._cut,
     ];
@@ -318,13 +414,17 @@ class PrinterService extends _$PrinterService {
 
   static String _fc(num value) {
     final digits = value.round().abs().toString();
-    final grouped = digits.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ' ');
+    final grouped = digits.replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (_) => ' ',
+    );
     return '${value < 0 ? '-' : ''}$grouped FC';
   }
 
   static String _usd(num value) => '\$${value.toStringAsFixed(2)}';
 
-  static String _qty(double q) => q == q.roundToDouble() ? q.toInt().toString() : q.toStringAsFixed(1);
+  static String _qty(double q) =>
+      q == q.roundToDouble() ? q.toInt().toString() : q.toStringAsFixed(1);
 
   static const _methods = {
     'CASH': 'Espèces',
@@ -336,7 +436,9 @@ class PrinterService extends _$PrinterService {
   String _row(String left, String right) {
     final width = paperColumns;
     final space = width - right.length - 1;
-    final cut = left.length > space ? left.substring(0, space < 0 ? 0 : space) : left;
+    final cut = left.length > space
+        ? left.substring(0, space < 0 ? 0 : space)
+        : left;
     return '$cut${' ' * (width - cut.length - right.length).clamp(1, width)}$right';
   }
 
@@ -358,11 +460,36 @@ class PrinterService extends _$PrinterService {
     return out;
   }
 
+  /// QR code (model 2, error level M) with GS ( k. Module size 4 dots: a ~60 character link
+  /// comes out about 17 mm wide, still read instantly by a phone camera.
+  List<int> _qr(String data) {
+    final payload = utf8.encode(data);
+    final len = payload.length + 3;
+    return [
+      0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00, // model 2
+      0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x04, // module size
+      0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31, // error correction M
+      0x1D,
+      0x28,
+      0x6B,
+      len & 0xFF,
+      (len >> 8) & 0xFF,
+      0x31,
+      0x50,
+      0x30,
+      ...payload, // store
+      0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30, // print
+      0x0A,
+    ];
+  }
+
   List<int> _receiptBytes({
+    List<int> logo = const [],
     required Map<String, dynamic> saleData,
     String? cashierName,
     String? paymentMethod,
     double? amountPaid,
+    String paidCurrency = 'CDF',
   }) {
     double num0(Object? v) => double.tryParse(v?.toString() ?? '') ?? 0.0;
 
@@ -371,7 +498,9 @@ class PrinterService extends _$PrinterService {
     final totalUsd = num0(saleData['totalNet']);
     var totalCdf = num0(saleData['totalCdf']);
     final clientName = saleData['client']?['name'] ?? 'Passant';
-    final created = DateTime.tryParse(saleData['createdAt']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    final created =
+        DateTime.tryParse(saleData['createdAt']?.toString() ?? '')?.toLocal() ??
+        DateTime.now();
     final method = paymentMethod ?? saleData['paymentMethod']?.toString();
     final rule = '-' * paperColumns;
 
@@ -381,9 +510,14 @@ class PrinterService extends _$PrinterService {
       ..add(0x0A);
 
     // Header
-    bytes.addAll([..._center, ..._boldOn, ..._bigOn]);
-    line('MELLIA RESTO');
-    bytes.addAll([..._sizeOff, ..._boldOff]);
+    bytes.addAll(_center);
+    if (logo.isNotEmpty) {
+      bytes.addAll(logo);
+    } else {
+      bytes.addAll([..._boldOn, ..._bigOn]);
+      line('MELLIA RESTO');
+      bytes.addAll([..._sizeOff, ..._boldOff]);
+    }
     for (final l in _wrap('10, Bypass, Mont-Ngafula, Kinshasa')) {
       line(l);
     }
@@ -393,7 +527,8 @@ class PrinterService extends _$PrinterService {
     // Info
     line('Ticket : #$ticketNum');
     line(_row('Date', DateFormat('dd/MM/yyyy HH:mm').format(created)));
-    if (cashierName != null && cashierName.isNotEmpty) line('Caissier : $cashierName');
+    if (cashierName != null && cashierName.isNotEmpty)
+      line('Caissier : $cashierName');
     line('Client : $clientName');
     line(rule);
 
@@ -419,15 +554,30 @@ class PrinterService extends _$PrinterService {
     line(_row('TOTAL', _fc(totalCdf)));
     bytes.addAll([..._sizeOff, ..._boldOff]);
     if (totalUsd > 0) line(_row('Soit', _usd(totalUsd)));
-    if (method != null && method.isNotEmpty) line(_row('Paiement', _methods[method] ?? method));
-    if (amountPaid != null && amountPaid > totalUsd + 0.004) {
-      line(_row('Reçu', _usd(amountPaid)));
-      line(_row('Rendu', _usd(amountPaid - totalUsd)));
+    if (method != null && method.isNotEmpty)
+      line(_row('Paiement', _methods[method] ?? method));
+    if (amountPaid != null && amountPaid > 0) {
+      line(
+        _row(
+          'Reçu',
+          paidCurrency == 'USD' ? _usd(amountPaid) : _fc(amountPaid),
+        ),
+      );
     }
     line(rule);
 
+    // Authenticity QR code: opens the public check page of this sale on the platform.
+    final saleId = saleData['id']?.toString() ?? '';
+    bytes.addAll(_center);
+    if (saleId.isNotEmpty) {
+      bytes.addAll(_qr('${ApiConstants.baseUrl}/v/$saleId'));
+      line('Scannez pour vérifier');
+      line('l\'authenticité de la facture');
+      bytes.add(0x0A);
+    }
+
     // Footer
-    bytes.addAll([..._center, ..._boldOn]);
+    bytes.addAll(_boldOn);
     line('Merci de votre visite !');
     bytes.addAll(_boldOff);
     line('Mangez comme chez vous');
