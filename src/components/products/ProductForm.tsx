@@ -788,7 +788,7 @@ export function ProductForm({
         <button
           type="button"
           onClick={(e) => handleSave(true, e)}
-          className="px-6 py-2.5 rounded-lg bg-[#00d3fa] text-white font-semibold hover:bg-[#00b8e0] transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
+          className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
           disabled={loading}
         >
           <Save size={18} />

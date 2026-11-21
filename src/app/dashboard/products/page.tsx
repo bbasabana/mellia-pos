@@ -130,11 +130,11 @@ function ProductsPageContent() {
 
   return (
     <>
-      <div className="flex flex-col h-full bg-gray-50">
+      <div className="flex flex-col h-full">
         {/* HEADER */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="px-1 pb-5 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <h1 className="ui-page-title flex items-center gap-2.5">
               <Package className="text-[#00d3fa]" />
               Gestion des Produits
             </h1>
@@ -155,7 +155,7 @@ function ProductsPageContent() {
         </div>
 
         {/* CONTENT AREA */}
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+        <div className="flex-1 overflow-auto px-1 pb-2 space-y-6">
 
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

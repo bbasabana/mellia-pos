@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { TrendingUp, DollarSign, Package, AlertCircle } from "lucide-react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export default function ValuationPage() {
     const [loading, setLoading] = useState(true);
@@ -25,14 +26,18 @@ export default function ValuationPage() {
         fetchData();
     }, []);
 
-    if (loading) return <div className="p-8 text-center text-gray-500">Calcul de la valorisation en cours...</div>;
-    if (!data) return <div className="p-8 text-center text-red-500">Erreur de chargement.</div>;
+    if (loading) return <DashboardLayout><div className="p-8 text-center text-gray-500">Calcul de la valorisation en cours...</div></DashboardLayout>;
+    if (!data) return <DashboardLayout><div className="p-8 text-center text-red-500">Erreur de chargement.</div></DashboardLayout>;
 
     const { items, totals } = data;
 
     return (
-        <div className="p-6 space-y-6">
-            <h1 className="text-2xl font-bold text-gray-800">Valorisation du Stock & Profits</h1>
+        <DashboardLayout>
+        <div className="px-1 space-y-6">
+            <div>
+                <h1 className="ui-page-title">Valorisation du stock & profits</h1>
+                <p className="ui-page-subtitle mt-1">Valeur d&apos;achat du stock actuel et marge attendue à la vente.</p>
+            </div>
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -115,5 +120,6 @@ export default function ValuationPage() {
                 )}
             </div>
         </div>
+        </DashboardLayout>
     );
 }

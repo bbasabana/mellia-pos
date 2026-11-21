@@ -34,11 +34,11 @@ export default function StockPage() {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col h-full bg-gray-50">
+            <div className="flex flex-col h-full">
                 {/* HEADER */}
-                <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <div className="px-1 pb-5 flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <h1 className="ui-page-title flex items-center gap-2.5">
                             <Package className="text-[#00d3fa]" />
                             Gestion de Stock & Investissements
                         </h1>
@@ -81,7 +81,7 @@ export default function StockPage() {
                 </div>
 
                 {/* CONTENT AREA */}
-                <div className="flex-1 overflow-auto p-6">
+                <div className="flex-1 overflow-auto px-1 pb-2">
                     {activeTab === "overview" && <StockOverview onOpenMovement={() => handleOpenMovement("ADJUSTMENT")} onTransfer={(pid) => handleOpenMovement("TRANSFER", pid)} />}
                     {activeTab === "movements" && <StockMovements />}
                     {activeTab === "inventory" && <StockInventory onOpenSession={() => handleOpenInventory()} onResumeSession={(id) => handleOpenInventory(id)} />}
@@ -158,7 +158,7 @@ function StockOverview({ onOpenMovement, onTransfer }: { onOpenMovement: () => v
                     PRODUITS DE VENTE
                     <span className={cn(
                         "px-1.5 py-0.5 rounded-full text-[10px]",
-                        subTab === "vendable" ? "bg-[#00d3fa] text-white" : "bg-gray-100 text-gray-500"
+                        subTab === "vendable" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"
                     )}>
                         {vendableProducts.length}
                     </span>
@@ -201,7 +201,7 @@ function StockOverview({ onOpenMovement, onTransfer }: { onOpenMovement: () => v
 
                 <button
                     onClick={onOpenMovement}
-                    className="h-full px-6 py-4 bg-[#71de00] text-white font-bold rounded shadow-sm hover:opacity-90 flex flex-col items-center justify-center gap-1"
+                    className="h-full px-6 py-4 bg-green-600 text-white font-bold rounded shadow-sm hover:opacity-90 flex flex-col items-center justify-center gap-1"
                 >
                     <Plus size={24} />
                     <span>Mouvement Manuel</span>
@@ -304,7 +304,7 @@ function StockInventory({ onOpenSession, onResumeSession }: { onOpenSession: () 
                 </div>
                 <button
                     onClick={onOpenSession}
-                    className="px-4 py-2 bg-[#00d3fa] text-white font-bold rounded flex items-center gap-2 hover:opacity-90 shadow-sm"
+                    className="px-4 py-2 bg-blue-600 text-white font-bold rounded flex items-center gap-2 hover:opacity-90 shadow-sm"
                 >
                     <History size={18} />
                     Nouvelle Session d&apos;Inventaire

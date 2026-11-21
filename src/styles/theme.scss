@@ -6,17 +6,17 @@
 
 :root {
   /* === BRAND COLORS (OFFICIAL) === */
-  --color-primary: #00d3fa; /* Cyan Blue - primary actions */
-  --color-primary-dark: #00b8e0;
-  --color-primary-light: #33dbfb;
-  --color-primary-pale: #e6f9ff;
+  --color-primary: #0089ad; /* Deep logo cyan - primary actions (readable with white text) */
+  --color-primary-dark: #006e8c;
+  --color-primary-light: #00d3fa; /* Logo cyan */
+  --color-primary-pale: #ecfcff;
   
-  --color-success: #71de00; /* Lime Green - validation */
-  --color-success-dark: #5fb800;
-  --color-success-light: #8de633;
-  --color-success-pale: #f1fce6;
+  --color-success: #3f8a00; /* Logo lime, darkened for text */
+  --color-success-dark: #336f04;
+  --color-success-light: #71de00; /* Logo lime */
+  --color-success-pale: #f4fde8;
   
-  --color-warning: #ff4900; /* Vibrant Orange - alerts, highlights */
+  --color-warning: #ff4900; /* Logo orange - alerts, highlights */
   --color-warning-dark: #e04000;
   --color-warning-light: #ff6a33;
   --color-warning-pale: #fff1eb;
@@ -28,25 +28,25 @@
   
   /* === WHITE BASE COLORS === */
   --color-bg-primary: #ffffff; /* White background */
-  --color-bg-secondary: #f8fafc; /* Light gray background */
-  --color-bg-tertiary: #f1f5f9; /* Lighter gray for cards */
-  --color-bg-hover: #e2e8f0; /* Hover state */
+  --color-bg-secondary: #f7f9fb; /* App background */
+  --color-bg-tertiary: #f0f3f6;
+  --color-bg-hover: #e3e8ee;
   
   --color-text-primary: #0f172a; /* Dark text */
-  --color-text-secondary: #475569; /* Medium gray text */
-  --color-text-muted: #94a3b8; /* Light gray text */
+  --color-text-secondary: #4d5869;
+  --color-text-muted: #6b7789;
   
   /* === BORDERS === */
-  --color-border-light: #e2e8f0;
-  --color-border-medium: #cbd5e1;
+  --color-border-light: #e3e8ee;
+  --color-border-medium: #cfd6df;
   --color-border-dark: #94a3b8;
   
-  /* === NO SHADOWS - FLAT DESIGN === */
-  --shadow-xs: none;
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
-  --shadow-xl: none;
+  /* === SOFT SHADOWS === */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 3px 0 rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08);
+  --shadow-lg: 0 12px 24px -6px rgb(15 23 42 / 0.10);
+  --shadow-xl: 0 20px 40px -12px rgb(15 23 42 / 0.16);
   
   /* === SPACING (POS-optimized) === */
   --spacing-xs: 0.5rem;
@@ -66,10 +66,10 @@
   --font-size-4xl: 2.5rem;
   
   /* === BORDERS === */
-  --border-radius-sm: 0.375rem;
-  --border-radius-md: 0.5rem;
-  --border-radius-lg: 0.75rem;
-  --border-radius-xl: 1rem;
+  --border-radius-sm: 0.5rem;
+  --border-radius-md: 0.625rem;
+  --border-radius-lg: 0.875rem;
+  --border-radius-xl: 1.125rem;
 }
 
 /* === GLOBAL RESETS === */
@@ -85,9 +85,8 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-bg-secondary);

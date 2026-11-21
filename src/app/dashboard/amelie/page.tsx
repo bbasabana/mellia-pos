@@ -133,9 +133,9 @@ export default function AmeliePage() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-full bg-gray-50">
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+      <div className="flex flex-col h-full">
+        <div className="px-1 pb-5">
+          <h1 className="ui-page-title flex items-center gap-2.5">
             <Sparkles className="text-[#ff4900]" />
             Amélie — Précision Investissement
           </h1>
@@ -144,7 +144,7 @@ export default function AmeliePage() {
           </p>
         </div>
 
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+        <div className="flex-1 overflow-auto px-1 pb-2 space-y-6">
           <div className="bg-white border border-gray-200 rounded-sm p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
             <div className="flex items-center gap-2 text-sm font-bold text-gray-600">
               <Calendar size={16} />

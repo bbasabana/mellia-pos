@@ -25,7 +25,11 @@ import {
   FileText,
   TrendingUp,
   Receipt,
-  Sparkles
+  Sparkles,
+  LayoutDashboard,
+  type LucideIcon,
+  UserCog,
+  ClipboardList,
 } from "lucide-react";
 import "@/styles/theme.scss";
 import { cn } from "@/lib/utils";
@@ -35,100 +39,125 @@ const menuItems = [
   {
     label: "POS (Ventes)",
     href: "/dashboard/pos",
+    section: "Ventes",
     icon: ShoppingCart,
     roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
     label: "Stock",
     href: "/dashboard/stock",
+    section: "Cuisine & stock",
     icon: Package,
     roles: ["ADMIN", "MANAGER"],
   },
   {
     label: "Mini Inventaire",
     href: "/dashboard/mini-inventory",
-    icon: Package,
+    section: "Cuisine & stock",
+    icon: ClipboardList,
     roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
     label: "Amélie",
     href: "/dashboard/amelie",
+    section: "Gestion",
     icon: Sparkles,
     roles: ["ADMIN", "MANAGER"],
   },
   {
     label: "Cuisine (KDS)",
     href: "/dashboard/kitchen",
+    section: "Cuisine & stock",
     icon: Flame,
     roles: ["ADMIN", "MANAGER", "KITCHEN"],
   },
   {
     label: "Produits",
     href: "/dashboard/products",
+    section: "Cuisine & stock",
     icon: UtensilsCrossed,
     roles: ["ADMIN", "MANAGER"],
   },
   {
     label: "Clients",
     href: "/dashboard/clients",
+    section: "Ventes",
     icon: Users,
     roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
     label: "Achats",
     href: "/dashboard/purchases",
+    section: "Cuisine & stock",
     icon: ShoppingBag,
     roles: ["ADMIN", "MANAGER"],
   },
   {
     label: "Dépenses",
     href: "/dashboard/expenses",
+    section: "Gestion",
     icon: TrendingDown,
     roles: ["ADMIN", "MANAGER"],
   },
   {
     label: "Brouillons",
     href: "/dashboard/sales/drafts",
+    section: "Ventes",
     icon: FileText,
     roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
     label: "Historique Ventes",
     href: "/dashboard/transactions",
+    section: "Ventes",
     icon: Receipt,
     roles: ["ADMIN", "MANAGER", "CASHIER"],
   },
   {
     label: "Transactions",
     href: "/dashboard/sales/transactions",
+    section: "Ventes",
     icon: TrendingUp,
     roles: ["ADMIN", "MANAGER"],
   },
   {
     label: "Rapports",
     href: "/dashboard/reports",
+    section: "Gestion",
     icon: BarChart3,
     roles: ["ADMIN", "MANAGER"],
   },
   {
     label: "Utilisateurs",
     href: "/dashboard/users",
+    section: "Administration",
     icon: Users,
     roles: ["ADMIN"],
   },
   {
     label: "Employés (RH)",
     href: "/dashboard/employees",
-    icon: Users,
+    section: "Administration",
+    icon: UserCog,
     roles: ["ADMIN"],
   },
   {
     label: "Paramètres",
     href: "/dashboard/settings",
+    section: "Administration",
     icon: Settings,
     roles: ["ADMIN"],
   },
 ];
+
+const sectionOrder = ["Ventes", "Cuisine & stock", "Gestion", "Administration"];
+
+const roleLabels: Record<string, string> = {
+  ADMIN: "Administrateur",
+  MANAGER: "Gérant",
+  CASHIER: "Caissier",
+  KITCHEN: "Cuisine",
+};
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -171,6 +200,22 @@ function DashboardLayout({ children, disablePadding = false }: DashboardLayoutPr
   const filteredMenuItems = useMemo(
     () => menuItems.filter((item) => item.roles.includes(userRole)),
     [userRole]
+  );
+
+  const groupedMenuItems = useMemo(
+    () =>
+      sectionOrder
+        .map((section) => ({ section, items: filteredMenuItems.filter((i) => i.section === section) }))
+        .filter((g) => g.items.length > 0),
+    [filteredMenuItems]
+  );
+
+  const currentItem = useMemo(
+    () =>
+      menuItems
+        .filter((i) => pathname === i.href || pathname?.startsWith(i.href + "/"))
+        .sort((a, b) => b.href.length - a.href.length)[0],
+    [pathname]
   );
 
   // Memoize user initials
@@ -223,11 +268,11 @@ function DashboardLayout({ children, disablePadding = false }: DashboardLayoutPr
   }, [currentTime]);
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
+    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans text-gray-900">
       {/* Sidebar Overlay for mobile */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-gray-950/40 backdrop-blur-[2px] z-40 lg:hidden"
           onClick={closeSidebar}
         />
       )}
@@ -235,81 +280,108 @@ function DashboardLayout({ children, disablePadding = false }: DashboardLayoutPr
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 z-50 flex flex-col transition-transform duration-300 transform lg:translate-x-0 lg:static lg:inset-0",
+          "fixed inset-y-0 left-0 w-[264px] bg-white border-r border-gray-200/80 z-50 flex flex-col transition-transform duration-300 transform lg:translate-x-0 lg:static lg:inset-0",
           sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full",
           disablePadding && "lg:hidden xl:flex xl:static" // Hide on large, show only on extra large in POS
         )}
       >
-        <div className="px-6 py-8 border-b border-gray-100 flex flex-col items-center">
-          <div className="mb-2">
-            <Image
-              src="/images/logos/logo.png"
-              alt="Mellia POS"
-              width={140}
-              height={46}
-              priority
-              className="object-contain"
-            />
-          </div>
-          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Système de caisse</span>
-        </div>
+        <Link
+          href="/dashboard"
+          onClick={closeSidebar}
+          className="px-6 pt-6 pb-5 flex flex-col items-center gap-2 group"
+        >
+          <Image
+            src="/images/logos/logo.png"
+            alt="Mellia POS"
+            width={124}
+            height={41}
+            priority
+            className="object-contain transition-transform group-hover:scale-[1.02]"
+          />
+          <span className="flex items-center gap-1.5 text-[10px] uppercase font-semibold text-gray-400 tracking-[0.18em]">
+            <span className="h-1 w-1 rounded-full bg-[#71de00]" />
+            Système de caisse
+            <span className="h-1 w-1 rounded-full bg-[#ff4900]" />
+          </span>
+        </Link>
 
-        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
-          {filteredMenuItems.map((item) => (
-            <NavItem
-              key={item.href}
-              item={item}
-              isActive={pathname === item.href}
-              onClick={closeSidebar}
-            />
+        <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-5">
+          <NavItem
+            item={{ label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard, roles: [], section: "" }}
+            isActive={pathname === "/dashboard"}
+            onClick={closeSidebar}
+          />
+          {groupedMenuItems.map((group) => (
+            <div key={group.section}>
+              <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">
+                {group.section}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavItem
+                    key={item.href}
+                    item={item}
+                    isActive={currentItem?.href === item.href}
+                    onClick={closeSidebar}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 space-y-4 bg-gray-50/50">
+        <div className="p-3 border-t border-gray-100">
           <UserInfo
             initials={userInitials}
             name={session?.user?.name || "User"}
-            role={userRole}
+            role={roleLabels[userRole] || userRole}
+            onLogout={handleLogoutClick}
           />
-
-          <button
-            onClick={handleLogoutClick}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-sm text-sm font-bold text-red-500 hover:bg-red-50 transition-all border border-transparent"
-          >
-            <LogOut size={18} />
-            Déconnexion
-          </button>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-[72px] bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0 z-10">
-          <div className="flex items-center gap-4">
+        <header className="h-16 bg-white/90 backdrop-blur border-b border-gray-200/80 px-4 sm:px-6 flex items-center justify-between shrink-0 z-10">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               className={cn(
-                "p-2 -ml-2 rounded-sm text-gray-500 hover:bg-gray-100",
+                "p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors",
                 disablePadding ? "flex" : "lg:hidden" // Always show toggle in POS mode if sidebar is hidden
               )}
               onClick={toggleSidebar}
               aria-label="Toggle menu"
             >
-              <Menu size={24} />
+              <Menu size={22} />
             </button>
-            <h1 className="text-lg font-bold text-gray-800">
-              {menuItems.find(i => i.href === pathname)?.label || 'Dashboard'}
-            </h1>
+            <div className="min-w-0">
+              <div className="hidden sm:block text-[11px] font-medium text-gray-400 leading-none mb-1">
+                {currentItem?.section || "Mellia"}
+              </div>
+              <h1 className="text-base sm:text-[17px] font-semibold text-gray-900 truncate leading-tight">
+                {currentItem?.label || "Tableau de bord"}
+              </h1>
+            </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-base font-bold text-gray-800 leading-none">{formattedTime}</span>
-              <span className="text-[10px] uppercase font-bold text-gray-400 mt-1 tracking-wider">{formattedDate}</span>
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2.5 rounded-full border border-gray-200 bg-gray-50 pl-3 pr-1 py-1">
+              <span className="text-xs font-medium text-gray-500 capitalize">{formattedDate}</span>
+              <span className="rounded-full bg-white border border-gray-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums text-gray-900 shadow-xs">
+                {formattedTime}
+              </span>
+            </div>
+            <span className="md:hidden text-sm font-semibold tabular-nums text-gray-900">{formattedTime}</span>
+            <div
+              className="h-9 w-9 shrink-0 rounded-full bg-gray-900 text-[#00d3fa] flex items-center justify-center text-xs font-bold ring-2 ring-white shadow-sm"
+              title={session?.user?.name || ""}
+            >
+              {userInitials}
             </div>
           </div>
         </header>
 
-        <div className={cn("flex-1 overflow-auto bg-gray-50", !disablePadding && "p-6")}>
+        <div className={cn("flex-1 overflow-auto bg-gray-50", !disablePadding && "p-4 sm:p-6")}>
           {children}
         </div>
       </main>
@@ -348,13 +420,20 @@ function DashboardLayout({ children, disablePadding = false }: DashboardLayoutPr
   );
 }
 
-// Updated NavItem to fit new Sidebar
+type MenuItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  roles: string[];
+  section: string;
+};
+
 const NavItem = memo(function NavItem({
   item,
   isActive,
   onClick
 }: {
-  item: typeof menuItems[0];
+  item: MenuItem;
   isActive: boolean;
   onClick: () => void;
 }) {
@@ -364,48 +443,57 @@ const NavItem = memo(function NavItem({
     <Link
       href={item.href}
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-bold transition-all group",
+        "relative flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] font-medium transition-colors group",
         isActive
-          ? "bg-black text-white shadow-md grayscale-0"
-          : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+          ? "bg-gray-900 text-white shadow-sm"
+          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       )}
       onClick={onClick}
     >
-      <div className={cn(
-        "flex shrink-0 items-center justify-center transition-colors",
-        isActive ? "text-[#00d3fa]" : "group-hover:text-[#00d3fa]"
-      )}>
-        <IconComponent size={20} strokeWidth={isActive ? 2.5 : 2} />
-      </div>
+      <IconComponent
+        size={18}
+        strokeWidth={isActive ? 2.2 : 1.8}
+        className={cn(
+          "shrink-0 transition-colors",
+          isActive ? "text-[#00d3fa]" : "text-gray-400 group-hover:text-blue-600"
+        )}
+      />
       <span className="truncate">{item.label}</span>
-      {isActive && (
-        <div className="ml-auto w-1 h-5 bg-[#00d3fa] rounded-full hidden lg:block" />
-      )}
+      {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#71de00]" />}
     </Link>
   );
 });
 
 NavItem.displayName = "NavItem";
 
-// Updated UserInfo for Sidebar footer
 const UserInfo = memo(function UserInfo({
   initials,
   name,
-  role
+  role,
+  onLogout,
 }: {
   initials: string;
   name: string;
   role: string;
+  onLogout: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 p-3 bg-white rounded-sm border border-gray-200">
-      <div className="w-9 h-9 flex shrink-0 items-center justify-center bg-black text-[#00d3fa] rounded-sm text-xs font-bold ring-2 ring-gray-100">
+    <div className="flex items-center gap-3 rounded-xl p-2 hover:bg-gray-50 transition-colors">
+      <div className="w-9 h-9 flex shrink-0 items-center justify-center bg-gray-900 text-[#00d3fa] rounded-full text-xs font-bold">
         {initials}
       </div>
-      <div className="flex flex-col min-w-0">
-        <div className="text-sm font-bold text-gray-800 truncate leading-none mb-1">{name}</div>
-        <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider truncate">{role}</div>
+      <div className="flex flex-col min-w-0 flex-1">
+        <div className="text-sm font-semibold text-gray-900 truncate leading-tight">{name}</div>
+        <div className="text-xs text-gray-500 truncate">{role}</div>
       </div>
+      <button
+        onClick={onLogout}
+        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+        title="Déconnexion"
+        aria-label="Déconnexion"
+      >
+        <LogOut size={17} />
+      </button>
     </div>
   );
 });

@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import AuthProvider from "@/components/AuthProvider";
 import { ToastContainer } from "@/components/ui/Toast";
 import InstallPwaPrompt from "@/components/pwa/InstallPrompt";
 import "./globals.css";
 import "@/styles/products.scss";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Mellia POS",
@@ -36,8 +39,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
-      <body suppressHydrationWarning>
+    <html lang="fr" className={inter.variable}>
+      <body suppressHydrationWarning className="font-sans antialiased">
         <AuthProvider>
           {children}
           <ToastContainer />

@@ -100,6 +100,8 @@ export async function POST(req: Request) {
                 pointsEarned = Math.floor(totalCdf / 20000);
             }
 
+            const hasFood = saleItemsData.some((i) => i.product.type === "FOOD");
+
             // 3. Create Sale
             // The last 6 digits of the clock repeat every ~16 minutes: a number already used
             // would make the sale fail on the unique constraint, so take another one.
@@ -145,8 +147,9 @@ export async function POST(req: Request) {
                             }
                         }
                     }),
-                    // Create Kitchen Order & Transaction automatically (Only if COMPLETED)
-                    ...(status === "COMPLETED" && {
+                    // Kitchen order only when the sale has something to cook: a sale of drinks
+                    // alone would sit in the kitchen screen forever.
+                    ...(status === "COMPLETED" && hasFood && {
                         kitchenOrders: {
                             create: {
                                 orderType: orderType || "DINE_IN",
@@ -155,6 +158,9 @@ export async function POST(req: Request) {
                                 ...(saleDate && { createdAt: saleDate }) // Match sale date
                             }
                         },
+                    }),
+                    // Payment transaction (Only if COMPLETED)
+                    ...(status === "COMPLETED" && {
                         transactions: {
                             create: {
                                 amount: totalBrut,

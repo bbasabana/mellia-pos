@@ -246,7 +246,7 @@ export function StockMovementModal({ isOpen, onClose, initialProductId, initialT
                     <button
                         onClick={handleSubmit}
                         disabled={loading || !productId || !quantity}
-                        className="px-6 py-2 bg-[#00d3fa] text-white font-bold rounded shadow hover:opacity-90 disabled:opacity-50"
+                        className="px-6 py-2 bg-blue-600 text-white font-bold rounded shadow hover:opacity-90 disabled:opacity-50"
                     >
                         {loading ? "Traitement..." : "Valider Mouvement"}
                     </button>

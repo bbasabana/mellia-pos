@@ -280,11 +280,11 @@ export default function ExpensesPage() {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col h-full bg-gray-50/50">
+            <div className="flex flex-col h-full">
                 {/* HEADER */}
-                <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-10 shadow-sm">
+                <div className="px-1 pb-5 flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <h1 className="ui-page-title flex items-center gap-2.5">
                             <DollarSign className="text-[#00d3fa]" />
                             Gestion des Dépenses & Trésorerie
                         </h1>
@@ -311,7 +311,7 @@ export default function ExpensesPage() {
                         </div>
                         {isManager && (
                             <button
-                                className="bg-[#00d3fa] text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-[#00b8e0] transition-all shadow-md active:scale-95"
+                                className="bg-blue-600 text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition-all shadow-md active:scale-95"
                                 onClick={openClosureModal}
                             >
                                 <Lock size={16} />
@@ -329,7 +329,7 @@ export default function ExpensesPage() {
                 </div>
 
                 {/* CONTENT AREA */}
-                <div className="flex-1 overflow-auto p-6 space-y-6">
+                <div className="flex-1 overflow-auto px-1 pb-2 space-y-6">
                     {/* Summary Cards */}
                     {loading && !summary ? (
                         <div className="flex justify-center p-12">
@@ -364,7 +364,7 @@ export default function ExpensesPage() {
                                     icon={<ShoppingCart size={20} />}
                                     color="bg-orange-50 text-orange-500 border-orange-100"
                                 />
-                                <div className="bg-[#00d3fa] p-4 rounded-sm shadow-md flex flex-col justify-between text-white relative overflow-hidden group">
+                                <div className="bg-blue-600 p-4 rounded-sm shadow-md flex flex-col justify-between text-white relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-110 transition-transform">
                                         <Wallet size={48} />
                                     </div>
@@ -478,7 +478,7 @@ export default function ExpensesPage() {
                                             </div>
                                             <button
                                                 onClick={() => { setActualCash(summary?.balance.toString() || "0"); setShowAdjustmentModal(true); }}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#00d3fa] text-white text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#00b8e0] transition-all shadow-sm"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-blue-700 transition-all shadow-sm"
                                             >
                                                 <Edit size={12} />
                                                 Ajuster le Solde

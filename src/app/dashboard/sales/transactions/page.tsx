@@ -130,7 +130,7 @@ export default function FinancialTransactionsPage() {
                 {/* Header */}
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-black text-gray-800 flex items-center gap-3">
+                        <h1 className="ui-page-title flex items-center gap-2.5">
                             <TrendingUp className="text-blue-600" size={28} />
                             Transactions Financières
                         </h1>

@@ -173,13 +173,13 @@ export default function TransactionsPage() {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col h-full bg-gray-50/50">
+            <div className="flex flex-col h-full">
                 {/* HEADER */}
-                <div className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 sticky top-0 z-10 shadow-sm">
+                <div className="px-1 pb-4 md:pb-5">
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <h1 className="ui-page-title text-xl md:text-2xl flex items-center gap-2.5">
                                     <Receipt className="text-green-600" size={20} />
                                     <span className="hidden sm:inline">Historique des Ventes</span>
                                     <span className="sm:hidden">Ventes</span>
@@ -268,7 +268,7 @@ export default function TransactionsPage() {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-auto p-3 md:p-6 space-y-4 md:space-y-6">
+                <div className="flex-1 overflow-auto px-1 pb-2 space-y-4 md:space-y-6">
                     {/* Summary Stats */}
                     <div className={`grid grid-cols-1 sm:grid-cols-2 ${showCategorySplit ? "lg:grid-cols-5" : "lg:grid-cols-3"} gap-3 md:gap-4`}>
                         <div className="bg-white p-4 md:p-5 border border-gray-200 rounded-lg md:rounded-sm shadow-sm">

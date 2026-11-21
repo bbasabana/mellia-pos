@@ -202,9 +202,9 @@ export default function MiniInventoryPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-full bg-gray-50">
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+      <div className="flex flex-col h-full">
+        <div className="px-1 pb-5">
+          <h1 className="ui-page-title flex items-center gap-2.5">
             <ShoppingBasket className="text-[#00d3fa]" />
             Mini Inventaire
           </h1>
@@ -213,7 +213,7 @@ export default function MiniInventoryPage() {
           </p>
         </div>
 
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+        <div className="flex-1 overflow-auto px-1 pb-2 space-y-6">
           <div className="bg-white border border-gray-200 rounded-sm p-4 space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               {PERIOD_OPTIONS.map((option) => (

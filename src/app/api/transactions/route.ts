@@ -343,10 +343,12 @@ export async function PUT(req: NextRequest) {
             if (isFinalizing) {
                 // Fetch fresh items (after updates above)
                 const updatedSale = await tx.sale.findUnique({ where: { id }, include: { items: true } });
+                let hasFood = false;
 
                 for (const item of updatedSale?.items || []) {
                     const product = await tx.product.findUnique({ where: { id: item.productId }, include: { costs: true } });
                     if (product) {
+                        if (product.type === "FOOD") hasFood = true;
                         await deductStock(
                             tx,
                             item.productId,
@@ -381,15 +383,17 @@ export async function PUT(req: NextRequest) {
                     });
                 }
 
-                // Create Kitchen Orders (since they were skipped in Draft)
-                await tx.kitchenOrder.create({
-                    data: {
-                        saleId: sale.id,
-                        orderType: sale.orderType,
-                        status: "PENDING",
-                        priority: 0
-                    }
-                });
+                // Create Kitchen Orders (since they were skipped in Draft), only when there is food to cook
+                if (hasFood) {
+                    await tx.kitchenOrder.create({
+                        data: {
+                            saleId: sale.id,
+                            orderType: sale.orderType,
+                            status: "PENDING",
+                            priority: 0
+                        }
+                    });
+                }
 
                 // Create Financial Transaction
                 await tx.financialTransaction.create({
