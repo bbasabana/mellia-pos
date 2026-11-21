@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:mellia_pos_mobile/core/services/exchange_rate.dart';
 import 'package:mellia_pos_mobile/core/services/notification_service.dart';
 import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
 import 'package:mellia_pos_mobile/features/cart/cart_provider.dart';
@@ -15,8 +16,9 @@ import 'package:mellia_pos_mobile/shared/widgets/primary_button.dart';
 final _fcFormat = NumberFormat.decimalPattern('fr');
 String _fc(num v) => '${_fcFormat.format(v.round())} FC';
 
-/// Checkout: the amount is in francs; the cashier types the money handed over, in francs or in
-/// dollars as the customer paid (no change is computed, only what was received is recorded).
+/// Checkout: the amount is in francs. The cashier types the money handed over, in francs or in
+/// whole dollars (no cents in Congo), converted at the platform's rate. Less than the total is
+/// refused; anything above is change, always given back in francs.
 class PaymentModal extends ConsumerStatefulWidget {
   const PaymentModal({super.key});
 
@@ -59,30 +61,40 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
     super.dispose();
   }
 
-  /// Amount typed by the cashier ("50 000", "20.5"...), or the exact total when left empty.
-  double _amountReceived(CartState cart) {
-    final typed = double.tryParse(
-      _amountController.text
-          .replaceAll(RegExp(r'[\s  ]'), '')
-          .replaceAll(',', '.'),
-    );
-    if (typed != null && typed > 0) return typed;
-    return currency == 'USD' ? cart.totalUsd : cart.totalCdf;
+  /// Amount typed by the cashier: whole francs ("5 000") or whole dollars ("2"); 0 if empty.
+  double _typed() {
+    final digits = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    return double.tryParse(digits) ?? 0;
   }
 
-  /// Why the typed amount cannot be accepted, or null when it covers the total.
-  /// A ticket is always paid in full: less than the total is refused.
+  /// FC for 1 $: the platform's active rate; until it is loaded, the rate implied by the prices.
+  double _rate(CartState cart) {
+    final live = ref.read(exchangeRateProvider).asData?.value;
+    if (live != null) return live;
+    return cart.totalUsd > 0 ? cart.totalCdf / cart.totalUsd : 0;
+  }
+
+  CashMath _math(CartState cart) => CashMath(
+    dueCdf: cart.totalCdf,
+    rate: _rate(cart),
+    currency: currency,
+    received: _typed(),
+  );
+
+  /// Why the cash payment cannot be accepted, or null. A ticket is always paid in full.
   String? _shortfall(CartState cart) {
     if (selectedMethod != 'CASH') return null;
-    final received = _amountReceived(cart);
+    final m = _math(cart);
     if (currency == 'USD') {
-      if (received + 0.004 < cart.totalUsd) {
-        return "Montant insuffisant : il manque \$${(cart.totalUsd - received).toStringAsFixed(2)}. "
-            "Le client doit payer \$${cart.totalUsd.toStringAsFixed(2)}.";
+      if (!m.typed) {
+        return "Indiquez combien de dollars le client a donnés (minimum ${m.minDollars} \$).";
       }
-    } else if (received + 0.5 < cart.totalCdf) {
-      return "Montant insuffisant : il manque ${_fc(cart.totalCdf - received)}. "
-          "Le client doit payer ${_fc(cart.totalCdf)}.";
+      if (m.shortfallCdf > 0) {
+        return "Montant insuffisant : ${m.received.toInt()} \$ = ${_fc(m.receivedCdf)}, il manque ${_fc(m.shortfallCdf)}. "
+            "Minimum ${m.minDollars} \$.";
+      }
+    } else if (m.shortfallCdf > 0) {
+      return "Montant insuffisant : il manque ${_fc(m.shortfallCdf)}. Le client doit payer ${_fc(cart.totalCdf)}.";
     }
     return null;
   }
@@ -105,10 +117,13 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
     try {
       final repo = await ref.read(salesRepositoryProvider.future);
       final cartSnapshot = cart;
-      final paidCurrency = selectedMethod == 'CASH' ? currency : 'CDF';
-      final amountPaid = selectedMethod == 'CASH'
-          ? _amountReceived(cartSnapshot)
-          : cartSnapshot.totalCdf;
+      final cash = selectedMethod == 'CASH';
+      final m = _math(cartSnapshot);
+      final paidCurrency = cash ? currency : 'CDF';
+      // Empty in francs = exact amount; in dollars an amount is always typed.
+      final amountPaid = cash && m.typed ? m.received : cartSnapshot.totalCdf;
+      final changeCdf = cash ? m.changeCdf : 0.0;
+      final rate = m.rate;
 
       final Map<String, dynamic> saleData;
       if (cartSnapshot.activeDraftId != null) {
@@ -163,6 +178,8 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
             paymentMethod: selectedMethod,
             amountPaid: amountPaid,
             paidCurrency: paidCurrency,
+            changeCdf: changeCdf,
+            rate: rate,
           ),
         );
       }
@@ -209,6 +226,10 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartNotifierProvider);
+    ref.watch(
+      exchangeRateProvider,
+    ); // keeps the live rate loaded while the sheet is open
+    final math = _math(cart);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
@@ -262,7 +283,11 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _TotalCard(totalCdf: cart.totalCdf, totalUsd: cart.totalUsd),
+                  _TotalCard(
+                    totalCdf: cart.totalCdf,
+                    minDollars: math.minDollars,
+                    rate: math.rate,
+                  ),
                   const SizedBox(height: 22),
 
                   const _Label("Mode de paiement"),
@@ -316,19 +341,13 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
                                 const SizedBox(height: 10),
                                 TextField(
                                   controller: _amountController,
-                                  onChanged: (_) {
-                                    if (_error != null) {
-                                      setState(() => _error = null);
-                                    }
-                                  },
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
+                                  onChanged: (_) =>
+                                      setState(() => _error = null),
+                                  keyboardType: TextInputType.number,
+                                  // Whole amounts only: no cents, no centimes.
                                   inputFormatters: [
-                                    FilteringTextInputFormatter.allow(
-                                      RegExp(r'[0-9 .,]'),
-                                    ),
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    _ThousandsFormatter(),
                                   ],
                                   style: const TextStyle(
                                     fontSize: 22,
@@ -336,7 +355,7 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
                                   ),
                                   decoration: InputDecoration(
                                     hintText: currency == 'USD'
-                                        ? cart.totalUsd.toStringAsFixed(2)
+                                        ? '${math.minDollars}'
                                         : _fcFormat.format(
                                             cart.totalCdf.round(),
                                           ),
@@ -357,16 +376,24 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  currency == 'USD'
-                                      ? "Le client paie en dollars. Laissez vide si c'est le montant exact."
-                                      : "Le client paie en francs. Laissez vide si c'est le montant exact.",
-                                  style: const TextStyle(
-                                    color: AppTheme.muted,
-                                    fontSize: 12.5,
-                                  ),
+                                const SizedBox(height: 10),
+                                _QuickAmounts(
+                                  currency: currency,
+                                  dueCdf: cart.totalCdf,
+                                  minDollars: math.minDollars,
+                                  onPick: (v) => setState(() {
+                                    _error = null;
+                                    _amountController.text = _fcFormat.format(
+                                      v,
+                                    );
+                                    _amountController.selection =
+                                        TextSelection.collapsed(
+                                          offset: _amountController.text.length,
+                                        );
+                                  }),
                                 ),
+                                const SizedBox(height: 12),
+                                _ChangePanel(math: math),
                               ],
                             ),
                           ),
@@ -478,11 +505,16 @@ class _Label extends StatelessWidget {
   );
 }
 
-/// Amount due, in francs first; the dollar value underneath.
+/// Amount due, in francs first; underneath, the fewest dollar notes that cover it and the rate.
 class _TotalCard extends StatelessWidget {
   final double totalCdf;
-  final double totalUsd;
-  const _TotalCard({required this.totalCdf, required this.totalUsd});
+  final int minDollars;
+  final double rate;
+  const _TotalCard({
+    required this.totalCdf,
+    required this.minDollars,
+    required this.rate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -528,15 +560,18 @@ class _TotalCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            "soit \$${totalUsd.toStringAsFixed(2)}",
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppTheme.lime,
-              fontWeight: FontWeight.w600,
+          if (rate > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              "En dollars : $minDollars \$ minimum · 1 \$ = ${_fc(rate)}",
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: AppTheme.lime,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -684,6 +719,178 @@ class _CurrencySwitch extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [option('CDF', 'FC'), option('USD', '\$')],
+      ),
+    );
+  }
+}
+
+/// Groups thousands while typing: "10000" -> "10 000".
+class _ThousandsFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return const TextEditingValue();
+    final text = _fcFormat.format(int.parse(digits));
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+/// One-tap amounts: the exact bill and the usual notes, in francs or in whole dollars.
+class _QuickAmounts extends StatelessWidget {
+  final String currency;
+  final double dueCdf;
+  final int minDollars;
+  final ValueChanged<int> onPick;
+  const _QuickAmounts({
+    required this.currency,
+    required this.dueCdf,
+    required this.minDollars,
+    required this.onPick,
+  });
+
+  List<int> get _values {
+    final set = <int>{};
+    if (currency == 'USD') {
+      if (minDollars > 0) set.add(minDollars);
+      for (final note in [5, 10, 20, 50, 100]) {
+        if (note > minDollars) set.add(note);
+      }
+    } else {
+      final due = dueCdf.round();
+      if (due > 0) set.add(due);
+      for (final step in [1000, 5000, 10000, 20000]) {
+        final up = ((due + step - 1) ~/ step) * step;
+        if (up > due) set.add(up);
+      }
+    }
+    return (set.toList()..sort()).take(4).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final values = _values;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final v in values)
+          Pressable(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onPick(v);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F9FB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.line),
+              ),
+              child: Text(
+                currency == 'USD' ? '$v \$' : _fc(v),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Live result of the cash typed: what is missing (red), the change to give back in francs
+/// (green), or exact.
+class _ChangePanel extends StatelessWidget {
+  final CashMath math;
+  const _ChangePanel({required this.math});
+
+  @override
+  Widget build(BuildContext context) {
+    final usd = math.currency == 'USD';
+    final Color bg, fg;
+    final IconData icon;
+    final String title;
+    String? detail;
+
+    if (!math.typed) {
+      bg = const Color(0xFFF7F9FB);
+      fg = AppTheme.muted;
+      icon = Icons.info_outline_rounded;
+      title = usd
+          ? "Saisissez les dollars reçus"
+          : "Vide = le client donne le montant exact";
+      detail = usd
+          ? "Billets entiers uniquement. La monnaie est rendue en francs."
+          : "Saisissez le montant reçu s'il faut rendre la monnaie.";
+    } else if (math.shortfallCdf > 0) {
+      bg = const Color(0xFFFFF1F1);
+      fg = const Color(0xFFB4232A);
+      icon = Icons.error_outline_rounded;
+      title = "Il manque ${_fc(math.shortfallCdf)}";
+      detail = usd
+          ? "${math.received.toInt()} \$ = ${_fc(math.receivedCdf)}. Minimum ${math.minDollars} \$."
+          : null;
+    } else if (math.changeCdf > 0) {
+      bg = AppTheme.lime.withValues(alpha: 0.12);
+      fg = AppTheme.limeDark;
+      icon = Icons.currency_exchange_rounded;
+      title = "Monnaie à rendre : ${_fc(math.changeCdf)}";
+      detail = usd
+          ? "${math.received.toInt()} \$ = ${_fc(math.receivedCdf)}"
+          : null;
+    } else {
+      bg = AppTheme.lime.withValues(alpha: 0.12);
+      fg = AppTheme.limeDark;
+      icon = Icons.check_circle_outline_rounded;
+      title = "Compte exact, rien à rendre";
+    }
+
+    return AnimatedContainer(
+      duration: AppTheme.fast,
+      curve: AppTheme.curve,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: fg, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: fg,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                if (detail != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    detail,
+                    style: TextStyle(
+                      color: fg.withValues(alpha: 0.85),
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -290,6 +290,8 @@ class PrinterService extends _$PrinterService {
     String? paymentMethod,
     double? amountPaid,
     String paidCurrency = 'CDF',
+    double changeCdf = 0,
+    double rate = 0,
   }) async {
     await _load();
     if (kind == PrinterKind.none) await autoConnect();
@@ -307,6 +309,8 @@ class PrinterService extends _$PrinterService {
       paymentMethod: paymentMethod,
       amountPaid: amountPaid,
       paidCurrency: paidCurrency,
+      changeCdf: changeCdf,
+      rate: rate,
     );
     if (!await _send(bytes)) {
       throw Exception(lastError ?? 'Impression impossible');
@@ -490,6 +494,8 @@ class PrinterService extends _$PrinterService {
     String? paymentMethod,
     double? amountPaid,
     String paidCurrency = 'CDF',
+    double changeCdf = 0,
+    double rate = 0,
   }) {
     double num0(Object? v) => double.tryParse(v?.toString() ?? '') ?? 0.0;
 
@@ -557,12 +563,17 @@ class PrinterService extends _$PrinterService {
     if (method != null && method.isNotEmpty)
       line(_row('Paiement', _methods[method] ?? method));
     if (amountPaid != null && amountPaid > 0) {
-      line(
-        _row(
-          'Reçu',
-          paidCurrency == 'USD' ? _usd(amountPaid) : _fc(amountPaid),
-        ),
-      );
+      // Dollars come as whole notes; their franc value is shown at the rate applied.
+      final usd = paidCurrency == 'USD';
+      line(_row('Reçu', usd ? '${amountPaid.round()} \$' : _fc(amountPaid)));
+      if (usd && rate > 0) {
+        line(_row('  1 \$ = ${_fc(rate)}', _fc(amountPaid * rate)));
+      }
+      if (changeCdf > 0) {
+        bytes.addAll(_boldOn);
+        line(_row('Monnaie rendue', _fc(changeCdf)));
+        bytes.addAll(_boldOff);
+      }
     }
     line(rule);
 

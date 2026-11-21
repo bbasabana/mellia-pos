@@ -18,12 +18,20 @@ class ReceiptModal extends ConsumerStatefulWidget {
   /// Currency the customer paid with: 'CDF' (francs) or 'USD'.
   final String paidCurrency;
 
+  /// Change given back, always in francs.
+  final double changeCdf;
+
+  /// FC for 1 dollar applied to this payment.
+  final double rate;
+
   const ReceiptModal({
     super.key,
     required this.saleData,
     required this.paymentMethod,
     required this.amountPaid,
     this.paidCurrency = 'CDF',
+    this.changeCdf = 0,
+    this.rate = 0,
   });
 
   @override
@@ -45,9 +53,8 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(printerServiceProvider.future);
       final printer = ref.read(printerServiceProvider.notifier);
-      if (printer.autoPrint && printer.kind != PrinterKind.none) {
-        _print(auto: true);
-      }
+      // printTicket finds the built-in printer by itself when none is set yet.
+      if (printer.autoPrint) _print(auto: true);
     });
   }
 
@@ -64,6 +71,8 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
             paymentMethod: paymentMethod,
             amountPaid: amountPaid,
             paidCurrency: widget.paidCurrency,
+            changeCdf: widget.changeCdf,
+            rate: widget.rate,
           );
       if (mounted) setState(() => _printed = true);
     } catch (e) {
@@ -239,8 +248,15 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
                         _buildInfoRow(
                           'Reçu',
                           widget.paidCurrency == 'USD'
-                              ? '\$${amountPaid.toStringAsFixed(2)}'
+                              ? '${amountPaid.round()} \$'
+                                    '${widget.rate > 0 ? ' (${fc(amountPaid * widget.rate)})' : ''}'
                               : fc(amountPaid),
+                        ),
+                      if (widget.changeCdf > 0)
+                        _buildTotalRow(
+                          'Monnaie rendue',
+                          fc(widget.changeCdf),
+                          isBold: true,
                         ),
                       if (saleId.isNotEmpty) ...[
                         const _Dashed(),
