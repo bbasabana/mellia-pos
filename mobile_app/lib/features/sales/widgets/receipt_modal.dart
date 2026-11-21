@@ -5,7 +5,7 @@ import 'package:mellia_pos_mobile/features/auth/providers/auth_provider.dart';
 import 'package:mellia_pos_mobile/core/services/printer_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ReceiptModal extends ConsumerWidget {
+class ReceiptModal extends ConsumerStatefulWidget {
   final Map<String, dynamic> saleData;
   final String paymentMethod;
   final double amountPaid;
@@ -18,7 +18,58 @@ class ReceiptModal extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReceiptModal> createState() => _ReceiptModalState();
+}
+
+class _ReceiptModalState extends ConsumerState<ReceiptModal> {
+  bool _printing = false;
+  bool _printed = false;
+
+  Map<String, dynamic> get saleData => widget.saleData;
+  String get paymentMethod => widget.paymentMethod;
+  double get amountPaid => widget.amountPaid;
+
+  @override
+  void initState() {
+    super.initState();
+    // Prints the receipt by itself once the sale is paid, when auto-print is on.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(printerServiceProvider.future);
+      final printer = ref.read(printerServiceProvider.notifier);
+      if (printer.autoPrint && printer.kind != PrinterKind.none) {
+        _print(auto: true);
+      }
+    });
+  }
+
+  Future<void> _print({bool auto = false}) async {
+    if (_printing) return;
+    setState(() => _printing = true);
+    final user = ref.read(authNotifierProvider).asData?.value;
+    try {
+      await ref
+          .read(printerServiceProvider.notifier)
+          .printTicket(
+            saleData: saleData,
+            cashierName: user?.name,
+            paymentMethod: paymentMethod,
+            amountPaid: amountPaid,
+          );
+      if (mounted) setState(() => _printed = true);
+    } catch (e) {
+      if (mounted) {
+        final reason = e.toString().replaceFirst('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(auto ? "Ticket non imprimé : $reason" : reason)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authNotifierProvider).asData?.value;
     final createdAt =
         DateTime.tryParse(saleData['createdAt'] ?? "") ?? DateTime.now();
@@ -151,24 +202,17 @@ class ReceiptModal extends ConsumerWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () async {
-                  try {
-                    await ref
-                        .read(printerServiceProvider.notifier)
-                        .printTicket(
-                          saleData: saleData,
-                          cashierName: user?.name,
-                        );
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text(e.toString())));
-                    }
-                  }
-                },
-                icon: const Icon(Icons.print),
-                label: const Text("IMPRIMER REÇU"),
+                onPressed: _printing ? null : () => _print(),
+                icon: _printing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.print),
+                label: Text(_printing
+                    ? "IMPRESSION..."
+                    : (_printed ? "RÉIMPRIMER LE REÇU" : "IMPRIMER REÇU")),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: Colors.black,

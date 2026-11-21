@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cache } from "@/lib/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-options";
 
 const CACHE_KEY = "exchange_rate:active";
 const CACHE_TTL = 60_000; // 60 seconds
@@ -30,6 +32,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    const session = await getServerSession(authOptions);
+    const role = session?.user?.role;
+    if (role !== "ADMIN" && role !== "MANAGER") {
+        return NextResponse.json({ success: false, error: "Permission refusée" }, { status: 403 });
+    }
+
     try {
         const body = await request.json();
         const { rateUsdToCdf } = body;

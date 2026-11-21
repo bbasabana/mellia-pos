@@ -94,7 +94,7 @@ class SettingsScreen extends ConsumerWidget {
           _buildSettingTile(
             icon: Icons.print_outlined,
             title: "Configuration de l'imprimante",
-            subtitle: "Bluetooth / Réseau / USB",
+            subtitle: "Sunmi intégrée / Bluetooth",
             onTap: () => _showPrinterConfig(context, ref),
           ),
           _buildSettingTile(
@@ -199,13 +199,21 @@ class _PrinterConfigModalState extends ConsumerState<_PrinterConfigModal> {
 
   Future<void> _scan() async {
     setState(() => isLoading = true);
+    await ref.read(printerServiceProvider.future);
     final list = await ref
         .read(printerServiceProvider.notifier)
         .getBondedDevices();
+    if (!mounted) return;
     setState(() {
       devices = list;
       isLoading = false;
     });
+  }
+
+  void _snack(String text, {bool ok = true}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: ok ? Colors.green : Colors.red),
+    );
   }
 
   @override
@@ -224,17 +232,65 @@ class _PrinterConfigModalState extends ConsumerState<_PrinterConfigModal> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                "Imprimantes Jumelées",
+                "Imprimante",
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
               ),
               IconButton(onPressed: _scan, icon: const Icon(Icons.refresh)),
             ],
           ),
-          const SizedBox(height: 16),
+          Builder(builder: (context) {
+            final printer = ref.read(printerServiceProvider.notifier);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Actuelle : ${printer.printerName}",
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                if (printer.sunmiAvailable)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.print),
+                    title: const Text("Imprimante intégrée Sunmi"),
+                    subtitle: Text("Terminal POS - ${printer.paperColumns == 48 ? '80' : '58'} mm"),
+                    trailing: printer.kind == PrinterKind.sunmi
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : null,
+                    onTap: () async {
+                      try {
+                        await printer.useSunmi();
+                        if (mounted) setState(() {});
+                        _snack("Imprimante intégrée Sunmi sélectionnée");
+                      } catch (e) {
+                        _snack(e.toString().replaceFirst('Exception: ', ''), ok: false);
+                      }
+                    },
+                  ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text("Imprimer automatiquement après chaque vente"),
+                  value: printer.autoPrint,
+                  onChanged: (v) async {
+                    await printer.setAutoPrint(v);
+                    if (mounted) setState(() {});
+                  },
+                ),
+                const Divider(),
+                const Text(
+                  "Imprimantes Bluetooth jumelées",
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
+            );
+          }),
+          const SizedBox(height: 8),
           if (isLoading)
             const Center(child: CircularProgressIndicator())
           else if (devices.isEmpty)
-            const Center(child: Text("Aucune imprimante Bluetooth trouvée"))
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text("Aucune imprimante Bluetooth jumelée"),
+            )
           else
             Expanded(
               child: ListView.builder(
@@ -288,7 +344,7 @@ class _PrinterConfigModalState extends ConsumerState<_PrinterConfigModal> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: const Text("AUTO-CONNECT & TEST"),
+              child: const Text("DÉTECTER & IMPRIMER UN TEST"),
             ),
           ),
         ],

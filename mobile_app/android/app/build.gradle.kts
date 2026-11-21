@@ -42,3 +42,9 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Sunmi's printer service (AIDL "woyou"), present on every Sunmi terminal: lets the app print
+    // on the built-in printer directly, without Bluetooth (same library as the Mihos POS app).
+    implementation("com.sunmi:printerlibrary:1.0.23")
+}

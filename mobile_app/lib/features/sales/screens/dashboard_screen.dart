@@ -41,16 +41,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _autoConfigPrinter() async {
     Future.delayed(const Duration(seconds: 2), () async {
+      // Finds the printer (built-in Sunmi or saved Bluetooth) without printing a test page.
       final result = await ref
           .read(printerServiceProvider.notifier)
-          .autoConnectAndTest();
+          .autoConnect();
       if (result != null && mounted) {
-        if (result.contains("Erreur") || result.contains("Échec")) {
-          // Fallback notification or just log
-          debugPrint("Printer Auto-config: $result");
-        } else {
-          NotificationService.showSuccess(context, result);
-        }
+        NotificationService.showSuccess(context, result);
       }
     });
   }

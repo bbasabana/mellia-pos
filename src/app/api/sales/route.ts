@@ -101,7 +101,13 @@ export async function POST(req: Request) {
             }
 
             // 3. Create Sale
-            const ticketNum = `TK-${Date.now().toString().slice(-6)}`;
+            // The last 6 digits of the clock repeat every ~16 minutes: a number already used
+            // would make the sale fail on the unique constraint, so take another one.
+            let ticketNum = `TK-${Date.now().toString().slice(-6)}`;
+            for (let attempt = 0; await tx.sale.findUnique({ where: { ticketNum }, select: { id: true } }); attempt++) {
+                if (attempt >= 5) throw new Error("Numéro de ticket indisponible, réessayez");
+                ticketNum = `TK-${Date.now().toString().slice(-6)}${Math.random().toString(36).slice(2, 4).toUpperCase()}`;
+            }
 
             const sale = await tx.sale.create({
                 data: {
