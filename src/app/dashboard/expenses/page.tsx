@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { showToast } from "@/components/ui/Toast";
+import { kinshasaDateStr, kinshasaTodayStr } from "@/components/purchases/purchase-format";
 
 interface Summary {
     totalSales: number;
@@ -103,7 +104,7 @@ export default function ExpensesPage() {
         amount: "",
         categoryId: "",
         source: "CASH_REGISTER",
-        date: new Date().toISOString().split('T')[0]
+        date: kinshasaTodayStr()
     });
 
     useEffect(() => {
@@ -113,7 +114,7 @@ export default function ExpensesPage() {
                 amount: editingExpense.amount.toString(),
                 categoryId: editingExpense.category.id,
                 source: editingExpense.source,
-                date: editingExpense.date.split('T')[0]
+                date: kinshasaDateStr(editingExpense.date)
             });
             setShowModal(true);
         } else {
@@ -122,7 +123,7 @@ export default function ExpensesPage() {
                 amount: "",
                 categoryId: "",
                 source: "CASH_REGISTER",
-                date: new Date().toISOString().split('T')[0]
+                date: kinshasaTodayStr()
             });
         }
     }, [editingExpense]);

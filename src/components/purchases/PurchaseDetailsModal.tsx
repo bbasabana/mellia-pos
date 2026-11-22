@@ -1,8 +1,10 @@
 "use client";
 
 import { Modal } from "@/components/ui/Modal";
-import { formatCurrency, formatDate, formatDateUTC } from "@/lib/utils";
-import { Package, MapPin, Hash, User, Calendar } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { purchaseDay } from "./PurchaseHistoryList";
+import { Package, MapPin, User, Calendar } from "lucide-react";
+import { unitLabel } from "./PurchaseAnalytics";
 
 interface PurchaseDetailsModalProps {
     isOpen: boolean;
@@ -22,26 +24,27 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                         <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Date</p>
                         <div className="flex items-center gap-2 text-sm text-gray-700">
                             <Calendar size={14} className="text-gray-400" />
-                            {formatDateUTC(new Date(investment.date))}
+                            {purchaseDay(investment.date)}
                         </div>
                     </div>
                     <div>
                         <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Acheteur</p>
                         <div className="flex items-center gap-2 text-sm text-gray-700">
                             <User size={14} className="text-gray-400" />
-                            {(() => {
-                                const desc = investment.description || "";
-                                const match = desc.match(/^\[Acheteur:\s*([^\]]+)\]/);
-                                return match ? match[1] : (investment.user?.name || "Inconnu");
-                            })()}
+{investment.buyer || investment.user?.name || "Inconnu"}
                         </div>
                     </div>
                     <div>
                         <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Source</p>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${investment.source === 'OWNER_CAPITAL' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
                             }`}>
-                            {investment.source === 'OWNER_CAPITAL' ? 'Patron' : 'Caisse'}
+                            {investment.source === 'OWNER_CAPITAL' ? 'Poche du patron' : 'Caisse du restaurant'}
                         </span>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Saisi par</p>
+                        <p className="text-sm text-gray-700">{investment.user?.name || "—"}</p>
+                        <p className="text-[10px] text-gray-400">Taux : {Number(investment.exchangeRate || 0).toLocaleString("fr-FR")} FC / $</p>
                     </div>
                 </div>
 
@@ -76,11 +79,11 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="font-bold text-gray-800">
-                                                {Number(mov.quantity)} {mov.product?.saleUnit === 'BOTTLE' ? 'Bout.' : (mov.product?.saleUnit || 'Unit')}
+                                                {Number(mov.quantity).toLocaleString("fr-FR")} {unitLabel(mov.product?.saleUnit || "PIECE")}
                                             </div>
                                             {mov.product?.purchaseUnit && mov.product?.packingQuantity > 1 && (
                                                 <div className="text-[10px] text-blue-500">
-                                                    {(Number(mov.quantity) / mov.product.packingQuantity).toFixed(1)} {mov.product.purchaseUnit}
+                                                    = {(Number(mov.quantity) / mov.product.packingQuantity).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} {mov.product.purchaseUnit} de {mov.product.packingQuantity}
                                                 </div>
                                             )}
                                         </td>
@@ -89,6 +92,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                                 {formatCurrency(Number(mov.costValue || 0), "CDF")}
                                             </div>
                                             <div className="text-[10px] text-gray-400">
+                                                {Number(mov.quantity) > 0 && `${Math.round(Number(mov.costValue || 0) / Number(mov.quantity)).toLocaleString("fr-FR")} FC / ${unitLabel(mov.product?.saleUnit || "PIECE")} · `}
                                                 {formatCurrency(Number(mov.costValue || 0) / (Number(investment.exchangeRate) || 2850), "USD")}
                                             </div>
                                         </td>
@@ -104,11 +108,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                     <div>
                         <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Description / Notes</p>
                         <p className="text-sm text-gray-700 italic">
-                            {(() => {
-                                const desc = investment.description || "";
-                                const match = desc.match(/^\[Acheteur:\s*[^\]]+\]\s*(.*)/);
-                                return match ? (match[1] || "Aucune note") : (desc || "Aucune note");
-                            })()}
+                            {investment.notes || "Aucune note"}
                         </p>
                     </div>
                     <div className="text-right space-y-1">
@@ -146,7 +146,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                             {/* Space 1: Terrasse */}
                             <div className="p-4 bg-green-50/50 border border-green-100 rounded-xl relative overflow-hidden">
                                 <div className="absolute top-0 right-0 bg-green-100 text-green-700 px-2 py-0.5 text-[9px] font-black rounded-bl-lg uppercase">Terrasse / Salle</div>
-                                <p className="text-[10px] text-green-600 uppercase font-bold mb-1">Revenu (Terrasse)</p>
+                                <p className="text-[10px] text-green-600 uppercase font-bold mb-1">Revenu si tout est vendu (Terrasse)</p>
                                 <div className="flex flex-col">
                                     <span className="text-xl font-black text-green-700">
                                         {formatCurrency(Number(investment.expectedRevenueCdf || 0), "CDF")}
@@ -156,7 +156,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                     </span>
                                 </div>
                                 <div className="mt-2 pt-2 border-t border-green-100 flex justify-between items-center">
-                                    <span className="text-[10px] text-green-600 font-bold uppercase">Profit Net</span>
+                                    <span className="text-[10px] text-green-600 font-bold uppercase">Marge sur le stock</span>
                                     <div className="text-right flex flex-col items-end leading-none">
                                         <span className="text-sm font-black text-green-700">
                                             +{formatCurrency(Number(investment.expectedProfitCdf || 0), "CDF")}
@@ -171,7 +171,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                             {/* Space 2: VIP */}
                             <div className="p-4 bg-[#fcf9ff] border border-purple-100 rounded-xl relative overflow-hidden">
                                 <div className="absolute top-0 right-0 bg-purple-100 text-purple-700 px-2 py-0.5 text-[9px] font-black rounded-bl-lg uppercase">VIP / Salon</div>
-                                <p className="text-[10px] text-purple-600 uppercase font-bold mb-1">Revenu (VIP)</p>
+                                <p className="text-[10px] text-purple-600 uppercase font-bold mb-1">Revenu si tout est vendu (VIP)</p>
                                 <div className="flex flex-col">
                                     <span className="text-xl font-black text-purple-700">
                                         {formatCurrency(Number(investment.expectedRevenueVipCdf || 0), "CDF")}
@@ -181,7 +181,7 @@ export function PurchaseDetailsModal({ isOpen, onClose, investment }: PurchaseDe
                                     </span>
                                 </div>
                                 <div className="mt-2 pt-2 border-t border-purple-100 flex justify-between items-center">
-                                    <span className="text-[10px] text-purple-600 font-bold uppercase">Profit Net</span>
+                                    <span className="text-[10px] text-purple-600 font-bold uppercase">Marge sur le stock</span>
                                     <div className="text-right flex flex-col items-end leading-none">
                                         <span className="text-sm font-black text-purple-700">
                                             +{formatCurrency(Number(investment.expectedProfitVipCdf || 0), "CDF")}

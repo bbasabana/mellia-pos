@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth-options";
 import { Prisma } from "@prisma/client";
 import { getStartDate, withEra } from "@/lib/cash-period";
 import { closedDayRefusal } from "@/lib/cash-count";
+import { resolveEntryDate } from "@/lib/entry-date";
 
 const refuse = (error: string) => NextResponse.json({ success: false, error }, { status: 403 });
 
@@ -98,7 +99,9 @@ export async function POST(req: Request) {
         }
 
         const role = (session.user as any).role;
-        const refusal = await closedDayRefusal(date ? new Date(date) : new Date(), role);
+        // A day picked in the form becomes a moment in that day (today: now), never 00:00 UTC.
+        const entryDate = resolveEntryDate(date);
+        const refusal = await closedDayRefusal(entryDate, role);
         if (refusal) return refuse(refusal);
 
         const expense = await prisma.expense.create({
@@ -108,7 +111,7 @@ export async function POST(req: Request) {
                 categoryId,
                 source: source || "CASH_REGISTER",
                 userId: session.user.id,
-                date: date ? new Date(date) : new Date(),
+                date: entryDate,
             },
             include: {
                 category: true,
@@ -138,10 +141,11 @@ export async function PUT(req: Request) {
 
         const role = (session.user as any).role;
         const current = await prisma.expense.findUnique({ where: { id }, select: { date: true } });
+        const entryDate = date ? resolveEntryDate(date, current?.date) : undefined;
         if (current) {
             const refusal =
                 (await closedDayRefusal(current.date, role)) ??
-                (date ? await closedDayRefusal(new Date(date), role) : null);
+                (entryDate ? await closedDayRefusal(entryDate, role) : null);
             if (refusal) return refuse(refusal);
         }
 
@@ -152,7 +156,7 @@ export async function PUT(req: Request) {
                 amount: new Prisma.Decimal(amount),
                 categoryId,
                 source: source || "CASH_REGISTER",
-                date: date ? new Date(date) : undefined,
+                date: entryDate,
             },
             include: {
                 category: true,
