@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { getStartDate } from "@/lib/cash-period";
 
 export async function GET() {
     try {
@@ -12,11 +13,13 @@ export async function GET() {
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
+        const eraStart = await getStartDate();
+
         // Run all 3 queries in parallel — was previously sequential (1.5x speedup)
         const [sales, lowStockCount, recentSales] = await Promise.all([
             prisma.sale.aggregate({
                 where: {
-                    createdAt: { gte: startOfDay, lt: endOfDay },
+                    createdAt: { gte: eraStart && eraStart > startOfDay ? eraStart : startOfDay, lt: endOfDay },
                     status: "COMPLETED",
                 },
                 _count: true,
@@ -28,7 +31,7 @@ export async function GET() {
             prisma.sale.findMany({
                 take: 5,
                 orderBy: { createdAt: "desc" },
-                where: { status: "COMPLETED" },
+                where: { status: "COMPLETED", ...(eraStart ? { createdAt: { gte: eraStart } } : {}) },
                 select: {
                     ticketNum: true,
                     totalNet: true,

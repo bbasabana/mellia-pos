@@ -11,6 +11,7 @@ import 'package:mellia_pos_mobile/features/cart/screens/drafts_screen.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:mellia_pos_mobile/features/settings/screens/settings_screen.dart';
+import 'package:mellia_pos_mobile/features/cash/day_closure_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -68,6 +69,10 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(
         path: '/transactions',
         builder: (context, state) => const TransactionsScreen(),
+      ),
+      GoRoute(
+        path: '/day-closure',
+        builder: (context, state) => const DayClosureScreen(),
       ),
       GoRoute(
         path: '/settings',

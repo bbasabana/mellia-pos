@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import {
     Plus, Filter, Calendar, TrendingUp, TrendingDown,
     ShoppingCart, Wallet, Loader2, DollarSign, X,
-    Edit, Trash2, PieChart, AlertCircle, Calculator, Lock
+    Edit, Trash2, PieChart, AlertCircle, Calculator, Lock, Flag, HandCoins
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -17,13 +17,16 @@ interface Summary {
     totalSales: number;
     totalExpenses: number;
     totalPurchases: number;
+    totalWithdrawals?: number;
     balance: number;
     totalExpensesBoss: number;
+    startDate: string | null;
     period: string;
     openingBalance: number;
     openPeriodStart: string | null;
     lastClosure: {
         label: string;
+        kind?: "MONTH" | "OPENING";
         closedAt: string;
         totalSalesCdf: number;
         closingBalanceCdf: number;
@@ -32,10 +35,17 @@ interface Summary {
 
 interface ClosurePreview {
     openingBalance: number;
+    startDate: string | null;
+    checks: {
+        unclosedSales: number;
+        unclosedSince: string;
+        pendingGaps: number;
+    };
     currentPeriod: {
         totalSales: number;
         totalExpenses: number;
         totalPurchases: number;
+        totalWithdrawals?: number;
         theoreticalBalance: number;
     };
     lastClosure: Summary["lastClosure"];
@@ -58,7 +68,9 @@ interface Expense {
 
 export default function ExpensesPage() {
     const { data: session } = useSession();
-    const isManager = ["ADMIN", "MANAGER"].includes((session?.user as { role?: string })?.role || "");
+    const role = (session?.user as { role?: string })?.role || "";
+    const isManager = ["ADMIN", "MANAGER"].includes(role);
+    const isAdmin = role === "ADMIN";
 
     const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState("current");
@@ -80,6 +92,9 @@ export default function ExpensesPage() {
     const [closingCash, setClosingCash] = useState("");
     const [closureNotes, setClosureNotes] = useState("");
     const [closurePreview, setClosurePreview] = useState<ClosurePreview | null>(null);
+    // "OPENING" = clôture de démarrage (admin, once, before going live); "MONTH" = monthly closure.
+    const [closureKind, setClosureKind] = useState<"MONTH" | "OPENING">("MONTH");
+    const [forceClosure, setForceClosure] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -196,29 +211,36 @@ export default function ExpensesPage() {
         }
     };
 
-    const fetchClosurePreview = useCallback(async () => {
+    const fetchClosurePreview = useCallback(async (kind: "MONTH" | "OPENING") => {
         try {
             const res = await fetch("/api/expenses/month-closure");
             const data = await res.json();
             if (data.success) {
                 setClosurePreview(data.data);
-                setClosingCash(String(data.data.currentPeriod.theoreticalBalance));
+                setClosingCash(kind === "OPENING" ? "" : String(data.data.currentPeriod.theoreticalBalance));
             }
         } catch (error) {
             console.error("Failed to fetch closure preview", error);
         }
     }, []);
 
-    const openClosureModal = () => {
-        fetchClosurePreview();
+    const openClosureModal = (kind: "MONTH" | "OPENING") => {
+        setClosureKind(kind);
+        setForceClosure(false);
+        setClosurePreview(null);
+        fetchClosurePreview(kind);
         setClosureNotes("");
         setShowClosureModal(true);
     };
 
     const handleMonthClosure = async () => {
         const closingBalanceCdf = Number(closingCash);
-        if (!Number.isFinite(closingBalanceCdf) || closingBalanceCdf < 0) {
-            showToast("Montant de clôture invalide", "error");
+        if (closingCash.trim() === "" || !Number.isFinite(closingBalanceCdf) || closingBalanceCdf < 0) {
+            showToast("Saisissez l'argent réellement compté en caisse", "error");
+            return;
+        }
+        if (forceClosure && !closureNotes.trim()) {
+            showToast("Le motif est obligatoire pour forcer la clôture", "error");
             return;
         }
 
@@ -228,13 +250,20 @@ export default function ExpensesPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    kind: closureKind,
                     closingBalanceCdf,
                     notes: closureNotes,
+                    force: forceClosure,
                 }),
             });
             const data = await res.json();
             if (data.success) {
-                showToast(`Mois clôturé — ${formatCurrency(data.data.closingBalanceCdf)} reportés`, "success");
+                showToast(
+                    closureKind === "OPENING"
+                        ? `Démarrage enregistré — ${formatCurrency(data.data.closingBalanceCdf)} en caisse`
+                        : `Mois clôturé — ${formatCurrency(data.data.closingBalanceCdf)} reportés`,
+                    "success"
+                );
                 setShowClosureModal(false);
                 fetchData();
             } else {
@@ -309,10 +338,19 @@ export default function ExpensesPage() {
                                 <option value="year">Cette Année</option>
                             </select>
                         </div>
-                        {isManager && (
+                        {summary && !summary.startDate && isAdmin && (
+                            <button
+                                className="bg-indigo-900 text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-indigo-950 transition-all shadow-md active:scale-95"
+                                onClick={() => openClosureModal("OPENING")}
+                            >
+                                <Flag size={16} />
+                                Clôture de démarrage
+                            </button>
+                        )}
+                        {summary?.startDate && isManager && (
                             <button
                                 className="bg-blue-600 text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition-all shadow-md active:scale-95"
-                                onClick={openClosureModal}
+                                onClick={() => openClosureModal("MONTH")}
                             >
                                 <Lock size={16} />
                                 Clôturer le mois
@@ -337,6 +375,27 @@ export default function ExpensesPage() {
                         </div>
                     ) : (
                         <>
+                            {summary && !summary.startDate && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-sm p-4 flex items-start gap-3">
+                                    <Flag size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                                    <div className="text-sm text-amber-900">
+                                        <p className="font-bold">La caisse n&apos;a pas encore de date de démarrage.</p>
+                                        <p className="text-xs mt-1 text-amber-800">
+                                            Le soir avant la mise en service, comptez l&apos;argent réellement présent et faites la
+                                            {" "}<strong>Clôture de démarrage</strong>{isAdmin ? " (bouton en haut)" : " (administrateur)"}.
+                                            Tout ce qui précède passe en archives : rien n&apos;est supprimé, mais plus rien ne compte dans les totaux.
+                                            Les clôtures de journée et de mois ne sont possibles qu&apos;après.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            {summary?.startDate && (
+                                <p className="text-[11px] text-gray-500 flex items-center gap-1.5">
+                                    <Flag size={12} className="text-indigo-500" />
+                                    Démarrage le {format(new Date(summary.startDate), "dd MMMM yyyy 'à' HH:mm", { locale: fr })} —
+                                    les opérations antérieures sont en archives.
+                                </p>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                                 {(summary?.openingBalance || 0) > 0 && (
                                     <KpiCard
@@ -389,7 +448,9 @@ export default function ExpensesPage() {
                             {summary?.lastClosure && (
                                 <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                                     <div>
-                                        <p className="text-[10px] uppercase font-black text-indigo-500 tracking-wider">Dernière clôture</p>
+                                        <p className="text-[10px] uppercase font-black text-indigo-500 tracking-wider">
+                                        {summary.lastClosure.kind === "OPENING" ? "Clôture de démarrage" : "Dernière clôture"}
+                                    </p>
                                         <p className="font-bold text-indigo-900 text-sm mt-1">{summary.lastClosure.label}</p>
                                         <p className="text-xs text-indigo-600 mt-0.5">
                                             Recettes : {formatCurrency(summary.lastClosure.totalSalesCdf)} · Reporté : {formatCurrency(summary.lastClosure.closingBalanceCdf)}
@@ -458,11 +519,18 @@ export default function ExpensesPage() {
                                                 </span>
                                                 <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalPurchases || 0)}</span>
                                             </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm text-red-700 font-medium flex items-center gap-1">
+                                                    <HandCoins size={12} className="text-red-500" />
+                                                    Versements au patron (clôtures de journée)
+                                                </span>
+                                                <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalWithdrawals || 0)}</span>
+                                            </div>
                                             <div className="border-t border-red-200 pt-2 mt-2">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-xs uppercase font-bold text-red-600">Total Sorties</span>
                                                     <span className="text-lg font-black text-red-800">
-                                                        {formatCurrency((summary?.totalExpenses || 0) + (summary?.totalPurchases || 0))}
+                                                        {formatCurrency((summary?.totalExpenses || 0) + (summary?.totalPurchases || 0) + (summary?.totalWithdrawals || 0))}
                                                     </span>
                                                 </div>
                                             </div>
@@ -508,10 +576,10 @@ export default function ExpensesPage() {
                                         <div className="flex items-start gap-2">
                                             <AlertCircle size={14} className="text-blue-600 mt-0.5 shrink-0" />
                                             <div className="text-xs text-blue-700 leading-relaxed">
-                                                <strong>Formule:</strong> Solde = Report clôture + Ventes - Dépenses - Achats
+                                                <strong>Formule:</strong> Solde = Report clôture + Ventes cash - Dépenses - Achats - Versements au patron
                                                 <br />
                                                 <span className="text-[10px] text-blue-600 mt-1 inline-block">
-                                                    Utilisez « Clôturer le mois » pour archiver les recettes et démarrer une nouvelle période avec le solde réel en caisse.
+                                                    Chaque soir : Historique des ventes › Clôturer la journée. En fin de mois : « Clôturer le mois », qui vérifie que toutes les journées sont clôturées et les écarts réglés.
                                                 </span>
                                             </div>
                                         </div>
@@ -914,88 +982,183 @@ export default function ExpensesPage() {
                         </div>
                     </div>
                 )}
-                {/* Month Closure Modal */}
-                {showClosureModal && closurePreview && (
+                {/* Closure Modal: start-up (OPENING) or monthly (MONTH) */}
+                {showClosureModal && (
                     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-                            <div className="px-6 py-4 border-b border-gray-100 bg-indigo-900 text-white flex items-center justify-between">
+                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 max-h-[95vh] flex flex-col">
+                            <div className="px-6 py-4 border-b border-gray-100 bg-indigo-900 text-white flex items-center justify-between shrink-0">
                                 <div>
                                     <h3 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
-                                        <Lock size={16} /> Clôturer la période
+                                        {closureKind === "OPENING" ? <><Flag size={16} /> Clôture de démarrage</> : <><Lock size={16} /> Clôturer le mois</>}
                                     </h3>
-                                    <p className="text-[10px] opacity-70 mt-1">Archive les recettes et démarre une nouvelle période</p>
+                                    <p className="text-[10px] opacity-70 mt-1">
+                                        {closureKind === "OPENING"
+                                            ? "Fixe la date de démarrage et l'argent de départ en caisse"
+                                            : "Archive les recettes et démarre une nouvelle période"}
+                                    </p>
                                 </div>
                                 <button onClick={() => setShowClosureModal(false)}><X size={20} /></button>
                             </div>
-                            <div className="p-6 space-y-5">
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                    <div className="bg-gray-50 p-3 rounded-sm border border-gray-100">
-                                        <p className="text-[10px] uppercase font-bold text-gray-400">Solde reporté</p>
-                                        <p className="font-black text-indigo-700 mt-1">{formatCurrency(closurePreview.openingBalance)}</p>
-                                    </div>
-                                    <div className="bg-green-50 p-3 rounded-sm border border-green-100">
-                                        <p className="text-[10px] uppercase font-bold text-green-600">Recettes période</p>
-                                        <p className="font-black text-green-800 mt-1">{formatCurrency(closurePreview.currentPeriod.totalSales)}</p>
-                                    </div>
-                                    <div className="bg-red-50 p-3 rounded-sm border border-red-100">
-                                        <p className="text-[10px] uppercase font-bold text-red-600">Dépenses caisse</p>
-                                        <p className="font-black text-red-800 mt-1">{formatCurrency(closurePreview.currentPeriod.totalExpenses)}</p>
-                                    </div>
-                                    <div className="bg-orange-50 p-3 rounded-sm border border-orange-100">
-                                        <p className="text-[10px] uppercase font-bold text-orange-600">Achats caisse</p>
-                                        <p className="font-black text-orange-800 mt-1">{formatCurrency(closurePreview.currentPeriod.totalPurchases)}</p>
-                                    </div>
+                            {!closurePreview ? (
+                                <div className="flex justify-center p-12">
+                                    <Loader2 className="animate-spin text-indigo-700" size={32} />
                                 </div>
-
-                                <div className="bg-gray-50 p-4 border border-gray-200 rounded-sm">
-                                    <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                                        <span>Solde théorique</span>
-                                        <span>Argent réel en caisse</span>
+                            ) : closureKind === "OPENING" ? (
+                                <div className="p-6 space-y-5 overflow-auto">
+                                    <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-4 text-xs text-indigo-900 space-y-2 leading-relaxed">
+                                        <p><strong>À faire le soir avant la mise en service</strong> (ex. 30 novembre), après la dernière vente.</p>
+                                        <p>Toutes les ventes, dépenses et achats enregistrés <strong>avant maintenant</strong> passent en archives : ils restent consultables (bouton « Archives » dans l&apos;historique des ventes) mais ne comptent plus dans les totaux, le solde ni les rapports.</p>
+                                        <p>Aucun ajustement n&apos;est enregistré : l&apos;argent compté devient simplement le solde de départ.</p>
                                     </div>
-                                    <div className="flex justify-between items-center gap-4">
-                                        <span className="text-sm font-bold text-gray-600">{formatCurrency(closurePreview.currentPeriod.theoreticalBalance)}</span>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-gray-500">Argent réellement compté en caisse (FC)</label>
                                         <input
                                             type="number"
+                                            min={0}
                                             value={closingCash}
                                             onChange={(e) => setClosingCash(e.target.value)}
-                                            className="bg-white border-2 border-indigo-900 rounded-sm px-3 py-2 w-36 text-right font-black text-lg outline-none"
+                                            placeholder="Ex: 150000"
+                                            autoFocus
+                                            className="w-full bg-white border-2 border-indigo-900 rounded-sm px-3 py-2 text-right font-black text-lg outline-none"
                                         />
                                     </div>
-                                </div>
-
-                                {Number(closingCash) !== closurePreview.currentPeriod.theoreticalBalance && (
-                                    <div className="p-3 rounded-sm border bg-amber-50 border-amber-200 text-amber-800 flex items-start gap-2">
-                                        <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                                        <p className="text-xs font-bold">
-                                            Un ajustement de {formatCurrency(Math.abs(Number(closingCash) - closurePreview.currentPeriod.theoreticalBalance))} sera enregistré automatiquement avant la clôture.
-                                        </p>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-gray-400">Note (optionnel)</label>
+                                        <input
+                                            type="text"
+                                            value={closureNotes}
+                                            onChange={(e) => setClosureNotes(e.target.value)}
+                                            placeholder="Ex: Comptage du 30 novembre au soir"
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                                        />
                                     </div>
-                                )}
-
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold uppercase text-gray-400">Note (optionnel)</label>
-                                    <input
-                                        type="text"
-                                        value={closureNotes}
-                                        onChange={(e) => setClosureNotes(e.target.value)}
-                                        placeholder="Ex: Clôture fin juin 2026"
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2 text-sm outline-none focus:border-indigo-500"
-                                    />
+                                    <p className="text-[11px] text-gray-500">
+                                        Le lendemain matin, faites l&apos;inventaire de départ : Stock › Inventaire.
+                                    </p>
+                                    <button
+                                        onClick={handleMonthClosure}
+                                        disabled={submitting || closingCash.trim() === ""}
+                                        className="w-full bg-indigo-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-indigo-950 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                    >
+                                        {submitting ? "Enregistrement..." : `Démarrer avec ${formatCurrency(Number(closingCash) || 0)} en caisse`}
+                                    </button>
                                 </div>
+                            ) : (() => {
+                                const { checks, currentPeriod } = closurePreview;
+                                const blockers: string[] = [];
+                                if (checks.unclosedSales > 0) {
+                                    blockers.push(`${checks.unclosedSales} vente(s) depuis le ${format(new Date(checks.unclosedSince), "dd MMM HH:mm", { locale: fr })} ne sont pas encore couvertes par une clôture de la journée.`);
+                                }
+                                if (checks.pendingGaps > 0) {
+                                    blockers.push(`${checks.pendingGaps} écart(s) de caisse sont encore « à vérifier ».`);
+                                }
+                                const blocked = blockers.length > 0 && !forceClosure;
+                                return (
+                                    <div className="p-6 space-y-5 overflow-auto">
+                                        {blockers.length > 0 && (
+                                            <div className="p-3 rounded-sm border bg-red-50 border-red-200 text-red-800 space-y-2">
+                                                <div className="flex items-start gap-2">
+                                                    <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                                    <div className="text-xs font-bold space-y-1">
+                                                        {blockers.map((b) => <p key={b}>{b}</p>)}
+                                                        <p className="font-medium">
+                                                            Clôturez la journée (Historique des ventes) et réglez les écarts avant de clôturer le mois.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {isAdmin && (
+                                                    <label className="flex items-center gap-2 text-xs font-bold cursor-pointer pl-6">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={forceClosure}
+                                                            onChange={(e) => setForceClosure(e.target.checked)}
+                                                        />
+                                                        Forcer quand même (motif obligatoire)
+                                                    </label>
+                                                )}
+                                            </div>
+                                        )}
 
-                                <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-3 text-xs text-indigo-800">
-                                    <strong>Après clôture :</strong> les recettes ({formatCurrency(closurePreview.currentPeriod.totalSales)}) seront archivées.
-                                    La nouvelle période démarrera avec <strong>{formatCurrency(Number(closingCash) || 0)}</strong> en caisse.
-                                </div>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                            <div className="bg-gray-50 p-3 rounded-sm border border-gray-100">
+                                                <p className="text-[10px] uppercase font-bold text-gray-400">Solde reporté</p>
+                                                <p className="font-black text-indigo-700 mt-1">{formatCurrency(closurePreview.openingBalance)}</p>
+                                            </div>
+                                            <div className="bg-green-50 p-3 rounded-sm border border-green-100">
+                                                <p className="text-[10px] uppercase font-bold text-green-600">Ventes cash</p>
+                                                <p className="font-black text-green-800 mt-1">{formatCurrency(currentPeriod.totalSales)}</p>
+                                            </div>
+                                            <div className="bg-red-50 p-3 rounded-sm border border-red-100">
+                                                <p className="text-[10px] uppercase font-bold text-red-600">Dépenses caisse</p>
+                                                <p className="font-black text-red-800 mt-1">{formatCurrency(currentPeriod.totalExpenses)}</p>
+                                            </div>
+                                            <div className="bg-orange-50 p-3 rounded-sm border border-orange-100">
+                                                <p className="text-[10px] uppercase font-bold text-orange-600">Achats caisse</p>
+                                                <p className="font-black text-orange-800 mt-1">{formatCurrency(currentPeriod.totalPurchases)}</p>
+                                            </div>
+                                            <div className="bg-purple-50 p-3 rounded-sm border border-purple-100 col-span-2">
+                                                <p className="text-[10px] uppercase font-bold text-purple-600">Versements au patron</p>
+                                                <p className="font-black text-purple-800 mt-1">{formatCurrency(currentPeriod.totalWithdrawals || 0)}</p>
+                                            </div>
+                                        </div>
 
-                                <button
-                                    onClick={handleMonthClosure}
-                                    disabled={submitting}
-                                    className="w-full bg-indigo-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-indigo-950 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                                >
-                                    {submitting ? "Clôture en cours..." : "Confirmer la clôture du mois"}
-                                </button>
-                            </div>
+                                        <div className="bg-gray-50 p-4 border border-gray-200 rounded-sm">
+                                            <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                                                <span>Solde théorique</span>
+                                                <span>Argent réel en caisse</span>
+                                            </div>
+                                            <div className="flex justify-between items-center gap-4">
+                                                <span className="text-sm font-bold text-gray-600">{formatCurrency(currentPeriod.theoreticalBalance)}</span>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={closingCash}
+                                                    onChange={(e) => setClosingCash(e.target.value)}
+                                                    className="bg-white border-2 border-indigo-900 rounded-sm px-3 py-2 w-36 text-right font-black text-lg outline-none"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {closingCash.trim() !== "" && Number(closingCash) !== currentPeriod.theoreticalBalance && (
+                                            <div className="p-3 rounded-sm border bg-amber-50 border-amber-200 text-amber-800 flex items-start gap-2">
+                                                <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                                <p className="text-xs font-bold">
+                                                    Un ajustement de {formatCurrency(Math.abs(Number(closingCash) - currentPeriod.theoreticalBalance))} sera enregistré automatiquement avant la clôture.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold uppercase text-gray-400">
+                                                {forceClosure ? "Motif (obligatoire)" : "Note (optionnel)"}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={closureNotes}
+                                                onChange={(e) => setClosureNotes(e.target.value)}
+                                                placeholder={forceClosure ? "Pourquoi forcer la clôture ?" : "Ex: Clôture fin décembre"}
+                                                className={cn(
+                                                    "w-full bg-gray-50 border rounded-sm px-4 py-2 text-sm outline-none focus:border-indigo-500",
+                                                    forceClosure && !closureNotes.trim() ? "border-red-300" : "border-gray-200"
+                                                )}
+                                            />
+                                        </div>
+
+                                        <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-3 text-xs text-indigo-800">
+                                            <strong>Après clôture :</strong> les recettes ({formatCurrency(currentPeriod.totalSales)}) seront archivées.
+                                            La nouvelle période démarrera avec <strong>{formatCurrency(Number(closingCash) || 0)}</strong> en caisse.
+                                        </div>
+
+                                        <button
+                                            onClick={handleMonthClosure}
+                                            disabled={submitting || blocked || (forceClosure && !closureNotes.trim())}
+                                            className="w-full bg-indigo-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-indigo-950 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                        >
+                                            {submitting ? "Clôture en cours..." : forceClosure ? "Forcer la clôture du mois" : "Confirmer la clôture du mois"}
+                                        </button>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 )}

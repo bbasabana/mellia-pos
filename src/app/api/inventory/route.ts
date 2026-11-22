@@ -129,9 +129,27 @@ export async function PUT(req: Request) {
             let totalVarianceValue = 0;
 
             for (const count of counts) {
-                const item = await tx.inventoryItem.findFirst({
+                let item = await tx.inventoryItem.findFirst({
                     where: { sessionId, productId: count.productId, location: count.location }
                 });
+
+                // Counted where the system expected nothing (stock at 0 or below): count it too,
+                // so a start-up inventory covers every product found on the shelves.
+                if (!item) {
+                    const stock = await tx.stockItem.findUnique({
+                        where: { productId_location: { productId: count.productId, location: count.location } }
+                    });
+                    item = await tx.inventoryItem.create({
+                        data: {
+                            sessionId,
+                            productId: count.productId,
+                            location: count.location,
+                            expectedQuantity: stock?.quantity ?? 0,
+                            actualQuantity: 0,
+                            variance: 0
+                        }
+                    });
+                }
 
                 // If item exists in snapshot
                 if (item) {
@@ -159,9 +177,10 @@ export async function PUT(req: Request) {
                         });
 
                         // Update real stock to match reality
-                        await tx.stockItem.update({
+                        await tx.stockItem.upsert({
                             where: { productId_location: { productId: count.productId, location: count.location } },
-                            data: { quantity: count.actualQuantity }
+                            update: { quantity: count.actualQuantity },
+                            create: { productId: count.productId, location: count.location, quantity: count.actualQuantity }
                         });
                     }
 
@@ -177,9 +196,10 @@ export async function PUT(req: Request) {
                                 userId: session.user.id
                             }
                         });
-                        await tx.stockItem.update({
+                        await tx.stockItem.upsert({
                             where: { productId_location: { productId: count.productId, location: count.location } },
-                            data: { quantity: count.actualQuantity }
+                            update: { quantity: count.actualQuantity },
+                            create: { productId: count.productId, location: count.location, quantity: count.actualQuantity }
                         });
                     }
                 }

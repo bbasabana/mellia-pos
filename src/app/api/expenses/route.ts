@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { Prisma } from "@prisma/client";
+import { getStartDate, withEra } from "@/lib/cash-period";
+import { closedDayRefusal } from "@/lib/cash-count";
+
+const refuse = (error: string) => NextResponse.json({ success: false, error }, { status: 403 });
 
 export async function GET(req: Request) {
     try {
@@ -57,8 +61,12 @@ export async function GET(req: Request) {
             whereClause = { date: { gte, lte } };
         }
 
+        // Before the start date everything is archived: shown only with ?archives=1.
+        const archives = searchParams.get("archives") === "1";
+        const eraWhere = withEra(whereClause, "date", await getStartDate(), archives);
+
         const expenses = await prisma.expense.findMany({
-            where: whereClause,
+            where: eraWhere,
             include: {
                 category: true,
                 user: {
@@ -88,6 +96,10 @@ export async function POST(req: Request) {
         if (!description || !amount || !categoryId) {
             return new NextResponse("Missing required fields", { status: 400 });
         }
+
+        const role = (session.user as any).role;
+        const refusal = await closedDayRefusal(date ? new Date(date) : new Date(), role);
+        if (refusal) return refuse(refusal);
 
         const expense = await prisma.expense.create({
             data: {
@@ -122,6 +134,15 @@ export async function PUT(req: Request) {
 
         if (!id || !description || !amount || !categoryId) {
             return new NextResponse("Missing required fields", { status: 400 });
+        }
+
+        const role = (session.user as any).role;
+        const current = await prisma.expense.findUnique({ where: { id }, select: { date: true } });
+        if (current) {
+            const refusal =
+                (await closedDayRefusal(current.date, role)) ??
+                (date ? await closedDayRefusal(new Date(date), role) : null);
+            if (refusal) return refuse(refusal);
         }
 
         const expense = await prisma.expense.update({

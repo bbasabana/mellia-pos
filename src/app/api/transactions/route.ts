@@ -14,8 +14,20 @@ import {
     getCashPeriodTotals,
     getLastCashClosure,
     getOpeningBalance,
-    resolveTransactionsDateRange,
+    getStartDate,
+    withEra,
 } from "@/lib/cash-period";
+import { closedDayRefusal, getLockedUntil } from "@/lib/cash-count";
+import { createAuditLog } from "@/lib/audit";
+
+/** Refuses changes to a completed sale of a closed day, except for admins (who are logged). */
+async function guardClosedSale(id: string, role: string | undefined) {
+    const sale = await prisma.sale.findUnique({ where: { id }, select: { status: true, createdAt: true } });
+    if (!sale || sale.status === "DRAFT") return { refusal: null, locked: false };
+    const lockedUntil = await getLockedUntil();
+    const locked = !!lockedUntil && sale.createdAt < lockedUntil;
+    return { refusal: locked ? await closedDayRefusal(sale.createdAt, role) : null, locked };
+}
 
 export async function GET(req: NextRequest) {
     try {
@@ -74,9 +86,14 @@ export async function GET(req: NextRequest) {
             };
         }
 
+        // Before the start date everything is archived: shown only when asked for.
+        const archives = searchParams.get("archives") === "1";
+        const [eraStart, lockedUntil] = await Promise.all([getStartDate(), getLockedUntil()]);
+        const eraWhere = withEra(where, "createdAt", eraStart, archives);
+
         const [sales, total, aggregates, periodSaleItems] = await Promise.all([
             prisma.sale.findMany({
-                where,
+                where: eraWhere,
                 include: {
                     client: true,
                     user: true, // Cashier
@@ -90,16 +107,16 @@ export async function GET(req: NextRequest) {
                 skip,
                 take: limit,
             }),
-            prisma.sale.count({ where }),
+            prisma.sale.count({ where: eraWhere }),
             prisma.sale.aggregate({
-                where,
+                where: eraWhere,
                 _sum: {
                     totalCdf: true,
                     totalNet: true,
                 }
             }),
             prisma.saleItem.findMany({
-                where: { sale: where },
+                where: { sale: eraWhere },
                 select: {
                     totalPrice: true,
                     unitPriceCdf: true,
@@ -124,11 +141,12 @@ export async function GET(req: NextRequest) {
             categoryBreakdown: computeSaleCategoryBreakdown(sale.items),
         }));
 
-        const cashRange = resolveTransactionsDateRange(period, startDate, endDate);
+        // Cash in hand: carried balance + everything since the last (month / start-up) closure,
+        // whatever date filter the list uses: mixing the two would count days twice or not at all.
         const lastClosure = await getLastCashClosure();
         const openingBalance = getOpeningBalance(lastClosure);
         const openStart = lastClosure?.closedAt ?? new Date(0);
-        const effectiveCashRange = cashRange ?? { gte: openStart, lte: new Date() };
+        const effectiveCashRange = { gte: openStart, lte: new Date() };
 
         const cashTotals = await getCashPeriodTotals(effectiveCashRange);
 
@@ -137,6 +155,7 @@ export async function GET(req: NextRequest) {
             totalSales: cashTotals.totalSales,
             totalExpenses: cashTotals.totalExpenses,
             totalPurchases: cashTotals.totalPurchases,
+            totalWithdrawals: cashTotals.totalWithdrawals,
         });
 
         return NextResponse.json({
@@ -153,6 +172,11 @@ export async function GET(req: NextRequest) {
                 expensesCdf: cashTotals.totalExpenses,
                 purchasesCdf: cashTotals.totalPurchases,
                 cashInHandCdf: cashInHand,
+            },
+            meta: {
+                startDate: eraStart,
+                lockedUntil,
+                archives,
             },
             pagination: {
                 total,
@@ -187,6 +211,11 @@ export async function PUT(req: NextRequest) {
 
         if (!id) {
             return NextResponse.json({ success: false, error: "ID manquant" }, { status: 400 });
+        }
+
+        const guard = await guardClosedSale(id, userRole);
+        if (guard.refusal) {
+            return NextResponse.json({ success: false, error: guard.refusal }, { status: 403 });
         }
 
         const body = await req.json();
@@ -417,7 +446,8 @@ export async function PUT(req: NextRequest) {
                     totalCdf: newTotalCdf > 0 ? Math.round(newTotalCdf) : undefined, // Round total CDF to integer
                     status: newStatus || undefined, // Update status if provided (DRAFT -> COMPLETED)
                     updatedAt: new Date(),
-                    ...(newDate && { createdAt: newDate }), // Update creation date if provided (Admin only)
+                    // A draft paid now belongs to the open day, so it is counted at the next closure.
+                    ...(newDate ? { createdAt: newDate } : isFinalizing ? { createdAt: new Date() } : {}),
                 },
                 include: {
                     client: true,
@@ -430,6 +460,16 @@ export async function PUT(req: NextRequest) {
                 }
             });
         });
+
+        if (guard.locked) {
+            await createAuditLog({
+                userId: session.user.id,
+                action: "UPDATE",
+                entity: "Sale",
+                entityId: id,
+                metadata: { closedDay: true, ticketNum: result.ticketNum },
+            });
+        }
 
         return NextResponse.json({ success: true, data: result });
 
@@ -458,6 +498,20 @@ export async function DELETE(req: NextRequest) {
 
         if (!id) {
             return NextResponse.json({ success: false, error: "ID manquant" }, { status: 400 });
+        }
+
+        const guard = await guardClosedSale(id, userRole);
+        if (guard.refusal) {
+            return NextResponse.json({ success: false, error: guard.refusal }, { status: 403 });
+        }
+        if (guard.locked) {
+            await createAuditLog({
+                userId: session.user.id,
+                action: "DELETE_SALE",
+                entity: "Sale",
+                entityId: id,
+                metadata: { closedDay: true },
+            });
         }
 
         const result = await prismaUnpooled.$transaction(async (tx) => {

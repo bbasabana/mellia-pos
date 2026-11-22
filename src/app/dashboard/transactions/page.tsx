@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useSession } from "next-auth/react";
-import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, Trash2, Edit, Receipt, Wine, UtensilsCrossed, Wallet, TrendingDown, TrendingUp, ShoppingCart } from "lucide-react";
+import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, Trash2, Edit, Receipt, Wine, UtensilsCrossed, Lock } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useReactToPrint } from "react-to-print";
@@ -16,7 +16,11 @@ import CashCountPanel from "@/components/transactions/CashCountPanel";
 export default function TransactionsPage() {
     const { data: session } = useSession();
     const isAdmin = (session?.user as any)?.role === "ADMIN";
-    const canSettleCash = ["ADMIN", "MANAGER"].includes((session?.user as any)?.role);
+    const role = (session?.user as any)?.role as string | undefined;
+    const [archives, setArchives] = useState(false);
+    const [meta, setMeta] = useState<{ startDate: string | null; lockedUntil: string | null }>({ startDate: null, lockedUntil: null });
+    const isLocked = (tx: any) =>
+        tx.status === "COMPLETED" && !!meta.lockedUntil && new Date(tx.createdAt) < new Date(meta.lockedUntil);
 
     const [transactions, setTransactions] = useState<any[]>([]);
     const [summary, setSummary] = useState({
@@ -85,6 +89,7 @@ export default function TransactionsPage() {
             });
             if (dateRange.start) params.append("startDate", dateRange.start);
             if (dateRange.end) params.append("endDate", dateRange.end);
+            if (archives) params.append("archives", "1");
 
             const res = await fetch(`/api/transactions?${params}`);
             const data = await res.json();
@@ -104,13 +109,14 @@ export default function TransactionsPage() {
                     cashInHandCdf: 0,
                 });
                 setTotalPages(data.pagination.totalPages);
+                if (data.meta) setMeta({ startDate: data.meta.startDate, lockedUntil: data.meta.lockedUntil });
             }
         } catch (error) {
             console.error("Failed to fetch transactions", error);
         } finally {
             setLoading(false);
         }
-    }, [page, search, dateRange, period]);
+    }, [page, search, dateRange, period, archives]);
 
     // Auto-refresh polling (every 10 seconds)
     useEffect(() => {
@@ -255,6 +261,24 @@ export default function TransactionsPage() {
                                 </div>
                             </div>
 
+                            {meta.startDate && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setArchives((a) => !a);
+                                        setPeriod("all");
+                                        setDateRange({ start: "", end: "" });
+                                        setPage(1);
+                                    }}
+                                    className={`px-3 py-2 text-[11px] font-black uppercase rounded-lg sm:rounded-sm border shadow-sm ${
+                                        archives ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200"
+                                    }`}
+                                    title={`Ventes d'avant le démarrage (${format(new Date(meta.startDate), "d MMM yyyy", { locale: fr })})`}
+                                >
+                                    {archives ? "← Ventes actuelles" : "Archives"}
+                                </button>
+                            )}
+
                             <label className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg sm:rounded-sm shadow-sm cursor-pointer select-none">
                                 <input
                                     type="checkbox"
@@ -326,54 +350,13 @@ export default function TransactionsPage() {
                         </div>
                     </div>
 
-                    {/* Trésorerie caisse */}
-                    <div className="bg-white border border-gray-200 rounded-lg md:rounded-sm shadow-sm overflow-hidden">
-                        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-gray-700 flex items-center gap-2">
-                                <Wallet size={14} className="text-[#00d3fa]" />
-                                Trésorerie caisse — après dépenses & achats
-                            </h3>
-                        </div>
-                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                            {summary.openingBalanceCdf > 0 && (
-                                <TreasuryLine
-                                    label="Solde reporté"
-                                    value={summary.openingBalanceCdf}
-                                    tone="indigo"
-                                />
-                            )}
-                            <TreasuryLine
-                                label="Ventes encaissées"
-                                value={summary.totalCdf}
-                                tone="green"
-                                prefix="+"
-                            />
-                            <TreasuryLine
-                                label="Dépenses caisse"
-                                value={summary.expensesCdf}
-                                tone="red"
-                                prefix="−"
-                            />
-                            <TreasuryLine
-                                label="Achats (menu Achat)"
-                                value={summary.purchasesCdf}
-                                tone="orange"
-                                prefix="−"
-                            />
-                            <div className="bg-[#00d3fa]/10 border-2 border-[#00d3fa] rounded-lg md:rounded-sm p-4 flex flex-col justify-center">
-                                <p className="text-[10px] uppercase font-black text-[#00d3fa] tracking-wider mb-1">En main (FC)</p>
-                                <p className="text-xl md:text-2xl font-black text-[#00d3fa] leading-none">
-                                    {summary.cashInHandCdf.toLocaleString("fr-FR")} <span className="text-xs opacity-60">FC</span>
-                                </p>
-                                <p className="text-[10px] text-gray-500 mt-1 font-medium">
-                                    Ventes − Dépenses − Achats{summary.openingBalanceCdf > 0 ? " + Report" : ""}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Contrôle de caisse : argent compté vs attendu */}
-                    <CashCountPanel canSettle={canSettleCash} />
+                    {!archives && <CashCountPanel role={role} onClosed={fetchTransactions} />}
+                    {archives && meta.startDate && (
+                        <div className="p-3 rounded border border-gray-300 bg-gray-50 text-sm text-gray-600">
+                            Archives : ventes d&apos;avant le démarrage du {format(new Date(meta.startDate), "d MMMM yyyy à HH:mm", { locale: fr })}. Elles ne comptent dans aucun total actuel.
+                        </div>
+                    )}
 
                     {/* Desktop Table View - Hidden on Mobile */}
                     <div className="hidden md:block bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm">
@@ -421,6 +404,9 @@ export default function TransactionsPage() {
                                                     }`}>
                                                     {tx.status}
                                                 </div>
+                                                {isLocked(tx) && (
+                                                    <div className="mt-1 text-[9px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Lock size={9} /> Journée clôturée</div>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 align-top w-48">
                                                 <div className="font-bold text-gray-800 text-sm">{tx.client?.name || "Client de passage"}</div>
@@ -662,43 +648,6 @@ export default function TransactionsPage() {
                 </div>
             </div>
         </DashboardLayout>
-    );
-}
-
-function TreasuryLine({
-    label,
-    value,
-    tone,
-    prefix = "",
-}: {
-    label: string;
-    value: number;
-    tone: "green" | "red" | "orange" | "indigo";
-    prefix?: string;
-}) {
-    const styles = {
-        green: "bg-green-50 border-green-100 text-green-800",
-        red: "bg-red-50 border-red-100 text-red-800",
-        orange: "bg-orange-50 border-orange-100 text-orange-800",
-        indigo: "bg-indigo-50 border-indigo-100 text-indigo-800",
-    };
-    const icons = {
-        green: TrendingUp,
-        red: TrendingDown,
-        orange: ShoppingCart,
-        indigo: Wallet,
-    };
-    const Icon = icons[tone];
-
-    return (
-        <div className={`border rounded-lg md:rounded-sm p-4 ${styles[tone]}`}>
-            <p className="text-[10px] uppercase font-black tracking-wider opacity-70 flex items-center gap-1 mb-1">
-                <Icon size={12} /> {label}
-            </p>
-            <p className="text-lg font-black leading-none">
-                {prefix}{value.toLocaleString("fr-FR")} <span className="text-xs opacity-50">FC</span>
-            </p>
-        </div>
     );
 }
 

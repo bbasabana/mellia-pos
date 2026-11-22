@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { DollarSign, TrendingUp, Package, PieChart, ArrowUpRight, BarChart3, Loader2, Calendar, ShoppingCart, Calculator, ArrowRightLeft } from "lucide-react";
+import { DollarSign, TrendingUp, Package, PieChart, ArrowUpRight, BarChart3, Loader2, Calendar, ShoppingCart, Calculator, ArrowRightLeft, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import DailyCashReport from "@/components/reports/DailyCashReport";
 
-type ReportMode = 'PERFORMANCE' | 'PROJECTION';
+type ReportMode = 'PERFORMANCE' | 'PROJECTION' | 'CAISSE';
 type Period = 'today' | 'week' | 'month' | 'year' | 'all';
 
 export default function ReportsPage() {
@@ -48,7 +49,7 @@ export default function ReportsPage() {
         setStats(null); // Reset stats when changing mode or period to trigger clean load
         if (mode === 'PERFORMANCE') {
             fetchPerformance();
-        } else {
+        } else if (mode === 'PROJECTION') {
             fetchProjection();
         }
     }, [mode, period, fetchPerformance, fetchProjection]);
@@ -79,7 +80,9 @@ export default function ReportsPage() {
                         <p className="text-sm text-gray-500">
                             {mode === 'PERFORMANCE'
                                 ? `Performance réelle - ${periodLabels[period]}`
-                                : "Estimation des profits sur le stock restant"}
+                                : mode === 'CAISSE'
+                                    ? "Clôtures de la journée : attendu, compté, écarts et versements"
+                                    : "Estimation des profits sur le stock restant"}
                         </p>
                     </div>
 
@@ -101,6 +104,15 @@ export default function ReportsPage() {
                             )}
                         >
                             <ArrowRightLeft size={14} /> Projections Stock
+                        </button>
+                        <button
+                            onClick={() => setMode('CAISSE')}
+                            className={cn(
+                                "px-3 py-1.5 text-xs font-bold rounded-sm transition-all flex items-center gap-2",
+                                mode === 'CAISSE' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            <Wallet size={14} /> Caisse journalière
                         </button>
                     </div>
                 </div>
@@ -128,7 +140,9 @@ export default function ReportsPage() {
 
                 {/* CONTENT AREA */}
                 <div className="flex-1 overflow-auto px-1 pb-2 space-y-6">
-                    {loading || !stats ? (
+                    {mode === 'CAISSE' ? (
+                        <DailyCashReport />
+                    ) : loading || !stats ? (
                         <div className="flex justify-center p-12">
                             <Loader2 className="animate-spin text-[#00d3fa]" size={40} />
                         </div>

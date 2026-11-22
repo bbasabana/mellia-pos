@@ -9,6 +9,7 @@ import {
   getOpeningBalance,
   getOpenPeriodStart,
   resolveSummaryDateRange,
+  getStartDate,
 } from "@/lib/cash-period";
 
 export async function GET(req: Request) {
@@ -28,19 +29,23 @@ export async function GET(req: Request) {
 
     const dateFilter = gte && lte ? { gte, lte } : undefined;
 
-    const displayRange =
+    // Nothing before the start date (date de démarrage) counts: it is archived.
+    const startDate = await getStartDate();
+    const floor = (d: Date) => (startDate && d < startDate ? startDate : d);
+    const rawRange =
       dateFilter ??
       (period === "current" || period === "all"
         ? { gte: new Date(0), lte: new Date() }
         : null);
+    const displayRange = rawRange ? { gte: floor(rawRange.gte), lte: rawRange.lte } : null;
 
     const [displayTotals, expensesBossAgg] = await Promise.all([
       displayRange
         ? getCashPeriodTotals({ gte: displayRange.gte, lte: displayRange.lte })
-        : Promise.resolve({ totalSales: 0, totalExpenses: 0, totalPurchases: 0 }),
+        : Promise.resolve({ totalSales: 0, totalExpenses: 0, totalPurchases: 0, totalWithdrawals: 0 }),
       prisma.expense.aggregate({
         where: {
-          ...(dateFilter && { date: dateFilter }),
+          date: displayRange ?? { gte: floor(new Date(0)) },
           source: "OWNER_CAPITAL",
         },
         _sum: { amount: true },
@@ -50,6 +55,7 @@ export async function GET(req: Request) {
     let totalSales = displayTotals.totalSales;
     let totalExpenses = displayTotals.totalExpenses;
     let totalPurchases = displayTotals.totalPurchases;
+    const totalWithdrawals = displayTotals.totalWithdrawals ?? 0;
 
     const balanceRangeStart = openPeriodStart ?? new Date(0);
     const openTotals = await getCashPeriodTotals({
@@ -66,7 +72,9 @@ export async function GET(req: Request) {
         totalSales,
         totalExpenses,
         totalPurchases,
+        totalWithdrawals,
         balance,
+        startDate: startDate?.toISOString() ?? null,
         totalExpensesBoss,
         period,
         openingBalance,
@@ -74,6 +82,7 @@ export async function GET(req: Request) {
         lastClosure: lastClosure
           ? {
               label: lastClosure.label,
+              kind: lastClosure.kind,
               closedAt: lastClosure.closedAt.toISOString(),
               totalSalesCdf: lastClosure.totalSalesCdf,
               closingBalanceCdf: lastClosure.closingBalanceCdf,
