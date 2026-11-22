@@ -12,9 +12,9 @@ export default function SettingsPage() {
         <DashboardLayout>
             <div className="w-full h-full flex flex-col overflow-y-auto bg-gray-50">
                 {/* Simple Header */}
-                <div className="bg-white border-b border-gray-200 p-8">
+                <div className="px-1 pb-6">
                     <div className="max-w-6xl mx-auto">
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                        <h1 className="ui-page-title flex items-center gap-2.5">
                             <Settings className="text-[#00d3fa]" size={28} />
                             Paramètres
                         </h1>
@@ -24,7 +24,7 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className="flex-1 p-8">
+                <div className="flex-1 px-1">
                     <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
                         {/* LEFT COLUMN (8 cols) */}
                         <div className="md:col-span-8 space-y-8">

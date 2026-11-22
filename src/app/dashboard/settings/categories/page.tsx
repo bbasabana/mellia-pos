@@ -343,7 +343,7 @@ export default function CategoriesPage() {
                                 </h2>
                                 <button
                                     onClick={openCreateModal}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#00d3fa] text-white text-sm font-medium rounded-lg hover:bg-[#00b8e0] transition-colors shadow-blue-500/20 shadow-md"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-blue-500/20 shadow-md"
                                 >
                                     <Plus size={20} />
                                     Nouvelle Catégorie
@@ -487,7 +487,7 @@ export default function CategoriesPage() {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 bg-[#00d3fa] text-white rounded-lg hover:bg-[#00b8e0] font-medium shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
                                     >
                                         <Save size={18} />
                                         {typeModalMode === "create" ? "Créer" : "Mettre à jour"}
@@ -621,7 +621,7 @@ export default function CategoriesPage() {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 bg-[#00d3fa] text-white rounded-lg hover:bg-[#00b8e0] font-medium shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
                                     >
                                         <Save size={18} />
                                         {modalMode === "create" ? "Créer" : "Mettre à jour"}

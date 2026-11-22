@@ -11,6 +11,29 @@ class SalesRepository {
 
   SalesRepository(this._dio);
 
+  /// POST /api/sales answers with the sale itself, PUT /api/transactions (finalising a draft)
+  /// with {success, data: sale}: always hand back the sale, or the receipt shows 0 and no items.
+  static Map<String, dynamic> _sale(dynamic body) {
+    if (body is Map && body['success'] == false) {
+      throw Exception(body['error']?.toString() ?? 'Erreur serveur');
+    }
+    if (body is Map && body['data'] is Map && body['totalCdf'] == null) {
+      return Map<String, dynamic>.from(body['data'] as Map);
+    }
+    if (body is Map) return Map<String, dynamic>.from(body);
+    throw Exception('Réponse inattendue du serveur');
+  }
+
+  static String _reason(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) return data['error'].toString();
+      if (data is String && data.isNotEmpty && data.length < 200) return data;
+      return e.message ?? e.toString();
+    }
+    return e.toString().replaceFirst('Exception: ', '');
+  }
+
   Future<Map<String, dynamic>> createSale({
     required List<CartItem> items,
     required String paymentMethod, // CASH, CARD, etc.
@@ -40,9 +63,9 @@ class SalesRepository {
       };
 
       final res = await _dio.post("/api/sales", data: payload);
-      return res.data;
+      return _sale(res.data);
     } catch (e) {
-      throw Exception("Echec de la vente: ${e.toString()}");
+      throw Exception("Échec de la vente : ${_reason(e)}");
     }
   }
 
@@ -75,9 +98,9 @@ class SalesRepository {
       };
 
       final res = await _dio.put("/api/transactions?id=$id", data: payload);
-      return res.data;
+      return _sale(res.data);
     } catch (e) {
-      throw Exception("Erreur de mise à jour: ${e.toString()}");
+      throw Exception("Erreur de mise à jour : ${_reason(e)}");
     }
   }
 

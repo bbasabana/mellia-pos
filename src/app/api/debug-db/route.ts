@@ -1,63 +1,32 @@
-
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 
+/** Database connectivity check, for a signed-in administrator only. */
 export async function GET() {
+    const session = await getServerSession(authOptions);
+    if (session?.user?.role !== "ADMIN") {
+        return NextResponse.json({ success: false, error: "Non autorisé" }, { status: 403 });
+    }
+
     try {
-        console.log("🔍 [DEBUG-DB] Starting connectivity test...");
-
-        // 1. Check Env Var (Masked/Hashed)
-        const dbUrl = process.env.DATABASE_URL || "MISSING";
-        const authSecret = process.env.NEXTAUTH_SECRET || "MISSING";
-        const authUrl = process.env.NEXTAUTH_URL || "MISSING";
-
-        const maskedDbUrl = dbUrl.replace(/:([^:@]+)@/, ":****@");
-
-        // 2. Try to connect and count users
-        let userCount = -1;
-        let dbStatus = "Checking...";
-        try {
-            userCount = await prisma.user.count();
-            dbStatus = "Connected";
-        } catch (e: any) {
-            dbStatus = `Connection Failed: ${e.message}`;
-        }
-
-        // 3. Try to find the admin user
-        let adminUser = null;
-        if (dbStatus === "Connected") {
-            adminUser = await prisma.user.findUnique({
-                where: { email: "admin@mellia.pos" },
-                select: { id: true, email: true, role: true, status: true }
-            });
-        }
-
+        const [totalUsers, admins] = await Promise.all([
+            prisma.user.count(),
+            prisma.user.count({ where: { role: "ADMIN", status: "ACTIVE" } }),
+        ]);
         return NextResponse.json({
             success: true,
             timestamp: new Date().toISOString(),
             environment: {
-                DATABASE_URL_DETECTED: dbUrl !== "MISSING",
-                DATABASE_URL_MASKED: maskedDbUrl,
-                NEXTAUTH_SECRET_DETECTED: authSecret !== "MISSING",
-                NEXTAUTH_URL: authUrl,
-                NODE_ENV: process.env.NODE_ENV
+                DATABASE_URL_DETECTED: !!process.env.DATABASE_URL,
+                NEXTAUTH_SECRET_DETECTED: !!process.env.NEXTAUTH_SECRET,
+                NODE_ENV: process.env.NODE_ENV,
             },
-            database: {
-                status: dbStatus,
-                totalUsers: userCount
-            },
-            adminUser: {
-                found: !!adminUser,
-                details: adminUser || "N/A"
-            }
+            database: { status: "Connected", totalUsers, activeAdmins: admins },
         });
-
     } catch (error: any) {
         console.error("🚨 [DEBUG-DB] Test failed:", error);
-        return NextResponse.json({
-            success: false,
-            error: error.message || "Unknown error during DB test",
-            stack: process.env.NODE_ENV === "development" ? error.stack : undefined
-        }, { status: 500 });
+        return NextResponse.json({ success: false, error: "Connexion à la base impossible" }, { status: 500 });
     }
 }

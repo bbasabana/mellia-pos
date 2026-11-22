@@ -43,29 +43,30 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }: ModalPr
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto">
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-gray-950/40 backdrop-blur-[2px] transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal */}
       <div className={`relative w-full ${sizeClasses[size]} mx-auto p-4`}>
         <div
-          className="relative bg-white rounded-lg shadow-xl transform transition-all max-h-[90vh] overflow-hidden flex flex-col"
+          className="relative bg-white rounded-2xl shadow-2xl ring-1 ring-gray-900/5 transform transition-all max-h-[90vh] overflow-hidden flex flex-col animate-fade-up"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
             <button
               onClick={onClose}
-              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Fermer"
             >
               <X size={20} />
             </button>
           </div>
 
           {/* Body - Scrollable */}
-          <div className="px-6 py-4 overflow-y-auto flex-1">{children}</div>
+          <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
         </div>
       </div>
     </div>

@@ -565,9 +565,9 @@ const ProductGrid = () => {
                     <button
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
-                        className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-sm text-[10px] md:text-xs font-bold whitespace-nowrap transition-all border ${activeCategory === cat
-                            ? "bg-gray-800 text-white border-gray-800 shadow-md"
-                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        className={`px-2.5 md:px-4 py-1.5 md:py-2 rounded-full text-[10px] md:text-xs font-semibold whitespace-nowrap transition-all border ${activeCategory === cat
+                            ? "bg-gray-900 text-white border-gray-900 shadow-sm"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900"
                             }`}
                     >
                         {categoryTranslations[cat] || cat}
@@ -588,27 +588,30 @@ const ProductGrid = () => {
                                 key={product.id}
                                 onClick={() => handleProductClick(product)}
                                 disabled={isOutOfStock}
-                                className={`flex flex-col items-center p-2 md:p-3 bg-white border border-gray-200 rounded-lg md:rounded-sm shadow-sm transition-all relative overflow-hidden group text-left
-                                    ${isOutOfStock ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:shadow-lg hover:border-[#00d3fa] active:scale-[0.98]'}
+                                className={`flex flex-col items-center p-2 md:p-3 bg-white border border-gray-200/80 rounded-xl shadow-xs transition-all relative overflow-hidden group text-left
+                                    ${isOutOfStock ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:shadow-md hover:border-blue-300 hover:-translate-y-0.5 active:scale-[0.98]'}
                                 `}
                             >
                                 {/* Stock Badge */}
-                                <div className={`absolute top-1 md:top-2 right-1 md:right-2 px-1.5 md:px-2 py-0.5 rounded text-[8px] md:text-[9px] font-bold uppercase tracking-wider ${isOutOfStock ? 'bg-red-50 text-red-600' :
-                                    isLowStock ? 'bg-orange-50 text-orange-600' :
-                                        'bg-green-50 text-green-600'
+                                <div className={`absolute top-1 md:top-2 right-1 md:right-2 px-1.5 md:px-2 py-0.5 rounded-full text-[8px] md:text-[9px] font-bold uppercase tracking-wider tabular-nums ${isOutOfStock ? 'bg-red-50 text-red-600' :
+                                    isLowStock ? 'bg-orange-50 text-orange-700' :
+                                        'bg-green-50 text-green-700'
                                     }`}>
                                     {isOutOfStock ? 'Épuisé' : `${stock}`}
                                 </div>
 
-                                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-50 flex items-center justify-center mb-2 md:mb-3 text-blue-600 group-hover:bg-[#00d3fa] group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <span className="font-black text-base md:text-lg">{product.name.charAt(0)}</span>
+                                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center mb-2 md:mb-3 transition-colors duration-300 shrink-0 ${product.type === 'FOOD'
+                                    ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white'
+                                    : 'bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
+                                    }`}>
+                                    <span className="font-bold text-base md:text-lg">{product.name.charAt(0)}</span>
                                 </div>
 
-                                <span className="font-bold text-gray-800 text-center text-xs md:text-sm leading-tight mb-1.5 md:mb-2 line-clamp-2 h-8 md:h-10 flex items-center justify-center w-full">
+                                <span className="font-semibold text-gray-900 text-center text-xs md:text-sm leading-tight mb-1.5 md:mb-2 line-clamp-2 h-8 md:h-10 flex items-center justify-center w-full">
                                     {product.name}
                                 </span>
 
-                                <span className="text-[10px] md:text-xs font-medium text-gray-500 bg-gray-50 px-1.5 md:px-2 py-0.5 md:py-1 rounded text-center w-full group-hover:bg-gray-100 transition-colors truncate">
+                                <span className="text-[10px] md:text-xs font-semibold text-gray-600 bg-gray-50 px-1.5 md:px-2 py-0.5 md:py-1 rounded-lg text-center w-full group-hover:bg-gray-100 transition-colors truncate tabular-nums">
                                     {product.prices?.length > 1
                                         ? `${product.prices.length} choix`
                                         : product.prices?.[0]?.priceCdf

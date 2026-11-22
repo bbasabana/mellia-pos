@@ -101,7 +101,7 @@ export function ExchangeRateCard() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="px-2 py-1 bg-[#00d3fa] text-white text-xs font-bold rounded hover:opacity-90 transition-opacity"
+                                className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded hover:opacity-90 transition-opacity"
                             >
                                 OK
                             </button>

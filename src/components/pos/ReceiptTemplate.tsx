@@ -3,6 +3,15 @@
 import { Sale, Client, User, SaleItem, Product, PaymentMethod } from "@prisma/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { QRCodeSVG } from "qrcode.react";
+
+/** Public page that proves a receipt is genuine (src/app/v/[id]). */
+export function receiptVerifyUrl(saleId: string) {
+    const base =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== "undefined" ? window.location.origin : "https://mellia-pos.vercel.app");
+    return `${base.replace(/\/$/, "")}/v/${saleId}`;
+}
 
 type ReceiptProps = {
     sale: Sale & {
@@ -114,6 +123,18 @@ export const ReceiptTemplate = ({ sale, width = "80mm", exchangeRate = 2800 }: R
                     <p style={{ margin: "0", fontWeight: "bold", fontSize: "13px" }}>FIDELITE MELLIA</p>
                     <p style={{ margin: "3px 0" }}>Points gagnés: +{sale?.pointsEarned || 0}</p>
                     <p style={{ margin: "0", fontWeight: "bold" }}>SOLDE ACTUEL: {sale.client.points} pts</p>
+                </div>
+            )}
+
+            {/* Authenticity QR code: opens the public check page of this sale */}
+            {sale?.id && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "10px 0 4px" }}>
+                    <QRCodeSVG value={receiptVerifyUrl(sale.id)} size={width === "58mm" ? 80 : 96} level="M" marginSize={0} />
+                    <p style={{ margin: "6px 0 0", fontSize: "11px", textAlign: "center" }}>
+                        Scannez pour vérifier
+                        <br />
+                        l&apos;authenticité de cette facture
+                    </p>
                 </div>
             )}
 

@@ -158,10 +158,10 @@ export default function UsersPage() {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col h-full bg-gray-50">
-                <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+            <div className="flex flex-col h-full">
+                <div className="px-1 pb-5 flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <h1 className="ui-page-title flex items-center gap-2.5">
                             <Shield className="text-[#00d3fa]" />
                             Gestion des Utilisateurs
                         </h1>
@@ -176,7 +176,7 @@ export default function UsersPage() {
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6">
+                <div className="flex-1 overflow-auto px-1 pb-2">
                     <div className="bg-white border border-gray-200 rounded-sm shadow-sm overflow-hidden">
                         <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                             <h3 className="font-bold text-gray-700 text-sm uppercase tracking-wider">Comptes Système</h3>

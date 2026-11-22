@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
+import 'package:mellia_pos_mobile/shared/widgets/motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mellia_pos_mobile/features/cart/drafts_provider.dart';
 import 'package:mellia_pos_mobile/features/cart/cart_provider.dart';
@@ -15,7 +17,7 @@ class DraftsScreen extends ConsumerWidget {
     final dateFormat = DateFormat('dd/MM HH:mm');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: AppTheme.canvas,
       appBar: AppBar(
         title: const Text("Brouillons (Web & Local)"),
         elevation: 0,
@@ -61,38 +63,41 @@ class DraftsScreen extends ConsumerWidget {
                       double.tryParse(draft.rawData['totalCdf'].toString()) ??
                       0.0;
 
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      title: Text(
-                        "Commande #${draft.ticketNum}",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(
-                        "${items.length} articles • ${dateFormat.format(draft.createdAt)}",
-                      ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            "\$${totalUsd.toStringAsFixed(2)}",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: Colors.blue,
+                  return FadeSlideIn(
+                    index: index,
+                    child: Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        title: Text(
+                          "Commande #${draft.ticketNum}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          "${items.length} articles • ${dateFormat.format(draft.createdAt)}",
+                        ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              "\$${totalUsd.toStringAsFixed(2)}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.cyanDark,
+                              ),
                             ),
-                          ),
-                          Text(
-                            "${totalCdf.toInt()} FC",
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.orange,
+                            Text(
+                              "${totalCdf.toInt()} FC",
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.orange,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        onTap: () => _resumeDraft(context, ref, draft),
                       ),
-                      onTap: () => _resumeDraft(context, ref, draft),
                     ),
                   );
                 },

@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -413,7 +414,7 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        "${item.unitPriceUsd}\$ • ${item.unitPriceCdf.toInt()} FC",
+                        "${NumberFormat.decimalPattern('fr').format(item.unitPriceCdf.round())} FC • \$${item.unitPriceUsd.toStringAsFixed(2)}",
                         style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
                     ],
@@ -423,17 +424,17 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      "${item.totalUsd.toStringAsFixed(1)}\$",
+                      "${NumberFormat.decimalPattern('fr').format(item.totalCdf.round())} FC",
                       style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
                       ),
                     ),
                     Text(
-                      "${item.totalCdf.toInt()} FC",
+                      "\$${item.totalUsd.toStringAsFixed(2)}",
                       style: const TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.orange600,
+                        fontSize: 11,
+                        color: AppTheme.muted,
                       ),
                     ),
                   ],
@@ -527,15 +528,15 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
       child: Column(
         children: [
           _totalRow(
-            "Total USD",
-            "\$${state.totalUsd.toStringAsFixed(2)}",
+            "Total",
+            "${NumberFormat.decimalPattern('fr').format(state.totalCdf.round())} FC",
             isPrimary: true,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           _totalRow(
-            "Total CDF",
-            "${state.totalCdf.toInt()} FC",
-            color: AppTheme.orange600,
+            "Soit",
+            "\$${state.totalUsd.toStringAsFixed(2)}",
+            color: AppTheme.muted,
           ),
           const SizedBox(height: 24),
           Row(
@@ -574,15 +575,16 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
               Expanded(
                 flex: 2,
                 child: PrimaryButton(
-                  text: "Encaisser (\$${state.totalUsd.toStringAsFixed(1)})",
+                  text: "Encaisser",
                   onPressed: () {
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,
+                      barrierColor: AppTheme.ink.withValues(alpha: 0.35),
                       builder: (ctx) => Padding(
                         padding: EdgeInsets.only(
-                          bottom: MediaQuery.of(context).viewInsets.bottom,
+                          top: MediaQuery.of(context).viewPadding.top + 20,
                         ),
                         child: const PaymentModal(),
                       ),

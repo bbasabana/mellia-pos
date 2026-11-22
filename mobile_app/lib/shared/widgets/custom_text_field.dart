@@ -31,7 +31,7 @@ class CustomTextField extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF64748B), // Slate-500
+            color: const Color(0xFF3A4453),
           ),
         ),
         const SizedBox(height: 8),
@@ -43,7 +43,7 @@ class CustomTextField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon != null
-                ? Icon(prefixIcon, color: const Color(0xFF94A3B8))
+                ? Icon(prefixIcon, color: const Color(0xFF98A3B3), size: 20)
                 : null,
             suffixIcon: suffixIcon,
           ),

@@ -106,7 +106,7 @@ export default function DraftsPage() {
                 {/* Header */}
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-black text-gray-800 flex items-center gap-3">
+                        <h1 className="ui-page-title flex items-center gap-2.5">
                             <FileText className="text-orange-500" size={28} />
                             Gestion des Brouillons
                         </h1>

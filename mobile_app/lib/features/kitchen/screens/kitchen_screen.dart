@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
+import 'package:mellia_pos_mobile/shared/widgets/motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mellia_pos_mobile/features/kitchen/data/kitchen_model.dart';
 import 'package:mellia_pos_mobile/features/kitchen/data/kitchen_repository.dart';
@@ -14,6 +16,84 @@ class KitchenScreen extends ConsumerStatefulWidget {
 
 class _KitchenScreenState extends ConsumerState<KitchenScreen> {
   Timer? _refreshTimer;
+
+  /// Cashier whose orders are shown; null = everyone.
+  String? _cashier;
+  bool _deleting = false;
+
+  static String _cashierOf(KitchenOrder o) => o.sale.user?.name ?? 'Sans nom';
+
+  bool _canManage() {
+    final role = ref.read(authNotifierProvider).asData?.value?.role;
+    return role == 'ADMIN' || role == 'MANAGER';
+  }
+
+  /// Deletes every order on screen (all of them, or only the selected cashier's), after a confirmation.
+  Future<void> _deleteAll(List<KitchenOrder> visible) async {
+    if (visible.isEmpty) return;
+    final who = _cashier;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(
+          Icons.delete_sweep_rounded,
+          color: AppTheme.error,
+          size: 32,
+        ),
+        title: Text(
+          who == null
+              ? "Vider la cuisine ?"
+              : "Supprimer les commandes de $who ?",
+        ),
+        content: Text(
+          "${visible.length} commande${visible.length > 1 ? 's' : ''} ${visible.length > 1 ? 'seront supprimées' : 'sera supprimée'} de la cuisine. "
+          "Les ventes et les tickets ne sont pas touchés.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Supprimer"),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      final repo = await ref.read(kitchenRepositoryProvider.future);
+      final n = await repo.deleteMany(
+        visible.map((o) => o.id).toList(),
+        all: who == null,
+      );
+      if (mounted) {
+        setState(() => _cashier = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "$n commande${n > 1 ? 's' : ''} supprimée${n > 1 ? 's' : ''}.",
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Suppression impossible : $e"),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    } finally {
+      ref.invalidate(kitchenOrdersProvider);
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
 
   @override
   void initState() {
@@ -36,25 +116,91 @@ class _KitchenScreenState extends ConsumerState<KitchenScreen> {
     final ordersAsync = ref.watch(kitchenOrdersProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: AppTheme.canvas,
       appBar: AppBar(
-        title: const Text(
-          'Commandes Cuisine',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
+        title: const Text('Cuisine'),
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            tooltip: "Actualiser",
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: () => ref.invalidate(kitchenOrdersProvider),
           ),
+          if (_canManage())
+            _deleting
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    tooltip: "Tout supprimer",
+                    icon: const Icon(
+                      Icons.delete_sweep_rounded,
+                      color: AppTheme.error,
+                    ),
+                    onPressed: () {
+                      final orders =
+                          ref.read(kitchenOrdersProvider).asData?.value ??
+                          const <KitchenOrder>[];
+                      final active = orders.where(
+                        (o) => o.status != 'DELIVERED',
+                      );
+                      _deleteAll(
+                        _cashier == null
+                            ? active.toList()
+                            : active
+                                  .where((o) => _cashierOf(o) == _cashier)
+                                  .toList(),
+                      );
+                    },
+                  ),
+          const SizedBox(width: 4),
         ],
       ),
       body: ordersAsync.when(
         data: (orders) {
-          final activeOrders = orders
+          final allActive = orders
               .where((o) => o.status != 'DELIVERED')
               .toList();
+
+          // Orders per cashier, for the filter chips
+          final counts = <String, int>{};
+          for (final o in allActive) {
+            counts[_cashierOf(o)] = (counts[_cashierOf(o)] ?? 0) + 1;
+          }
+          final selected = counts.containsKey(_cashier) ? _cashier : null;
+          final activeOrders = selected == null
+              ? allActive
+              : allActive.where((o) => _cashierOf(o) == selected).toList();
+
+          final filters = counts.length < 2
+              ? const SizedBox.shrink()
+              : SizedBox(
+                  height: 52,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    children: [
+                      _CashierChip(
+                        label: "Tous",
+                        count: allActive.length,
+                        selected: selected == null,
+                        onTap: () => setState(() => _cashier = null),
+                      ),
+                      for (final e in counts.entries)
+                        _CashierChip(
+                          label: e.key,
+                          count: e.value,
+                          selected: selected == e.key,
+                          onTap: () => setState(() => _cashier = e.key),
+                        ),
+                    ],
+                  ),
+                );
 
           if (activeOrders.isEmpty) {
             return Center(
@@ -80,19 +226,29 @@ class _KitchenScreenState extends ConsumerState<KitchenScreen> {
             );
           }
 
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 400,
-              mainAxisExtent: 320,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: activeOrders.length,
-            itemBuilder: (context, index) {
-              final order = activeOrders[index];
-              return _KitchenOrderCard(order: order);
-            },
+          return Column(
+            children: [
+              filters,
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 400,
+                    mainAxisExtent: 320,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: activeOrders.length,
+                  itemBuilder: (context, index) {
+                    final order = activeOrders[index];
+                    return FadeSlideIn(
+                      index: index,
+                      child: _KitchenOrderCard(order: order),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -195,6 +351,33 @@ class _KitchenOrderCard extends ConsumerWidget {
             child: Row(
               children: [
                 _buildOrderTypeBadge(order.orderType),
+                if (order.sale.user?.name != null) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.person_outline_rounded,
+                          size: 14,
+                          color: AppTheme.muted,
+                        ),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            order.sale.user!.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Icon(
                   Icons.access_time_rounded,
@@ -203,7 +386,7 @@ class _KitchenOrderCard extends ConsumerWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  "$elapsed min",
+                  _elapsedLabel(elapsed),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: isLate ? FontWeight.w900 : FontWeight.bold,
@@ -333,7 +516,7 @@ class _KitchenOrderCard extends ConsumerWidget {
         onPressed: () => _updateStatus(ref, 'IN_PREPARATION'),
         icon: const Icon(Icons.local_fire_department),
         label: const Text("LANCER"),
-        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.brandOrange),
       );
     }
     if (order.status == 'IN_PREPARATION') {
@@ -341,12 +524,12 @@ class _KitchenOrderCard extends ConsumerWidget {
         onPressed: () => _updateStatus(ref, 'READY'),
         icon: const Icon(Icons.check_circle),
         label: const Text("PRÊT"),
-        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.limeDark),
       );
     }
     return ElevatedButton(
       onPressed: () => _updateStatus(ref, 'DELIVERED'),
-      style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
+      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.ink),
       child: const Text("TERMINER"),
     );
   }
@@ -456,5 +639,56 @@ class _KitchenOrderCard extends ConsumerWidget {
       default:
         return status;
     }
+  }
+}
+
+/// "12 min", "2 h 05", "3 j" — old orders stay readable.
+String _elapsedLabel(int minutes) {
+  if (minutes < 60) return '$minutes min';
+  if (minutes < 24 * 60) {
+    return '${minutes ~/ 60} h ${(minutes % 60).toString().padLeft(2, '0')}';
+  }
+  return '${minutes ~/ (24 * 60)} j';
+}
+
+class _CashierChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CashierChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Pressable(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: AppTheme.fast,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.ink : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: selected ? AppTheme.ink : AppTheme.line),
+          ),
+          child: Text(
+            "$label · $count",
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: selected ? Colors.white : AppTheme.ink,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -30,7 +30,7 @@ export default async function NewProductPage() {
         <div className="product-form-scroll">
           <div className="max-w-[1200px] mx-auto">
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-[#00d3fa] mb-1">Nouveau Produit</h1>
+              <h1 className="ui-page-title mb-1">Nouveau Produit</h1>
               <p className="text-gray-500 text-sm">Créer un nouveau produit dans le système</p>
             </div>
 

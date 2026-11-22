@@ -610,7 +610,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                         !qty ||
                         (saisieMode === "UNIT" ? !unitPrice : !lineTotalInput)
                     }
-                    className="p-2 bg-[#00d3fa] text-white rounded hover:opacity-90 transition-all disabled:opacity-50 h-[38px] w-[38px] flex items-center justify-center mb-[1px]"
+                    className="p-2 bg-blue-600 text-white rounded hover:opacity-90 transition-all disabled:opacity-50 h-[38px] w-[38px] flex items-center justify-center mb-[1px]"
                 >
                     <Plus size={20} />
                 </button>
@@ -716,7 +716,7 @@ export function InvestmentForm({ editId, onSuccess, onCancel }: { editId?: strin
                 <button
                     onClick={handleSubmit}
                     disabled={items.length === 0 || loading || !buyerName}
-                    className="px-8 py-3 bg-[#71de00] text-white font-bold rounded shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center gap-2"
+                    className="px-8 py-3 bg-green-600 text-white font-bold rounded shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center gap-2"
                 >
                     <Save size={18} />
                     {loading ? "Traitement..." : (editId ? "Mettre à jour" : "Valider l'Achat")}

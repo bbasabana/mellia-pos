@@ -7,8 +7,8 @@ plugins {
 
 android {
     namespace = "com.melliapos.mellia_pos_mobile"
-    compileSdk = 34
-    ndkVersion = "27.0.12077973"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -41,4 +41,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Sunmi's printer service (AIDL "woyou"), present on every Sunmi terminal: lets the app print
+    // on the built-in printer directly, without Bluetooth (same library as the Mihos POS app).
+    implementation("com.sunmi:printerlibrary:1.0.23")
 }

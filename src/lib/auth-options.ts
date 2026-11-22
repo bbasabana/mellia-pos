@@ -38,19 +38,6 @@ export const authOptions: NextAuthOptions = {
             throw new Error("Email et mot de passe requis");
           }
 
-          // 🛠️ ISOLATION TEST: Hardcoded user
-          // If this works but admin@mellia.pos fails, the problem is DATABASE.
-          // If this ALSO fails, the problem is VERCEL/COOKIES/SECRET.
-          if (email === "debug@mellia.pos" && credentials.password === "Debug123!") {
-            console.log("🛠️ [AUTH] Debug user login successful (DB Bypassed)");
-            return {
-              id: "debug-id",
-              email: "debug@mellia.pos",
-              name: "Diagnostic User",
-              role: "ADMIN" as any,
-            };
-          }
-
           // Database check
           await prisma.$connect();
 

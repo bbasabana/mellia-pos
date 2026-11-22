@@ -3,12 +3,122 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 47.4% 11.2%;
+  --background: 210 33% 98%;
+  --foreground: 222 47% 11%;
+  --brand-cyan: #00d3fa;
+  --brand-lime: #71de00;
+  --brand-orange: #ff4900;
+  --brand-ink: #0f172a;
 }
 
 body {
   min-height: 100vh;
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #cff7fe;
+  color: #0b4a5f;
+}
+
+/* Quiet, thin scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cfd6df transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cfd6df;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #98a3b3;
+  background-clip: content-box;
+}
+
+@layer base {
+  h1, h2, h3, h4 {
+    letter-spacing: -0.015em;
+  }
+
+  /* Form controls: one calm look everywhere, with the brand focus ring. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    @apply transition-colors;
+  }
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    border-color: #00b3db !important;
+    box-shadow: 0 0 0 3px rgb(0 211 250 / 0.18) !important;
+  }
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid #00b3db;
+    outline-offset: 2px;
+  }
+
+  /* Tables read better with tabular numbers. */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Slogan whose colours slowly move through the logo palette. */
+@keyframes mellia-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.mellia-shimmer {
+  background-image: linear-gradient(90deg, #00b3db, #5cbf00, #ff4900, #00b3db, #5cbf00);
+  background-size: 300% 100%;
+  animation: mellia-shimmer 6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mellia-shimmer { animation: none; }
+}
+
+@layer components {
+  /* Building blocks for new screens. */
+  .ui-card {
+    @apply bg-white rounded-xl border border-gray-200/80 shadow-sm;
+  }
+  .ui-page-title {
+    @apply text-2xl font-bold tracking-tight text-gray-900;
+  }
+  .ui-page-subtitle {
+    @apply text-sm text-gray-500;
+  }
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .ui-btn-primary {
+    @apply ui-btn bg-ink text-white hover:bg-gray-800 shadow-sm;
+  }
+  .ui-btn-brand {
+    @apply ui-btn bg-blue-600 text-white hover:bg-blue-700 shadow-sm;
+  }
+  .ui-btn-ghost {
+    @apply ui-btn bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300;
+  }
+  .ui-btn-danger {
+    @apply ui-btn bg-red-600 text-white hover:bg-red-700 shadow-sm;
+  }
+  .ui-btn-danger-soft {
+    @apply ui-btn bg-red-50 text-red-700 border border-red-100 hover:bg-red-100;
+  }
+  .ui-chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold;
+  }
 }

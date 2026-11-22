@@ -12,7 +12,7 @@ _KitchenOrder _$KitchenOrderFromJson(Map<String, dynamic> json) =>
       orderType: json['orderType'] as String,
       status: json['status'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      priority: (json['priority'] as num).toInt(),
+      priority: json['priority'] == null ? 0 : _toInt(json['priority']),
       sale: KitchenSale.fromJson(json['sale'] as Map<String, dynamic>),
     );
 
@@ -34,6 +34,9 @@ _KitchenSale _$KitchenSaleFromJson(Map<String, dynamic> json) => _KitchenSale(
   client: json['client'] == null
       ? null
       : KitchenClient.fromJson(json['client'] as Map<String, dynamic>),
+  user: json['user'] == null
+      ? null
+      : KitchenClient.fromJson(json['user'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$KitchenSaleToJson(_KitchenSale instance) =>
@@ -41,12 +44,13 @@ Map<String, dynamic> _$KitchenSaleToJson(_KitchenSale instance) =>
       'ticketNum': instance.ticketNum,
       'items': instance.items,
       'client': instance.client,
+      'user': instance.user,
     };
 
 _KitchenItem _$KitchenItemFromJson(Map<String, dynamic> json) => _KitchenItem(
   id: json['id'] as String,
   product: KitchenProduct.fromJson(json['product'] as Map<String, dynamic>),
-  quantity: (json['quantity'] as num).toDouble(),
+  quantity: _toDouble(json['quantity']),
 );
 
 Map<String, dynamic> _$KitchenItemToJson(_KitchenItem instance) =>

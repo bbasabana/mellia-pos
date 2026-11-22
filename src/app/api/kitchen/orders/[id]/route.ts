@@ -9,8 +9,9 @@ export async function DELETE(
 ) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || (session.user as any).role !== "ADMIN") {
-            return NextResponse.json({ success: false, error: "Non autorisé" }, { status: 401 });
+        const role = (session?.user as any)?.role;
+        if (role !== "ADMIN" && role !== "MANAGER") {
+            return NextResponse.json({ success: false, error: "Réservé aux administrateurs et gérants" }, { status: 403 });
         }
 
         const { id } = params;

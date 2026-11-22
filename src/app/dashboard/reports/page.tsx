@@ -68,11 +68,11 @@ export default function ReportsPage() {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col h-full bg-gray-50">
+            <div className="flex flex-col h-full">
                 {/* HEADER */}
-                <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="px-1 pb-5 flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <h1 className="ui-page-title flex items-center gap-2.5">
                             <BarChart3 className="text-[#00d3fa]" />
                             Tableau de Bord & Rapports
                         </h1>
@@ -107,7 +107,7 @@ export default function ReportsPage() {
 
                 {/* FILTERS FOR PERFORMANCE */}
                 {mode === 'PERFORMANCE' && (
-                    <div className="px-6 py-3 bg-white border-b border-gray-200 flex items-center gap-2 overflow-x-auto shrink-0">
+                    <div className="px-1 pb-5 flex items-center gap-2 overflow-x-auto shrink-0">
                         <Calendar size={14} className="text-gray-400 mr-2" />
                         {(Object.keys(periodLabels) as Period[]).map((p) => (
                             <button
@@ -127,7 +127,7 @@ export default function ReportsPage() {
                 )}
 
                 {/* CONTENT AREA */}
-                <div className="flex-1 overflow-auto p-6 space-y-6">
+                <div className="flex-1 overflow-auto px-1 pb-2 space-y-6">
                     {loading || !stats ? (
                         <div className="flex justify-center p-12">
                             <Loader2 className="animate-spin text-[#00d3fa]" size={40} />
