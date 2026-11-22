@@ -11,10 +11,12 @@ import { ReceiptTemplate } from "@/components/pos/ReceiptTemplate";
 import { showToast } from "@/components/ui/Toast";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import EditTransactionModal from "@/components/transactions/EditTransactionModal";
+import CashCountPanel from "@/components/transactions/CashCountPanel";
 
 export default function TransactionsPage() {
     const { data: session } = useSession();
     const isAdmin = (session?.user as any)?.role === "ADMIN";
+    const canSettleCash = ["ADMIN", "MANAGER"].includes((session?.user as any)?.role);
 
     const [transactions, setTransactions] = useState<any[]>([]);
     const [summary, setSummary] = useState({
@@ -369,6 +371,9 @@ export default function TransactionsPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Contrôle de caisse : argent compté vs attendu */}
+                    <CashCountPanel canSettle={canSettleCash} />
 
                     {/* Desktop Table View - Hidden on Mobile */}
                     <div className="hidden md:block bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm">

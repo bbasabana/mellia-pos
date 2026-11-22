@@ -33,6 +33,7 @@ model User {
   sessions              Session[]
   stockMovements        StockMovement[]
   cashMonthClosures     CashMonthClosure[]
+  cashCounts            CashCount[]
 
   @@index([email])
   @@index([role])
@@ -564,6 +565,7 @@ enum SaleUnit {
   BOX
   PACK
 }
+
 enum Currency {
   CDF
   USD
@@ -604,6 +606,40 @@ model CashMonthClosure {
 
   @@index([closedAt])
   @@map("cash_month_closures")
+}
+
+/// Cash count of a day: money actually counted vs what should be in the till.
+model CashCount {
+  id              String          @id @default(cuid())
+  periodStart     DateTime
+  periodEnd       DateTime
+  salesCashCdf    Decimal         @db.Decimal(15, 2)
+  salesOtherCdf   Decimal         @default(0) @db.Decimal(15, 2)
+  expensesCdf     Decimal         @default(0) @db.Decimal(15, 2)
+  purchasesCdf    Decimal         @default(0) @db.Decimal(15, 2)
+  openingFloatCdf Decimal         @default(0) @db.Decimal(15, 2)
+  expectedCdf     Decimal         @db.Decimal(15, 2)
+  countedCdf      Decimal         @db.Decimal(15, 2)
+  differenceCdf   Decimal         @db.Decimal(15, 2)
+  status          CashCountStatus @default(TO_VERIFY)
+  notes           String?
+  resolutionNote  String?
+  resolvedByName  String?
+  resolvedAt      DateTime?
+  userId          String
+  createdAt       DateTime        @default(now())
+  user            User            @relation(fields: [userId], references: [id])
+
+  @@index([periodStart])
+  @@index([status])
+  @@map("cash_counts")
+}
+
+enum CashCountStatus {
+  BALANCED
+  TO_VERIFY
+  LOSS
+  JUSTIFIED
 }
 
 enum FundSource {
