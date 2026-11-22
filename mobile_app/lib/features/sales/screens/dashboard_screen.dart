@@ -243,12 +243,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         color: const Color(0xFF7C5CFF),
         onTap: () => go('/transactions'),
       ),
-      _NavEntry(
-        icon: Icons.lock_clock_rounded,
-        label: 'Clôturer la journée',
-        color: AppTheme.ink,
-        onTap: () => go('/day-closure'),
-      ),
+      // The day is closed by the manager or the admin, when the money is handed over.
+      if (user?.role == 'ADMIN' || user?.role == 'MANAGER')
+        _NavEntry(
+          icon: Icons.lock_clock_rounded,
+          label: 'Clôturer la journée',
+          color: AppTheme.ink,
+          onTap: () => go('/day-closure'),
+        ),
       _NavEntry(
         icon: Icons.tune_rounded,
         label: 'Paramètres',

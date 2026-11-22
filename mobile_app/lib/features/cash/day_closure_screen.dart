@@ -42,6 +42,14 @@ String _when(Object? iso) {
   return DateFormat('EEE d MMM HH:mm', 'fr').format(kinshasaFrom(iso));
 }
 
+/// "Journée du lun. 1 déc." from the server's business day (a morning closure closes the
+/// day before), falling back to the closure time.
+String _dayTitle(Map<String, dynamic> c) {
+  final day = DateTime.tryParse(c['businessDay']?.toString() ?? '');
+  if (day == null) return _when(c['periodEnd']);
+  return 'Journée du ${DateFormat('EEE d MMM', 'fr').format(day)}';
+}
+
 const _statusLabels = {
   'BALANCED': ('Correct', AppTheme.success),
   'TO_VERIFY': ('À vérifier', AppTheme.warning),
@@ -272,12 +280,13 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: (gap == 0
-                        ? AppTheme.success
-                        : gap < 0
-                        ? AppTheme.error
-                        : AppTheme.cyanDark)
-                    .withValues(alpha: 0.08),
+                color:
+                    (gap == 0
+                            ? AppTheme.success
+                            : gap < 0
+                            ? AppTheme.error
+                            : AppTheme.cyanDark)
+                        .withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -305,7 +314,7 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
               child: Text(
                 withdrawalTooHigh
                     ? 'Le versement dépasse l\'argent compté'
-                    : 'Reste en caisse pour demain : ${_fc(counted - withdrawal)}',
+                    : 'Reste en caisse (fond suivant) : ${_fc(counted - withdrawal)}',
                 style: TextStyle(
                   fontSize: 12.5,
                   color: withdrawalTooHigh ? AppTheme.error : AppTheme.muted,
@@ -373,7 +382,8 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
             final c = Map<String, dynamic>.from(raw as Map);
             final diff = _n(c['differenceCdf']);
             final (label, color) =
-                _statusLabels[c['status']] ?? (c['status'].toString(), AppTheme.muted);
+                _statusLabels[c['status']] ??
+                (c['status'].toString(), AppTheme.muted);
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: SoftCard(
@@ -386,7 +396,7 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _when(c['periodEnd']),
+                            _dayTitle(c),
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 2),

@@ -546,7 +546,9 @@ class PrinterService extends _$PrinterService {
       bytes.addAll([..._boldOn, ..._tallOn]);
       line('DUPLICATA');
       bytes.addAll([..._sizeOff, ..._boldOff]);
-      line('Réimprimé le ${DateFormat('dd/MM/yyyy HH:mm').format(nowKinshasa())}');
+      line(
+        'Réimprimé le ${DateFormat('dd/MM/yyyy HH:mm').format(nowKinshasa())}',
+      );
     }
     bytes.addAll(_left);
     line(rule);
@@ -644,6 +646,12 @@ class PrinterService extends _$PrinterService {
     bytes.addAll([..._sizeOff, ..._boldOff]);
     line('Clôture de la journée');
     line('MELLIA RESTO');
+    final day = DateTime.tryParse(c['businessDay']?.toString() ?? '');
+    if (day != null) {
+      bytes.addAll(_boldOn);
+      line('Journée du ${DateFormat('EEEE d MMMM yyyy', 'fr').format(day)}');
+      bytes.addAll(_boldOff);
+    }
     bytes.addAll(_left);
     line(rule);
     line(_row('Du', fmt.format(d(c['periodStart']))));
@@ -654,10 +662,12 @@ class PrinterService extends _$PrinterService {
 
     line(_row('Fond de caisse', _fc(n(c['openingFloatCdf']))));
     final cashCount = c['salesCount'];
-    line(_row(
-      cashCount != null ? '+ Ventes cash ($cashCount)' : '+ Ventes cash',
-      _fc(n(c['salesCashCdf'])),
-    ));
+    line(
+      _row(
+        cashCount != null ? '+ Ventes cash ($cashCount)' : '+ Ventes cash',
+        _fc(n(c['salesCashCdf'])),
+      ),
+    );
     line(_row('- Dépenses caisse', _fc(n(c['expensesCdf']))));
     line(_row('- Achats caisse', _fc(n(c['purchasesCdf']))));
     bytes.addAll(_boldOn);

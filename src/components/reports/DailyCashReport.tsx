@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { AlertTriangle, CalendarDays, HandCoins, Loader2, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CLOSURE_STATUS, fc, type DayClosure } from "@/components/transactions/CashCountPanel";
+import { CLOSURE_STATUS, dayLabel, fc, type DayClosure } from "@/components/transactions/CashCountPanel";
 
 /** Current month in Kinshasa time (UTC+1), as YYYY-MM. */
 function currentMonth(): string {
@@ -146,12 +146,9 @@ export default function DailyCashReport() {
                                     return (
                                         <tr key={r.id} className="hover:bg-gray-50">
                                             <td className="px-3 py-2 whitespace-nowrap">
-                                                <p className="font-bold text-gray-800 capitalize">
-                                                    {format(new Date(r.periodEnd), "EEE d MMM", { locale: fr })}
-                                                </p>
+                                                <p className="font-bold text-gray-800 capitalize">{dayLabel(r.businessDay)}</p>
                                                 <p className="text-[10px] text-gray-400">
-                                                    {format(new Date(r.periodStart), "d MMM HH:mm", { locale: fr })} →{" "}
-                                                    {format(new Date(r.periodEnd), "HH:mm", { locale: fr })}
+                                                    Clôturée le {format(new Date(r.periodEnd), "d MMM HH:mm", { locale: fr })}
                                                 </p>
                                             </td>
                                             <td className="px-3 py-2 text-right text-gray-500">{fc(r.openingFloatCdf)}</td>

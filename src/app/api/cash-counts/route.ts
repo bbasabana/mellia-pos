@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/audit";
 import {
+  businessDay,
+  businessMonthRange,
   CASH_GAP_CATEGORY,
   ensureExpenseCategory,
   expectedCash,
@@ -24,6 +26,7 @@ function serialize(row: Row) {
     id: row.id,
     periodStart: row.periodStart,
     periodEnd: row.periodEnd,
+    businessDay: businessDay(row.periodEnd),
     salesCashCdf: Number(row.salesCashCdf),
     salesOtherCdf: Number(row.salesOtherCdf),
     expensesCdf: Number(row.expensesCdf),
@@ -57,13 +60,8 @@ export async function GET(req: NextRequest) {
     let monthFilter: Prisma.CashCountWhereInput = {};
     if (month && /^\d{4}-\d{2}$/.test(month)) {
       const [y, m] = month.split("-").map(Number);
-      // Months follow Kinshasa time (UTC+1).
-      monthFilter = {
-        periodEnd: {
-          gte: new Date(Date.UTC(y, m - 1, 1) - 3600_000),
-          lt: new Date(Date.UTC(y, m, 1) - 3600_000),
-        },
-      };
+      // By business day: the morning closure of the 1st still belongs to the previous month.
+      monthFilter = { periodEnd: businessMonthRange(y, m) };
     }
 
     const open = await getOpenDayPeriod();
@@ -114,6 +112,13 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const user = session?.user as SessionUser | undefined;
   if (!user?.id) return new NextResponse("Unauthorized", { status: 401 });
+  // The day is closed when the money is handed to the owner: by the manager or the admin.
+  if (!MANAGERS.includes(user.role ?? "")) {
+    return NextResponse.json(
+      { success: false, error: "La clôture de la journée est faite par le gérant ou l'administrateur" },
+      { status: 403 }
+    );
+  }
 
   try {
     const body = await req.json();
