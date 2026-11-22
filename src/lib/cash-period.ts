@@ -9,10 +9,13 @@ export type CashPeriodTotals = {
   totalSales: number;
   totalExpenses: number;
   totalPurchases: number;
+  /** Cash handed to the owner at day closures ("versements"); optional for older callers. */
+  totalWithdrawals?: number;
 };
 
 export type LastCashClosure = {
   id: string;
+  kind: "MONTH" | "OPENING";
   closedAt: Date;
   periodStart: Date;
   periodEnd: Date;
@@ -42,6 +45,7 @@ export async function getLastCashClosure(): Promise<LastCashClosure | null> {
 
   return {
     id: row.id,
+    kind: row.kind,
     closedAt: row.closedAt,
     periodStart: row.periodStart,
     periodEnd: row.periodEnd,
@@ -146,11 +150,13 @@ export function resolveTransactionsDateRange(
 export async function getCashPeriodTotals(range: CashPeriodRange): Promise<CashPeriodTotals> {
   const dateFilter = { gte: range.gte, lte: range.lte };
 
-  const [sales, expenses, purchases] = await Promise.all([
+  const [sales, expenses, purchases, withdrawals] = await Promise.all([
     prisma.sale.aggregate({
       where: {
         createdAt: dateFilter,
         status: "COMPLETED",
+        // Only cash lands in the till; card / mobile money go straight to the bank or wallet.
+        paymentMethod: "CASH",
       },
       _sum: { totalCdf: true },
     }),
@@ -168,12 +174,17 @@ export async function getCashPeriodTotals(range: CashPeriodRange): Promise<CashP
       },
       _sum: { totalAmountCdf: true },
     }),
+    prisma.cashCount.aggregate({
+      where: { periodEnd: dateFilter },
+      _sum: { withdrawalCdf: true },
+    }),
   ]);
 
   return {
     totalSales: toNum(sales._sum.totalCdf),
     totalExpenses: toNum(expenses._sum.amount),
     totalPurchases: toNum(purchases._sum.totalAmountCdf),
+    totalWithdrawals: toNum(withdrawals._sum.withdrawalCdf),
   };
 }
 
@@ -181,7 +192,13 @@ export function computeTheoreticalBalance(
   openingBalance: number,
   totals: CashPeriodTotals
 ): number {
-  return openingBalance + totals.totalSales - totals.totalExpenses - totals.totalPurchases;
+  return (
+    openingBalance +
+    totals.totalSales -
+    totals.totalExpenses -
+    totals.totalPurchases -
+    (totals.totalWithdrawals ?? 0)
+  );
 }
 
 export function formatClosureLabel(start: Date, end: Date): string {
@@ -209,4 +226,34 @@ export async function ensureAdjustmentCategoryId(): Promise<string> {
   }
 
   return category.id;
+}
+
+// ------------------------------------------------------------------ start date & archives
+
+/**
+ * Date de démarrage: the latest start-up (OPENING) closure. Everything before it is archived:
+ * kept, readable, but out of every total. Null until the start-up closure is done.
+ */
+export async function getStartDate(): Promise<Date | null> {
+  const row = await prisma.cashMonthClosure.findFirst({
+    where: { kind: "OPENING" },
+    orderBy: { closedAt: "desc" },
+    select: { closedAt: true },
+  });
+  return row?.closedAt ?? null;
+}
+
+/**
+ * Restricts a Prisma `where` to the current era (on/after the start date) or, with
+ * `archives`, to what came before it. Without a start date nothing is archived yet.
+ */
+export function withEra<W extends Record<string, unknown>>(
+  where: W,
+  field: string,
+  startDate: Date | null,
+  archives: boolean
+): W {
+  if (!startDate) return archives ? ({ AND: [where, { [field]: { lt: new Date(0) } }] } as unknown as W) : where;
+  const era = archives ? { [field]: { lt: startDate } } : { [field]: { gte: startDate } };
+  return { AND: [where, era] } as unknown as W;
 }

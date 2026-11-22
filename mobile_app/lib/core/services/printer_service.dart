@@ -317,6 +317,18 @@ class PrinterService extends _$PrinterService {
     }
   }
 
+  /// Prints the Z ticket of a day closure (a row of /api/cash-counts).
+  Future<void> printZTicket(Map<String, dynamic> closure) async {
+    await _load();
+    if (kind == PrinterKind.none) await autoConnect();
+    if (kind == PrinterKind.none) {
+      throw Exception('Aucune imprimante configurée (Paramètres > Imprimante)');
+    }
+    if (!await _send(_zBytes(closure))) {
+      throw Exception(lastError ?? 'Impression impossible');
+    }
+  }
+
   Future<bool> _send(List<int> bytes) async {
     lastError = null;
     switch (kind) {
@@ -593,6 +605,88 @@ class PrinterService extends _$PrinterService {
     bytes.addAll(_boldOff);
     line('Mangez comme chez vous');
     bytes.addAll(_left);
+    bytes.addAll(_cut);
+    return bytes;
+  }
+
+  static const _closureStatus = {
+    'BALANCED': 'Correct',
+    'TO_VERIFY': 'À vérifier',
+    'LOSS': 'Perte',
+    'JUSTIFIED': 'Justifié',
+  };
+
+  List<int> _zBytes(Map<String, dynamic> c) {
+    double n(Object? v) => double.tryParse(v?.toString() ?? '') ?? 0.0;
+    DateTime d(Object? v) =>
+        DateTime.tryParse(v?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    final fmt = DateFormat('dd/MM/yyyy HH:mm');
+    final rule = '-' * paperColumns;
+    final diff = n(c['differenceCdf']);
+    final withdrawal = n(c['withdrawalCdf']);
+    final counted = n(c['countedCdf']);
+
+    final bytes = <int>[..._init];
+    void line(String text) => bytes
+      ..addAll(_encode(text))
+      ..add(0x0A);
+
+    bytes.addAll([..._center, ..._boldOn, ..._bigOn]);
+    line('TICKET Z');
+    bytes.addAll([..._sizeOff, ..._boldOff]);
+    line('Clôture de la journée');
+    line('MELLIA RESTO');
+    bytes.addAll(_left);
+    line(rule);
+    line(_row('Du', fmt.format(d(c['periodStart']))));
+    line(_row('Au', fmt.format(d(c['periodEnd']))));
+    final by = c['userName']?.toString() ?? '';
+    if (by.isNotEmpty) line('Clôturé par : $by');
+    line(rule);
+
+    line(_row('Fond de caisse', _fc(n(c['openingFloatCdf']))));
+    final cashCount = c['salesCount'];
+    line(_row(
+      cashCount != null ? '+ Ventes cash ($cashCount)' : '+ Ventes cash',
+      _fc(n(c['salesCashCdf'])),
+    ));
+    line(_row('- Dépenses caisse', _fc(n(c['expensesCdf']))));
+    line(_row('- Achats caisse', _fc(n(c['purchasesCdf']))));
+    bytes.addAll(_boldOn);
+    line(_row('= Attendu', _fc(n(c['expectedCdf']))));
+    bytes.addAll(_boldOff);
+    line(rule);
+
+    bytes.addAll([..._boldOn, ..._tallOn]);
+    line(_row('COMPTÉ', _fc(counted)));
+    bytes.addAll([..._sizeOff, ..._boldOff]);
+    final gapLabel = diff == 0 ? 'Écart' : (diff < 0 ? 'Manquant' : 'Surplus');
+    bytes.addAll(_boldOn);
+    line(_row(gapLabel, diff == 0 ? '0 FC' : _fc(diff.abs())));
+    bytes.addAll(_boldOff);
+    final status = c['status']?.toString() ?? '';
+    line(_row('Statut', _closureStatus[status] ?? status));
+    line(rule);
+
+    if (withdrawal > 0) line(_row('Versé au patron', _fc(withdrawal)));
+    line(_row('Reste en caisse', _fc(counted - withdrawal)));
+    final other = n(c['salesOtherCdf']);
+    if (other > 0) {
+      line(_row('Hors cash (info)', _fc(other)));
+    }
+    final notes = c['notes']?.toString() ?? '';
+    if (notes.isNotEmpty) {
+      line(rule);
+      for (final l in _wrap('Note : $notes')) {
+        line(l);
+      }
+    }
+    line(rule);
+    line('Imprimé le ${fmt.format(DateTime.now())}');
+    bytes.add(0x0A);
+    line('Signature caissier :');
+    bytes.addAll([0x0A, 0x0A]);
+    line('Signature gérant :');
     bytes.addAll(_cut);
     return bytes;
   }

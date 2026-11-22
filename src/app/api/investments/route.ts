@@ -3,6 +3,8 @@ import { prisma, prismaUnpooled } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { FundSource, StockLocation } from "@prisma/client";
+import { getStartDate, withEra } from "@/lib/cash-period";
+import { closedDayRefusal } from "@/lib/cash-count";
 
 // GET: Fetch Investment Stats & History
 export async function GET(req: Request) {
@@ -55,7 +57,13 @@ export async function GET(req: Request) {
         else if (period === "month") startDate = startOfMonth;
         else if (period === "year") startDate = startOfYear;
 
-        const whereClause = startDate ? { date: { gte: startDate } } : {};
+        // Before the start date everything is archived: shown only with ?archives=1.
+        const whereClause = withEra(
+            startDate ? { date: { gte: startDate } } : {},
+            "date",
+            await getStartDate(),
+            searchParams.get("archives") === "1"
+        );
 
         // 1. Get investments with filtering
         const investments = await prisma.investment.findMany({
@@ -163,6 +171,12 @@ export async function POST(req: Request) {
             items, // Array of { productId, quantity, cost, isVendable }
             transportFee = 0 // Extract transport fee (default 0)
         } = body;
+
+        // A purchase paid from the till cannot land in a closed day (admins excepted).
+        if ((source || "OWNER_CAPITAL") === "CASH_REGISTER") {
+            const refusal = await closedDayRefusal(date ? new Date(date) : new Date(), (session.user as any)?.role);
+            if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
+        }
 
         // Validation Fix: Accept totalAmountCdf if totalAmount is missing
         if (!totalAmount && body.totalAmountCdf) {
@@ -359,6 +373,15 @@ export async function PUT(req: Request) {
 
         const body = await req.json();
         let { id, totalAmount, source, description, items, date, transportFee = 0 } = body;
+
+        {
+            const current = id ? await prisma.investment.findUnique({ where: { id }, select: { date: true, source: true } }) : null;
+            const role = (session.user as any)?.role;
+            const refusal =
+                (current?.source === "CASH_REGISTER" ? await closedDayRefusal(current.date, role) : null) ??
+                (source === "CASH_REGISTER" ? await closedDayRefusal(date ? new Date(date) : current?.date ?? new Date(), role) : null);
+            if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
+        }
 
         // Validation Fix: Accept totalAmountCdf if totalAmount is missing
         if (!totalAmount && body.totalAmountCdf) {
@@ -572,6 +595,10 @@ export async function DELETE(req: Request) {
         const existing = await prisma.investment.findUnique({ where: { id } });
         if (!existing) {
             return NextResponse.json({ error: "Investment not found" }, { status: 404 });
+        }
+        if (existing.source === "CASH_REGISTER") {
+            const refusal = await closedDayRefusal(existing.date, (session.user as any)?.role);
+            if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
         }
 
         await prismaUnpooled.$transaction(async (tx) => {

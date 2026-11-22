@@ -588,51 +588,62 @@ enum StockMovementType {
 }
 
 model CashMonthClosure {
-  id                    String   @id @default(cuid())
-  closedAt              DateTime @default(now())
+  id                    String          @id @default(cuid())
+  kind                  CashClosureKind @default(MONTH)
+  closedAt              DateTime        @default(now())
   periodStart           DateTime
   periodEnd             DateTime
   label                 String
-  totalSalesCdf         Decimal  @db.Decimal(15, 2)
-  totalExpensesCdf      Decimal  @db.Decimal(15, 2)
-  totalPurchasesCdf     Decimal  @db.Decimal(15, 2)
-  openingBalanceCdf     Decimal  @default(0) @db.Decimal(15, 2)
-  theoreticalBalanceCdf Decimal  @db.Decimal(15, 2)
-  closingBalanceCdf     Decimal  @db.Decimal(15, 2)
-  adjustmentCdf         Decimal  @default(0) @db.Decimal(15, 2)
+  totalSalesCdf         Decimal         @db.Decimal(15, 2)
+  totalExpensesCdf      Decimal         @db.Decimal(15, 2)
+  totalPurchasesCdf     Decimal         @db.Decimal(15, 2)
+  openingBalanceCdf     Decimal         @default(0) @db.Decimal(15, 2)
+  theoreticalBalanceCdf Decimal         @db.Decimal(15, 2)
+  closingBalanceCdf     Decimal         @db.Decimal(15, 2)
+  adjustmentCdf         Decimal         @default(0) @db.Decimal(15, 2)
   notes                 String?
   userId                String
-  user                  User     @relation(fields: [userId], references: [id])
+  user                  User            @relation(fields: [userId], references: [id])
 
   @@index([closedAt])
   @@map("cash_month_closures")
 }
 
-/// Cash count of a day: money actually counted vs what should be in the till.
+/// Day closure (Z): money counted vs what should be in the till since the previous closure.
+/// Sales up to periodEnd are locked; withdrawalCdf is the cash handed to the owner after counting.
 model CashCount {
-  id              String          @id @default(cuid())
-  periodStart     DateTime
-  periodEnd       DateTime
-  salesCashCdf    Decimal         @db.Decimal(15, 2)
-  salesOtherCdf   Decimal         @default(0) @db.Decimal(15, 2)
-  expensesCdf     Decimal         @default(0) @db.Decimal(15, 2)
-  purchasesCdf    Decimal         @default(0) @db.Decimal(15, 2)
-  openingFloatCdf Decimal         @default(0) @db.Decimal(15, 2)
-  expectedCdf     Decimal         @db.Decimal(15, 2)
-  countedCdf      Decimal         @db.Decimal(15, 2)
-  differenceCdf   Decimal         @db.Decimal(15, 2)
-  status          CashCountStatus @default(TO_VERIFY)
-  notes           String?
-  resolutionNote  String?
-  resolvedByName  String?
-  resolvedAt      DateTime?
-  userId          String
-  createdAt       DateTime        @default(now())
-  user            User            @relation(fields: [userId], references: [id])
+  id                  String          @id @default(cuid())
+  periodStart         DateTime
+  periodEnd           DateTime
+  salesCashCdf        Decimal         @db.Decimal(15, 2)
+  salesOtherCdf       Decimal         @default(0) @db.Decimal(15, 2)
+  expensesCdf         Decimal         @default(0) @db.Decimal(15, 2)
+  purchasesCdf        Decimal         @default(0) @db.Decimal(15, 2)
+  openingFloatCdf     Decimal         @default(0) @db.Decimal(15, 2)
+  expectedCdf         Decimal         @db.Decimal(15, 2)
+  countedCdf          Decimal         @db.Decimal(15, 2)
+  differenceCdf       Decimal         @db.Decimal(15, 2)
+  withdrawalCdf       Decimal         @default(0) @db.Decimal(15, 2)
+  settlementExpenseId String?
+  settlementCategory  String?
+  status              CashCountStatus @default(TO_VERIFY)
+  notes               String?
+  resolutionNote      String?
+  resolvedByName      String?
+  resolvedAt          DateTime?
+  userId              String
+  createdAt           DateTime        @default(now())
+  user                User            @relation(fields: [userId], references: [id])
 
   @@index([periodStart])
   @@index([status])
   @@map("cash_counts")
+}
+
+/// OPENING = start-up closure: everything before it is archived (date de démarrage).
+enum CashClosureKind {
+  MONTH
+  OPENING
 }
 
 enum CashCountStatus {

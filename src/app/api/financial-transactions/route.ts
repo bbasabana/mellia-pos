@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { getStartDate, withEra } from "@/lib/cash-period";
 
 export async function GET(req: NextRequest) {
     try {
@@ -36,9 +37,11 @@ export async function GET(req: NextRequest) {
             };
         }
 
+        const eraWhere = withEra(where, "createdAt", await getStartDate(), searchParams.get("archives") === "1");
+
         const [transactions, total] = await Promise.all([
             prisma.financialTransaction.findMany({
-                where,
+                where: eraWhere,
                 include: {
                     user: { select: { name: true } },
                     sale: { select: { ticketNum: true, clientId: true, client: { select: { name: true } } } }
@@ -47,7 +50,7 @@ export async function GET(req: NextRequest) {
                 skip,
                 take: limit,
             }),
-            prisma.financialTransaction.count({ where }),
+            prisma.financialTransaction.count({ where: eraWhere }),
         ]);
 
         return NextResponse.json({

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { startOfDay, endOfDay, subDays, startOfWeek, startOfMonth, startOfYear } from "date-fns";
+import { getStartDate } from "@/lib/cash-period";
 
 export async function GET(req: Request) {
     try {
@@ -35,6 +36,16 @@ export async function GET(req: Request) {
                     break;
                 default:
                     startDate = new Date(0); // Beginning of time
+            }
+        }
+
+        // Reports start at the start date (date de démarrage); older data is archived.
+        const eraStart = await getStartDate();
+        if (eraStart) {
+            if (searchParams.get("archives") === "1") {
+                endDate = new Date(Math.min(endDate.getTime(), eraStart.getTime() - 1));
+            } else if (startDate < eraStart) {
+                startDate = eraStart;
             }
         }
 
