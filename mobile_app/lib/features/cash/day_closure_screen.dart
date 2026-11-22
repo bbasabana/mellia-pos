@@ -1,3 +1,4 @@
+import 'package:mellia_pos_mobile/core/services/business_time.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,8 +38,8 @@ String _fc(num v) {
 int _digits(String s) => int.tryParse(s.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
 String _when(Object? iso) {
-  final d = DateTime.tryParse(iso?.toString() ?? '')?.toLocal();
-  return d == null ? '' : DateFormat('EEE d MMM HH:mm', 'fr').format(d);
+  if (DateTime.tryParse(iso?.toString() ?? '') == null) return '';
+  return DateFormat('EEE d MMM HH:mm', 'fr').format(kinshasaFrom(iso));
 }
 
 const _statusLabels = {

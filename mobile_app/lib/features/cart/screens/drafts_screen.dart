@@ -1,3 +1,4 @@
+import 'package:mellia_pos_mobile/core/services/business_time.dart';
 import 'package:flutter/material.dart';
 import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
 import 'package:mellia_pos_mobile/shared/widgets/motion.dart';
@@ -74,7 +75,7 @@ class DraftsScreen extends ConsumerWidget {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
-                          "${items.length} articles • ${dateFormat.format(draft.createdAt)}",
+                          "${items.length} articles • ${dateFormat.format(toKinshasa(draft.createdAt))}",
                         ),
                         trailing: Column(
                           mainAxisAlignment: MainAxisAlignment.center,

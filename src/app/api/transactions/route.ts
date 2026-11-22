@@ -76,9 +76,13 @@ export async function GET(req: NextRequest) {
             }
             where.createdAt = { gte: start };
         } else if (startDate && endDate) {
+            // A full timestamp (the mobile app sends the local day bounds) is taken as is;
+            // a bare date covers that whole day.
             where.createdAt = {
                 gte: new Date(startDate),
-                lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+                lte: endDate.includes("T")
+                    ? new Date(endDate)
+                    : new Date(new Date(endDate).setHours(23, 59, 59, 999)),
             };
         } else if (startDate) {
             where.createdAt = {

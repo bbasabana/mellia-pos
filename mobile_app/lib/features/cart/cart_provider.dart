@@ -85,7 +85,7 @@ class CartNotifier extends _$CartNotifier {
 
   /// Adds one [product] at the [price] the cashier picked (Terrasse, VIP...).
   /// Without a price, the product's only price is used.
-  void addItem(Product product, {ProductPrice? price}) {
+  void addItem(Product product, {ProductPrice? price, int quantity = 1}) {
     final p =
         price ?? (product.prices.isNotEmpty ? product.prices.first : null);
     final priceUsd = p?.priceUsd ?? product.priceUsd ?? 0;
@@ -97,7 +97,7 @@ class CartNotifier extends _$CartNotifier {
         ...state.items,
         key: CartItem(
           product: product,
-          quantity: (state.items[key]?.quantity ?? 0) + 1,
+          quantity: (state.items[key]?.quantity ?? 0) + quantity,
           unitPriceUsd: priceUsd,
           unitPriceCdf: priceCdf,
           spaceId: p?.spaceId,

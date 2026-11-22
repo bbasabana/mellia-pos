@@ -1,3 +1,4 @@
+import 'package:mellia_pos_mobile/core/services/business_time.dart';
 import 'package:dio/dio.dart';
 import 'package:mellia_pos_mobile/core/api/api_provider.dart';
 import 'package:mellia_pos_mobile/core/constants/api_constants.dart';
@@ -104,6 +105,7 @@ class SalesRepository {
     }
   }
 
+  /// Sales of a status (drafts screen), newest first.
   Future<List<dynamic>> getTransactions({
     String status = "COMPLETED",
     String? startDate,
@@ -124,6 +126,64 @@ class SalesRepository {
       return [];
     }
   }
+
+  /// One page of completed sales for a local day, newest first, with the day's totals
+  /// (computed by the server over the whole day, not just this page).
+  Future<SalesPage> getSalesPage({
+    required DateTime day,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final (start, end) = kinshasaDayBounds(day);
+    try {
+      final res = await _dio.get(
+        ApiConstants.transactions,
+        queryParameters: {
+          'status': 'COMPLETED',
+          'page': page,
+          'limit': limit,
+          'startDate': start.toUtc().toIso8601String(),
+          'endDate': end.toUtc().toIso8601String(),
+        },
+      );
+      final body = res.data;
+      if (body is! Map || body['success'] == false) {
+        throw Exception(body is Map ? body['error'] : 'Réponse inattendue');
+      }
+      double n(Object? v) => double.tryParse(v?.toString() ?? '') ?? 0;
+      final summary = (body['summary'] as Map?) ?? const {};
+      final pagination = (body['pagination'] as Map?) ?? const {};
+      return SalesPage(
+        items: List<Map<String, dynamic>>.from(
+          (body['data'] as List? ?? []).map(
+            (e) => Map<String, dynamic>.from(e as Map),
+          ),
+        ),
+        total: (pagination['total'] as num?)?.toInt() ?? 0,
+        totalPages: (pagination['totalPages'] as num?)?.toInt() ?? 1,
+        totalCdf: n(summary['totalCdf']),
+        totalUsd: n(summary['totalUsd']),
+      );
+    } catch (e) {
+      throw Exception("Historique indisponible : ${_reason(e)}");
+    }
+  }
+}
+
+class SalesPage {
+  final List<Map<String, dynamic>> items;
+  final int total;
+  final int totalPages;
+  final double totalCdf;
+  final double totalUsd;
+
+  const SalesPage({
+    required this.items,
+    required this.total,
+    required this.totalPages,
+    required this.totalCdf,
+    required this.totalUsd,
+  });
 }
 
 @riverpod
@@ -131,21 +191,3 @@ Future<SalesRepository> salesRepository(SalesRepositoryRef ref) async {
   final dio = await ref.watch(dioProvider.future);
   return SalesRepository(dio);
 }
-
-final transactionsProvider = FutureProvider.family<List<dynamic>, String>((
-  ref,
-  queryKey,
-) async {
-  // queryKey format: "startDate|endDate|status"
-  final parts = queryKey.split('|');
-  final startDate = parts[0];
-  final endDate = parts[1];
-  final status = parts[2];
-
-  final repo = await ref.watch(salesRepositoryProvider.future);
-  return repo.getTransactions(
-    status: status,
-    startDate: startDate,
-    endDate: endDate,
-  );
-});
