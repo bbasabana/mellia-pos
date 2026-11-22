@@ -24,7 +24,7 @@ Map<String, dynamic> _$DeliveryInfoToJson(_DeliveryInfo instance) =>
 // RiverpodGenerator
 // **************************************************************************
 
-String _$cartNotifierHash() => r'cd522515b9cac47df8c2870e6cd18e494652e88d';
+String _$cartNotifierHash() => r'4d921484b8e377ba6a8639e9063c2549bfd03f8a';
 
 /// See also [CartNotifier].
 @ProviderFor(CartNotifier)

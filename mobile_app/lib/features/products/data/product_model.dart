@@ -56,22 +56,25 @@ abstract class Product with _$Product {
       _$ProductFromJson(json);
 }
 
+Object? _readSpaceId(Map json, String key) =>
+    json['spaceId'] ?? (json['space'] is Map ? json['space']['id'] : null);
+Object? _readSpaceName(Map json, String key) =>
+    json['spaceName'] ?? (json['space'] is Map ? json['space']['name'] : null);
+
+/// One selling price of a product, for one sale space (Terrasse, VIP...).
 @freezed
 abstract class ProductPrice with _$ProductPrice {
   const factory ProductPrice({
     required String id,
-    required String spaceId,
+    @JsonKey(readValue: _readSpaceId) required String spaceId,
+    @JsonKey(readValue: _readSpaceName) String? spaceName,
     @JsonKey(fromJson: toDouble) required double priceUsd,
     @JsonKey(fromJson: toDouble) required double priceCdf,
     @Default('BOTTLE') String forUnit,
   }) = _ProductPrice;
 
-  factory ProductPrice.fromJson(Map<String, dynamic> json) {
-    if (json['spaceId'] == null && json['space'] != null) {
-      json['spaceId'] = json['space']['id'];
-    }
-    return _$ProductPriceFromJson(json);
-  }
+  factory ProductPrice.fromJson(Map<String, dynamic> json) =>
+      _$ProductPriceFromJson(json);
 }
 
 @freezed

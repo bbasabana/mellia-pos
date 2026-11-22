@@ -14,10 +14,17 @@ abstract class CartItem with _$CartItem {
     required int quantity,
     required double unitPriceUsd,
     required double unitPriceCdf,
+    String? spaceId,
+    String? spaceName, // "Terrasse", "VIP"...
   }) = _CartItem;
 
   // Computed properties helpers
   const CartItem._();
+
+  /// A product sold at Terrasse and at VIP makes two separate lines.
+  static String keyFor(String productId, String? spaceId, double priceCdf) =>
+      '$productId@${spaceId ?? priceCdf.round()}';
+  String get key => keyFor(product.id, spaceId, unitPriceCdf);
   double get totalUsd => unitPriceUsd * quantity;
   double get totalCdf => unitPriceCdf * quantity;
 }
@@ -76,47 +83,54 @@ class CartNotifier extends _$CartNotifier {
     state = state.copyWith(deliveryInfo: info, orderType: 'DELIVERY');
   }
 
-  void addItem(Product product) {
-    // Determine price based on context (e.g. SaleSpace). For MVP we take the first price or 0.
-    // Ideally we need to know the 'Selected Sale Space'.
-    // For now, we pick: first price found, or 0.
-    double priceUsd = 0;
-    double priceCdf = 0;
-
-    if (product.prices.isNotEmpty) {
-      // Take first price
-      priceUsd = product.prices.first.priceUsd;
-      priceCdf = product.prices.first.priceCdf;
-    } else {
-      // Fallback to flattened fields if API provided them
-      priceUsd = product.priceUsd ?? 0;
-      priceCdf = product.priceCdf ?? 0;
-    }
+  /// Adds one [product] at the [price] the cashier picked (Terrasse, VIP...).
+  /// Without a price, the product's only price is used.
+  void addItem(Product product, {ProductPrice? price}) {
+    final p =
+        price ?? (product.prices.isNotEmpty ? product.prices.first : null);
+    final priceUsd = p?.priceUsd ?? product.priceUsd ?? 0;
+    final priceCdf = p?.priceCdf ?? product.priceCdf ?? 0;
+    final key = CartItem.keyFor(product.id, p?.spaceId, priceCdf);
 
     state = state.copyWith(
       items: {
         ...state.items,
-        product.id: CartItem(
+        key: CartItem(
           product: product,
-          quantity: (state.items[product.id]?.quantity ?? 0) + 1,
+          quantity: (state.items[key]?.quantity ?? 0) + 1,
           unitPriceUsd: priceUsd,
           unitPriceCdf: priceCdf,
+          spaceId: p?.spaceId,
+          spaceName: p?.spaceName,
         ),
       },
     );
   }
 
-  void removeItem(String productId) {
-    final currentQty = state.items[productId]?.quantity ?? 0;
+  /// One more of an existing cart line (same product, same space and price).
+  void increment(String key) {
+    final item = state.items[key];
+    if (item == null) return;
+    state = state.copyWith(
+      items: {
+        ...state.items,
+        key: item.copyWith(quantity: item.quantity + 1),
+      },
+    );
+  }
+
+  /// One less of a cart line; the line goes away at zero.
+  void removeItem(String key) {
+    final currentQty = state.items[key]?.quantity ?? 0;
     if (currentQty <= 1) {
       final newItems = Map<String, CartItem>.from(state.items);
-      newItems.remove(productId);
+      newItems.remove(key);
       state = state.copyWith(items: newItems);
     } else {
       state = state.copyWith(
         items: {
           ...state.items,
-          productId: state.items[productId]!.copyWith(quantity: currentQty - 1),
+          key: state.items[key]!.copyWith(quantity: currentQty - 1),
         },
       );
     }

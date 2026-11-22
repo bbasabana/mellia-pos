@@ -155,14 +155,23 @@ class DraftsScreen extends ConsumerWidget {
       final product = Product.fromJson(
         productJson,
       ); // Ensure Product.fromJson exists
-      final productId = product.id;
-
-      items[productId] = CartItem(
+      final unitCdf = double.tryParse(i['unitPriceCdf'].toString()) ?? 0.0;
+      // The sale keeps the price, not the space: find the space whose price matches.
+      final match = product.prices
+          .where((p) => p.priceCdf.round() == unitCdf.round())
+          .firstOrNull;
+      final item = CartItem(
         product: product,
         quantity: int.tryParse(i['quantity'].toString()) ?? 1,
         unitPriceUsd: double.tryParse(i['unitPrice'].toString()) ?? 0.0,
-        unitPriceCdf: double.tryParse(i['unitPriceCdf'].toString()) ?? 0.0,
+        unitPriceCdf: unitCdf,
+        spaceId: match?.spaceId,
+        spaceName: match?.spaceName,
       );
+      final existing = items[item.key];
+      items[item.key] = existing == null
+          ? item
+          : existing.copyWith(quantity: existing.quantity + item.quantity);
     }
 
     return CartState(

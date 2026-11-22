@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
+import 'package:mellia_pos_mobile/features/products/widgets/price_choice_sheet.dart';
 import 'package:mellia_pos_mobile/features/cart/cart_provider.dart';
 import 'package:mellia_pos_mobile/features/cart/drafts_provider.dart';
 import 'package:mellia_pos_mobile/core/services/notification_service.dart';
@@ -34,7 +35,7 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
     // 1. Handle Deletions
     for (int i = 0; i < _displayedItems.length; i++) {
       final item = _displayedItems[i];
-      if (!newItems.any((ni) => ni.product.id == item.product.id)) {
+      if (!newItems.any((ni) => ni.key == item.key)) {
         final removedItem = _displayedItems[i];
         setState(() {
           _displayedItems.removeAt(i);
@@ -50,9 +51,7 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
 
     // 2. Handle Additions & Updates
     for (var ni in newItems) {
-      final existsIndex = _displayedItems.indexWhere(
-        (di) => di.product.id == ni.product.id,
-      );
+      final existsIndex = _displayedItems.indexWhere((di) => di.key == ni.key);
       if (existsIndex == -1) {
         setState(() {
           _displayedItems.add(ni);
@@ -374,7 +373,7 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
       child: FadeTransition(
         opacity: animation,
         child: Slidable(
-          key: ValueKey(item.product.id),
+          key: ValueKey(item.key),
           endActionPane: ActionPane(
             motion: const ScrollMotion(),
             extentRatio: 0.25,
@@ -382,7 +381,7 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
               SlidableAction(
                 onPressed: (context) => ref
                     .read(cartNotifierProvider.notifier)
-                    .removeItem(item.product.id),
+                    .removeItem(item.key),
                 backgroundColor: Colors.redAccent,
                 foregroundColor: Colors.white,
                 icon: Icons.delete_outline,
@@ -403,14 +402,24 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        item.product.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              item.product.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (item.spaceName != null) ...[
+                            const SizedBox(width: 6),
+                            SpaceBadge(item.spaceName!),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -459,9 +468,7 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
         children: [
           _qtyIcon(
             Icons.remove,
-            () => ref
-                .read(cartNotifierProvider.notifier)
-                .removeItem(item.product.id),
+            () => ref.read(cartNotifierProvider.notifier).removeItem(item.key),
           ),
           SizedBox(
             width: 30,
@@ -477,7 +484,7 @@ class _CartWidgetState extends ConsumerState<CartWidget> {
           ),
           _qtyIcon(
             Icons.add,
-            () => ref.read(cartNotifierProvider.notifier).addItem(item.product),
+            () => ref.read(cartNotifierProvider.notifier).increment(item.key),
           ),
         ],
       ),
