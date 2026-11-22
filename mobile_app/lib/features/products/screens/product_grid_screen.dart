@@ -5,6 +5,7 @@ import 'package:mellia_pos_mobile/core/theme/app_theme.dart';
 import 'package:mellia_pos_mobile/features/cart/cart_provider.dart';
 import 'package:mellia_pos_mobile/features/products/data/product_model.dart';
 import 'package:mellia_pos_mobile/features/products/data/product_repository.dart';
+import 'package:mellia_pos_mobile/features/products/widgets/price_choice_sheet.dart';
 import 'package:mellia_pos_mobile/shared/widgets/motion.dart';
 
 final _fc = NumberFormat.decimalPattern('fr');
@@ -353,12 +354,13 @@ class _ProductCard extends ConsumerWidget {
     final isOutOfStock = product.isOutOfStock && isDrink;
     final accent = isDrink ? AppTheme.cyanDark : AppTheme.brandOrange;
     final tint = isDrink ? const Color(0xFFECFCFF) : const Color(0xFFFFF4ED);
-    final price = product.prices.isNotEmpty ? product.prices.first : null;
+    final sorted = [...product.prices]
+      ..sort((a, b) => a.priceCdf.compareTo(b.priceCdf));
+    final price = sorted.isNotEmpty ? sorted.first : null;
+    final choices = sorted.length;
 
     return Pressable(
-      onTap: isOutOfStock
-          ? null
-          : () => ref.read(cartNotifierProvider.notifier).addItem(product),
+      onTap: isOutOfStock ? null : () => _add(context, ref),
       child: AnimatedOpacity(
         duration: AppTheme.fast,
         opacity: isOutOfStock ? 0.55 : 1,
@@ -460,11 +462,15 @@ class _ProductCard extends ConsumerWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '\$${price.priceUsd.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: AppTheme.muted,
+                            choices > 1
+                                ? '$choices prix'
+                                : '\$${price.priceUsd.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: choices > 1
+                                  ? AppTheme.brandOrange
+                                  : AppTheme.muted,
                               fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
@@ -482,5 +488,22 @@ class _ProductCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// One price: straight into the cart. Several (Terrasse, VIP...): the cashier picks one.
+  Future<void> _add(BuildContext context, WidgetRef ref) async {
+    final cart = ref.read(cartNotifierProvider.notifier);
+    if (product.prices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${product.name} n'a pas de prix défini.")),
+      );
+      return;
+    }
+    if (product.prices.length == 1) {
+      cart.addItem(product, price: product.prices.first);
+      return;
+    }
+    final picked = await showPriceChoice(context, product);
+    if (picked != null) cart.addItem(product, price: picked);
   }
 }

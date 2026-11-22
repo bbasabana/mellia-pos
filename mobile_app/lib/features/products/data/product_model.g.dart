@@ -57,7 +57,8 @@ Map<String, dynamic> _$ProductToJson(_Product instance) => <String, dynamic>{
 _ProductPrice _$ProductPriceFromJson(Map<String, dynamic> json) =>
     _ProductPrice(
       id: json['id'] as String,
-      spaceId: json['spaceId'] as String,
+      spaceId: _readSpaceId(json, 'spaceId') as String,
+      spaceName: _readSpaceName(json, 'spaceName') as String?,
       priceUsd: toDouble(json['priceUsd']),
       priceCdf: toDouble(json['priceCdf']),
       forUnit: json['forUnit'] as String? ?? 'BOTTLE',
@@ -67,6 +68,7 @@ Map<String, dynamic> _$ProductPriceToJson(_ProductPrice instance) =>
     <String, dynamic>{
       'id': instance.id,
       'spaceId': instance.spaceId,
+      'spaceName': instance.spaceName,
       'priceUsd': instance.priceUsd,
       'priceCdf': instance.priceCdf,
       'forUnit': instance.forUnit,

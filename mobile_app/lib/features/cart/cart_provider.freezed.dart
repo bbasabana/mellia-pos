@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$CartItem {
 
- Product get product; int get quantity; double get unitPriceUsd; double get unitPriceCdf;
+ Product get product; int get quantity; double get unitPriceUsd; double get unitPriceCdf; String? get spaceId; String? get spaceName;
 /// Create a copy of CartItem
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $CartItemCopyWith<CartItem> get copyWith => _$CartItemCopyWithImpl<CartItem>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CartItem&&(identical(other.product, product) || other.product == product)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unitPriceUsd, unitPriceUsd) || other.unitPriceUsd == unitPriceUsd)&&(identical(other.unitPriceCdf, unitPriceCdf) || other.unitPriceCdf == unitPriceCdf));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CartItem&&(identical(other.product, product) || other.product == product)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unitPriceUsd, unitPriceUsd) || other.unitPriceUsd == unitPriceUsd)&&(identical(other.unitPriceCdf, unitPriceCdf) || other.unitPriceCdf == unitPriceCdf)&&(identical(other.spaceId, spaceId) || other.spaceId == spaceId)&&(identical(other.spaceName, spaceName) || other.spaceName == spaceName));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,product,quantity,unitPriceUsd,unitPriceCdf);
+int get hashCode => Object.hash(runtimeType,product,quantity,unitPriceUsd,unitPriceCdf,spaceId,spaceName);
 
 @override
 String toString() {
-  return 'CartItem(product: $product, quantity: $quantity, unitPriceUsd: $unitPriceUsd, unitPriceCdf: $unitPriceCdf)';
+  return 'CartItem(product: $product, quantity: $quantity, unitPriceUsd: $unitPriceUsd, unitPriceCdf: $unitPriceCdf, spaceId: $spaceId, spaceName: $spaceName)';
 }
 
 
@@ -45,7 +45,7 @@ abstract mixin class $CartItemCopyWith<$Res>  {
   factory $CartItemCopyWith(CartItem value, $Res Function(CartItem) _then) = _$CartItemCopyWithImpl;
 @useResult
 $Res call({
- Product product, int quantity, double unitPriceUsd, double unitPriceCdf
+ Product product, int quantity, double unitPriceUsd, double unitPriceCdf, String? spaceId, String? spaceName
 });
 
 
@@ -62,13 +62,15 @@ class _$CartItemCopyWithImpl<$Res>
 
 /// Create a copy of CartItem
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? product = null,Object? quantity = null,Object? unitPriceUsd = null,Object? unitPriceCdf = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? product = null,Object? quantity = null,Object? unitPriceUsd = null,Object? unitPriceCdf = null,Object? spaceId = freezed,Object? spaceName = freezed,}) {
   return _then(_self.copyWith(
 product: null == product ? _self.product : product // ignore: cast_nullable_to_non_nullable
 as Product,quantity: null == quantity ? _self.quantity : quantity // ignore: cast_nullable_to_non_nullable
 as int,unitPriceUsd: null == unitPriceUsd ? _self.unitPriceUsd : unitPriceUsd // ignore: cast_nullable_to_non_nullable
 as double,unitPriceCdf: null == unitPriceCdf ? _self.unitPriceCdf : unitPriceCdf // ignore: cast_nullable_to_non_nullable
-as double,
+as double,spaceId: freezed == spaceId ? _self.spaceId : spaceId // ignore: cast_nullable_to_non_nullable
+as String?,spaceName: freezed == spaceName ? _self.spaceName : spaceName // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 /// Create a copy of CartItem
@@ -162,10 +164,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Product product,  int quantity,  double unitPriceUsd,  double unitPriceCdf)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Product product,  int quantity,  double unitPriceUsd,  double unitPriceCdf,  String? spaceId,  String? spaceName)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CartItem() when $default != null:
-return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceCdf);case _:
+return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceCdf,_that.spaceId,_that.spaceName);case _:
   return orElse();
 
 }
@@ -183,10 +185,10 @@ return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceC
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Product product,  int quantity,  double unitPriceUsd,  double unitPriceCdf)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Product product,  int quantity,  double unitPriceUsd,  double unitPriceCdf,  String? spaceId,  String? spaceName)  $default,) {final _that = this;
 switch (_that) {
 case _CartItem():
-return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceCdf);case _:
+return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceCdf,_that.spaceId,_that.spaceName);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +205,10 @@ return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceC
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Product product,  int quantity,  double unitPriceUsd,  double unitPriceCdf)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Product product,  int quantity,  double unitPriceUsd,  double unitPriceCdf,  String? spaceId,  String? spaceName)?  $default,) {final _that = this;
 switch (_that) {
 case _CartItem() when $default != null:
-return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceCdf);case _:
+return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceCdf,_that.spaceId,_that.spaceName);case _:
   return null;
 
 }
@@ -218,13 +220,15 @@ return $default(_that.product,_that.quantity,_that.unitPriceUsd,_that.unitPriceC
 
 
 class _CartItem extends CartItem {
-  const _CartItem({required this.product, required this.quantity, required this.unitPriceUsd, required this.unitPriceCdf}): super._();
+  const _CartItem({required this.product, required this.quantity, required this.unitPriceUsd, required this.unitPriceCdf, this.spaceId, this.spaceName}): super._();
   
 
 @override final  Product product;
 @override final  int quantity;
 @override final  double unitPriceUsd;
 @override final  double unitPriceCdf;
+@override final  String? spaceId;
+@override final  String? spaceName;
 
 /// Create a copy of CartItem
 /// with the given fields replaced by the non-null parameter values.
@@ -236,16 +240,16 @@ _$CartItemCopyWith<_CartItem> get copyWith => __$CartItemCopyWithImpl<_CartItem>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CartItem&&(identical(other.product, product) || other.product == product)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unitPriceUsd, unitPriceUsd) || other.unitPriceUsd == unitPriceUsd)&&(identical(other.unitPriceCdf, unitPriceCdf) || other.unitPriceCdf == unitPriceCdf));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CartItem&&(identical(other.product, product) || other.product == product)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unitPriceUsd, unitPriceUsd) || other.unitPriceUsd == unitPriceUsd)&&(identical(other.unitPriceCdf, unitPriceCdf) || other.unitPriceCdf == unitPriceCdf)&&(identical(other.spaceId, spaceId) || other.spaceId == spaceId)&&(identical(other.spaceName, spaceName) || other.spaceName == spaceName));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,product,quantity,unitPriceUsd,unitPriceCdf);
+int get hashCode => Object.hash(runtimeType,product,quantity,unitPriceUsd,unitPriceCdf,spaceId,spaceName);
 
 @override
 String toString() {
-  return 'CartItem(product: $product, quantity: $quantity, unitPriceUsd: $unitPriceUsd, unitPriceCdf: $unitPriceCdf)';
+  return 'CartItem(product: $product, quantity: $quantity, unitPriceUsd: $unitPriceUsd, unitPriceCdf: $unitPriceCdf, spaceId: $spaceId, spaceName: $spaceName)';
 }
 
 
@@ -256,7 +260,7 @@ abstract mixin class _$CartItemCopyWith<$Res> implements $CartItemCopyWith<$Res>
   factory _$CartItemCopyWith(_CartItem value, $Res Function(_CartItem) _then) = __$CartItemCopyWithImpl;
 @override @useResult
 $Res call({
- Product product, int quantity, double unitPriceUsd, double unitPriceCdf
+ Product product, int quantity, double unitPriceUsd, double unitPriceCdf, String? spaceId, String? spaceName
 });
 
 
@@ -273,13 +277,15 @@ class __$CartItemCopyWithImpl<$Res>
 
 /// Create a copy of CartItem
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? product = null,Object? quantity = null,Object? unitPriceUsd = null,Object? unitPriceCdf = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? product = null,Object? quantity = null,Object? unitPriceUsd = null,Object? unitPriceCdf = null,Object? spaceId = freezed,Object? spaceName = freezed,}) {
   return _then(_CartItem(
 product: null == product ? _self.product : product // ignore: cast_nullable_to_non_nullable
 as Product,quantity: null == quantity ? _self.quantity : quantity // ignore: cast_nullable_to_non_nullable
 as int,unitPriceUsd: null == unitPriceUsd ? _self.unitPriceUsd : unitPriceUsd // ignore: cast_nullable_to_non_nullable
 as double,unitPriceCdf: null == unitPriceCdf ? _self.unitPriceCdf : unitPriceCdf // ignore: cast_nullable_to_non_nullable
-as double,
+as double,spaceId: freezed == spaceId ? _self.spaceId : spaceId // ignore: cast_nullable_to_non_nullable
+as String?,spaceName: freezed == spaceName ? _self.spaceName : spaceName // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

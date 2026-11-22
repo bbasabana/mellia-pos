@@ -368,7 +368,7 @@ as List<StockItem>,
 /// @nodoc
 mixin _$ProductPrice {
 
- String get id; String get spaceId;@JsonKey(fromJson: toDouble) double get priceUsd;@JsonKey(fromJson: toDouble) double get priceCdf; String get forUnit;
+ String get id;@JsonKey(readValue: _readSpaceId) String get spaceId;@JsonKey(readValue: _readSpaceName) String? get spaceName;@JsonKey(fromJson: toDouble) double get priceUsd;@JsonKey(fromJson: toDouble) double get priceCdf; String get forUnit;
 /// Create a copy of ProductPrice
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -381,16 +381,16 @@ $ProductPriceCopyWith<ProductPrice> get copyWith => _$ProductPriceCopyWithImpl<P
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProductPrice&&(identical(other.id, id) || other.id == id)&&(identical(other.spaceId, spaceId) || other.spaceId == spaceId)&&(identical(other.priceUsd, priceUsd) || other.priceUsd == priceUsd)&&(identical(other.priceCdf, priceCdf) || other.priceCdf == priceCdf)&&(identical(other.forUnit, forUnit) || other.forUnit == forUnit));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProductPrice&&(identical(other.id, id) || other.id == id)&&(identical(other.spaceId, spaceId) || other.spaceId == spaceId)&&(identical(other.spaceName, spaceName) || other.spaceName == spaceName)&&(identical(other.priceUsd, priceUsd) || other.priceUsd == priceUsd)&&(identical(other.priceCdf, priceCdf) || other.priceCdf == priceCdf)&&(identical(other.forUnit, forUnit) || other.forUnit == forUnit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,spaceId,priceUsd,priceCdf,forUnit);
+int get hashCode => Object.hash(runtimeType,id,spaceId,spaceName,priceUsd,priceCdf,forUnit);
 
 @override
 String toString() {
-  return 'ProductPrice(id: $id, spaceId: $spaceId, priceUsd: $priceUsd, priceCdf: $priceCdf, forUnit: $forUnit)';
+  return 'ProductPrice(id: $id, spaceId: $spaceId, spaceName: $spaceName, priceUsd: $priceUsd, priceCdf: $priceCdf, forUnit: $forUnit)';
 }
 
 
@@ -401,7 +401,7 @@ abstract mixin class $ProductPriceCopyWith<$Res>  {
   factory $ProductPriceCopyWith(ProductPrice value, $Res Function(ProductPrice) _then) = _$ProductPriceCopyWithImpl;
 @useResult
 $Res call({
- String id, String spaceId,@JsonKey(fromJson: toDouble) double priceUsd,@JsonKey(fromJson: toDouble) double priceCdf, String forUnit
+ String id,@JsonKey(readValue: _readSpaceId) String spaceId,@JsonKey(readValue: _readSpaceName) String? spaceName,@JsonKey(fromJson: toDouble) double priceUsd,@JsonKey(fromJson: toDouble) double priceCdf, String forUnit
 });
 
 
@@ -418,11 +418,12 @@ class _$ProductPriceCopyWithImpl<$Res>
 
 /// Create a copy of ProductPrice
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? spaceId = null,Object? priceUsd = null,Object? priceCdf = null,Object? forUnit = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? spaceId = null,Object? spaceName = freezed,Object? priceUsd = null,Object? priceCdf = null,Object? forUnit = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,spaceId: null == spaceId ? _self.spaceId : spaceId // ignore: cast_nullable_to_non_nullable
-as String,priceUsd: null == priceUsd ? _self.priceUsd : priceUsd // ignore: cast_nullable_to_non_nullable
+as String,spaceName: freezed == spaceName ? _self.spaceName : spaceName // ignore: cast_nullable_to_non_nullable
+as String?,priceUsd: null == priceUsd ? _self.priceUsd : priceUsd // ignore: cast_nullable_to_non_nullable
 as double,priceCdf: null == priceCdf ? _self.priceCdf : priceCdf // ignore: cast_nullable_to_non_nullable
 as double,forUnit: null == forUnit ? _self.forUnit : forUnit // ignore: cast_nullable_to_non_nullable
 as String,
@@ -510,10 +511,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String spaceId, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id, @JsonKey(readValue: _readSpaceId)  String spaceId, @JsonKey(readValue: _readSpaceName)  String? spaceName, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProductPrice() when $default != null:
-return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
+return $default(_that.id,_that.spaceId,_that.spaceName,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
   return orElse();
 
 }
@@ -531,10 +532,10 @@ return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUn
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String spaceId, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id, @JsonKey(readValue: _readSpaceId)  String spaceId, @JsonKey(readValue: _readSpaceName)  String? spaceName, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)  $default,) {final _that = this;
 switch (_that) {
 case _ProductPrice():
-return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
+return $default(_that.id,_that.spaceId,_that.spaceName,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -551,10 +552,10 @@ return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUn
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String spaceId, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id, @JsonKey(readValue: _readSpaceId)  String spaceId, @JsonKey(readValue: _readSpaceName)  String? spaceName, @JsonKey(fromJson: toDouble)  double priceUsd, @JsonKey(fromJson: toDouble)  double priceCdf,  String forUnit)?  $default,) {final _that = this;
 switch (_that) {
 case _ProductPrice() when $default != null:
-return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
+return $default(_that.id,_that.spaceId,_that.spaceName,_that.priceUsd,_that.priceCdf,_that.forUnit);case _:
   return null;
 
 }
@@ -566,11 +567,12 @@ return $default(_that.id,_that.spaceId,_that.priceUsd,_that.priceCdf,_that.forUn
 @JsonSerializable()
 
 class _ProductPrice implements ProductPrice {
-  const _ProductPrice({required this.id, required this.spaceId, @JsonKey(fromJson: toDouble) required this.priceUsd, @JsonKey(fromJson: toDouble) required this.priceCdf, this.forUnit = 'BOTTLE'});
+  const _ProductPrice({required this.id, @JsonKey(readValue: _readSpaceId) required this.spaceId, @JsonKey(readValue: _readSpaceName) this.spaceName, @JsonKey(fromJson: toDouble) required this.priceUsd, @JsonKey(fromJson: toDouble) required this.priceCdf, this.forUnit = 'BOTTLE'});
   factory _ProductPrice.fromJson(Map<String, dynamic> json) => _$ProductPriceFromJson(json);
 
 @override final  String id;
-@override final  String spaceId;
+@override@JsonKey(readValue: _readSpaceId) final  String spaceId;
+@override@JsonKey(readValue: _readSpaceName) final  String? spaceName;
 @override@JsonKey(fromJson: toDouble) final  double priceUsd;
 @override@JsonKey(fromJson: toDouble) final  double priceCdf;
 @override@JsonKey() final  String forUnit;
@@ -588,16 +590,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProductPrice&&(identical(other.id, id) || other.id == id)&&(identical(other.spaceId, spaceId) || other.spaceId == spaceId)&&(identical(other.priceUsd, priceUsd) || other.priceUsd == priceUsd)&&(identical(other.priceCdf, priceCdf) || other.priceCdf == priceCdf)&&(identical(other.forUnit, forUnit) || other.forUnit == forUnit));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProductPrice&&(identical(other.id, id) || other.id == id)&&(identical(other.spaceId, spaceId) || other.spaceId == spaceId)&&(identical(other.spaceName, spaceName) || other.spaceName == spaceName)&&(identical(other.priceUsd, priceUsd) || other.priceUsd == priceUsd)&&(identical(other.priceCdf, priceCdf) || other.priceCdf == priceCdf)&&(identical(other.forUnit, forUnit) || other.forUnit == forUnit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,spaceId,priceUsd,priceCdf,forUnit);
+int get hashCode => Object.hash(runtimeType,id,spaceId,spaceName,priceUsd,priceCdf,forUnit);
 
 @override
 String toString() {
-  return 'ProductPrice(id: $id, spaceId: $spaceId, priceUsd: $priceUsd, priceCdf: $priceCdf, forUnit: $forUnit)';
+  return 'ProductPrice(id: $id, spaceId: $spaceId, spaceName: $spaceName, priceUsd: $priceUsd, priceCdf: $priceCdf, forUnit: $forUnit)';
 }
 
 
@@ -608,7 +610,7 @@ abstract mixin class _$ProductPriceCopyWith<$Res> implements $ProductPriceCopyWi
   factory _$ProductPriceCopyWith(_ProductPrice value, $Res Function(_ProductPrice) _then) = __$ProductPriceCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String spaceId,@JsonKey(fromJson: toDouble) double priceUsd,@JsonKey(fromJson: toDouble) double priceCdf, String forUnit
+ String id,@JsonKey(readValue: _readSpaceId) String spaceId,@JsonKey(readValue: _readSpaceName) String? spaceName,@JsonKey(fromJson: toDouble) double priceUsd,@JsonKey(fromJson: toDouble) double priceCdf, String forUnit
 });
 
 
@@ -625,11 +627,12 @@ class __$ProductPriceCopyWithImpl<$Res>
 
 /// Create a copy of ProductPrice
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? spaceId = null,Object? priceUsd = null,Object? priceCdf = null,Object? forUnit = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? spaceId = null,Object? spaceName = freezed,Object? priceUsd = null,Object? priceCdf = null,Object? forUnit = null,}) {
   return _then(_ProductPrice(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,spaceId: null == spaceId ? _self.spaceId : spaceId // ignore: cast_nullable_to_non_nullable
-as String,priceUsd: null == priceUsd ? _self.priceUsd : priceUsd // ignore: cast_nullable_to_non_nullable
+as String,spaceName: freezed == spaceName ? _self.spaceName : spaceName // ignore: cast_nullable_to_non_nullable
+as String?,priceUsd: null == priceUsd ? _self.priceUsd : priceUsd // ignore: cast_nullable_to_non_nullable
 as double,priceCdf: null == priceCdf ? _self.priceCdf : priceCdf // ignore: cast_nullable_to_non_nullable
 as double,forUnit: null == forUnit ? _self.forUnit : forUnit // ignore: cast_nullable_to_non_nullable
 as String,
