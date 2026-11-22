@@ -105,8 +105,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             actions: [
               if (user != null)
                 Padding(
-                  padding: const EdgeInsets.only(right: 14),
-                  child: _Avatar(name: user.name, size: 34),
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Tooltip(
+                    message: 'Mon profil',
+                    child: InkResponse(
+                      radius: 26,
+                      onTap: () => context.push('/profile'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: _Avatar(name: user.name, size: 34),
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -261,51 +271,59 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-            child: SoftCard(
-              padding: const EdgeInsets.all(12),
-              radius: 16,
-              child: Row(
-                children: [
-                  _Avatar(name: user?.name, size: 40),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user?.name ?? 'Utilisateur',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
+            child: Pressable(
+              scale: 0.98,
+              onTap: () => go('/profile'),
+              child: SoftCard(
+                padding: const EdgeInsets.all(12),
+                radius: 16,
+                child: Row(
+                  children: [
+                    _Avatar(name: user?.name, size: 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user?.name ?? 'Utilisateur',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _roleLabel(user?.role),
-                          style: const TextStyle(
-                            color: AppTheme.muted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (ref.watch(receiptNameProvider).isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              "Ticket : ${ref.watch(receiptNameProvider)}",
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppTheme.cyanDark,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _roleLabel(user?.role),
+                            style: const TextStyle(
+                              color: AppTheme.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                      ],
+                          if (ref.watch(receiptNameProvider).isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                "Ticket : ${ref.watch(receiptNameProvider)}",
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppTheme.cyanDark,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppTheme.subtle,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

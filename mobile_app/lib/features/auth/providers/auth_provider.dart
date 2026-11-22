@@ -29,10 +29,18 @@ class AuthNotifier extends _$AuthNotifier {
       if (sessionData.containsKey('user')) {
         // Map user data
         final user = sessionData['user'];
+        var name = user['name'] as String?;
+        var email = user['email'] as String?;
+        // The session keeps the name given at login; the profile has the current one.
+        try {
+          final profile = await repo.getProfile();
+          name = profile['name'] as String? ?? name;
+          email = profile['email'] as String? ?? email;
+        } catch (_) {}
         return UserState(
           id: user['id'],
-          name: user['name'],
-          email: user['email'],
+          name: name,
+          email: email,
           role: user['role'],
         );
       }
@@ -76,6 +84,18 @@ class AuthNotifier extends _$AuthNotifier {
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
+  }
+
+  /// Shows the new name / email right away after the profile was saved.
+  void applyProfile(Map<String, dynamic> profile) {
+    final current = state.asData?.value;
+    if (current == null) return;
+    state = AsyncValue.data(
+      current.copyWith(
+        name: profile['name'] as String? ?? current.name,
+        email: profile['email'] as String? ?? current.email,
+      ),
+    );
   }
 
   Future<void> logout() async {

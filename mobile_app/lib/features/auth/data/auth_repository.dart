@@ -52,6 +52,36 @@ class AuthRepository {
     }
   }
 
+  /// The signed-in user's own profile (fresh from the database, unlike the session).
+  Future<Map<String, dynamic>> getProfile() async {
+    final res = await _dio.get('/api/profile');
+    return _profile(res.data);
+  }
+
+  /// Saves the user's own profile. Only the given fields change.
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    try {
+      final res = await _dio.put('/api/profile', data: data);
+      return _profile(res.data);
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      throw Exception(
+        body is Map && body['error'] != null
+            ? body['error'].toString()
+            : 'Enregistrement impossible, vérifiez la connexion',
+      );
+    }
+  }
+
+  static Map<String, dynamic> _profile(dynamic body) {
+    if (body is Map && body['success'] == true && body['data'] is Map) {
+      return Map<String, dynamic>.from(body['data'] as Map);
+    }
+    throw Exception(
+      body is Map ? (body['error'] ?? 'Erreur serveur') : 'Erreur serveur',
+    );
+  }
+
   Future<void> logout() async {
     try {
       // Get CSRF again for signout
