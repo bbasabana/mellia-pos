@@ -21,6 +21,7 @@ interface Summary {
     balance: number;
     totalExpensesBoss: number;
     startDate: string | null;
+    canRedoStart?: boolean;
     period: string;
     openingBalance: number;
     openPeriodStart: string | null;
@@ -338,13 +339,18 @@ export default function ExpensesPage() {
                                 <option value="year">Cette Année</option>
                             </select>
                         </div>
-                        {summary && !summary.startDate && isAdmin && (
+                        {summary && isAdmin && (!summary.startDate || summary.canRedoStart) && (
                             <button
-                                className="bg-indigo-900 text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-indigo-950 transition-all shadow-md active:scale-95"
+                                className={cn(
+                                    "px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 transition-all shadow-md active:scale-95",
+                                    summary.startDate
+                                        ? "bg-white text-indigo-900 border border-indigo-200 hover:bg-indigo-50"
+                                        : "bg-indigo-900 text-white hover:bg-indigo-950"
+                                )}
                                 onClick={() => openClosureModal("OPENING")}
                             >
                                 <Flag size={16} />
-                                Clôture de démarrage
+                                {summary.startDate ? "Refaire le démarrage" : "Clôture de démarrage"}
                             </button>
                         )}
                         {summary?.startDate && isManager && (
@@ -381,10 +387,10 @@ export default function ExpensesPage() {
                                     <div className="text-sm text-amber-900">
                                         <p className="font-bold">La caisse n&apos;a pas encore de date de démarrage.</p>
                                         <p className="text-xs mt-1 text-amber-800">
-                                            Le soir avant la mise en service, comptez l&apos;argent réellement présent et faites la
-                                            {" "}<strong>Clôture de démarrage</strong>{isAdmin ? " (bouton en haut)" : " (administrateur)"}.
-                                            Tout ce qui précède passe en archives : rien n&apos;est supprimé, mais plus rien ne compte dans les totaux.
-                                            Les clôtures de journée et de mois ne sont possibles qu&apos;après.
+                                            Faites la <strong>Clôture de démarrage</strong>{isAdmin ? " (bouton en haut)" : " (administrateur)"} :
+                                            tout ce qui précède passe en archives (rien n&apos;est supprimé, mais plus rien ne compte dans les totaux).
+                                            Pas encore compté l&apos;argent ? Démarrez avec 0 FC, puis refaites le démarrage avec le bon montant
+                                            après le comptage. Les clôtures de journée et de mois ne sont possibles qu&apos;après.
                                         </p>
                                     </div>
                                 </div>
@@ -394,6 +400,11 @@ export default function ExpensesPage() {
                                     <Flag size={12} className="text-indigo-500" />
                                     Démarrage le {format(new Date(summary.startDate), "dd MMMM yyyy 'à' HH:mm", { locale: fr })} —
                                     les opérations antérieures sont en archives.
+                                    {summary.canRedoStart && (
+                                        <span className="text-indigo-600 font-semibold">
+                                            {" "}Montant de départ : {formatCurrency(summary.openingBalance)} — peut encore être refait tant qu&apos;aucune journée n&apos;est clôturée.
+                                        </span>
+                                    )}
                                 </p>
                             )}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1006,9 +1017,9 @@ export default function ExpensesPage() {
                             ) : closureKind === "OPENING" ? (
                                 <div className="p-6 space-y-5 overflow-auto">
                                     <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-4 text-xs text-indigo-900 space-y-2 leading-relaxed">
-                                        <p><strong>À faire le soir avant la mise en service</strong> (ex. 30 novembre), après la dernière vente.</p>
                                         <p>Toutes les ventes, dépenses et achats enregistrés <strong>avant maintenant</strong> passent en archives : ils restent consultables (bouton « Archives » dans l&apos;historique des ventes) mais ne comptent plus dans les totaux, le solde ni les rapports.</p>
-                                        <p>Aucun ajustement n&apos;est enregistré : l&apos;argent compté devient simplement le solde de départ.</p>
+                                        <p>L&apos;argent compté devient le solde de départ. <strong>Pas encore compté ?</strong> Mettez 0 : tout est archivé dès maintenant, et vous referez le démarrage avec le bon montant après le comptage (possible tant qu&apos;aucune journée n&apos;est clôturée).</p>
+                                        <p>Ensuite : inventaire de départ dans Stock › Inventaire, pour ajuster les stocks.</p>
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-bold uppercase text-gray-500">Argent réellement compté en caisse (FC)</label>
@@ -1028,13 +1039,10 @@ export default function ExpensesPage() {
                                             type="text"
                                             value={closureNotes}
                                             onChange={(e) => setClosureNotes(e.target.value)}
-                                            placeholder="Ex: Comptage du 30 novembre au soir"
+                                            placeholder="Ex: Montant à compter / Comptage du 23 novembre"
                                             className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2 text-sm outline-none focus:border-indigo-500"
                                         />
                                     </div>
-                                    <p className="text-[11px] text-gray-500">
-                                        Le lendemain matin, faites l&apos;inventaire de départ : Stock › Inventaire.
-                                    </p>
                                     <button
                                         onClick={handleMonthClosure}
                                         disabled={submitting || closingCash.trim() === ""}

@@ -66,6 +66,11 @@ export async function GET(req: Request) {
 
     const totalExpensesBoss = Number(expensesBossAgg._sum.amount || 0);
 
+    // The start-up can be redone (with the counted amount) until a day has been closed.
+    const canRedoStart =
+      startDate !== null &&
+      (await prisma.cashCount.count({ where: { periodEnd: { gte: startDate } } })) === 0;
+
     return NextResponse.json({
       success: true,
       data: {
@@ -75,6 +80,7 @@ export async function GET(req: Request) {
         totalWithdrawals,
         balance,
         startDate: startDate?.toISOString() ?? null,
+        canRedoStart,
         totalExpensesBoss,
         period,
         openingBalance,

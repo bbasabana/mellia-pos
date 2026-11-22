@@ -145,6 +145,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (kind === "OPENING") {
+      // The start-up can be redone (e.g. 0 FC first, the counted amount later) until the
+      // first day is closed: after that, real operations would be archived.
+      const startDate = await getStartDate();
+      if (startDate) {
+        const closedDays = await prisma.cashCount.count({ where: { periodEnd: { gte: startDate } } });
+        if (closedDays > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Des journées ont déjà été clôturées depuis le démarrage : il ne peut plus être refait.",
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     const lastClosure = await getLastCashClosure();
     const openingBalance = getOpeningBalance(lastClosure);
     const openPeriodStart = getOpenPeriodStart(lastClosure);

@@ -44,6 +44,8 @@ export type DayClosure = {
     id: string;
     periodStart: string;
     periodEnd: string;
+    /** YYYY-MM-DD: the day this closure accounts for (a morning closure closes the day before). */
+    businessDay: string;
     salesCashCdf: number;
     salesOtherCdf: number;
     expensesCdf: number;
@@ -73,6 +75,11 @@ export const fc = (v: number) => `${Math.round(v).toLocaleString("fr-FR")} FC`;
 const digits = (s: string) => s.replace(/[^0-9]/g, "");
 const grouped = (s: string) => (digits(s) ? Number(digits(s)).toLocaleString("fr-FR") : "");
 const when = (d: string) => format(new Date(d), "EEE d MMM HH:mm", { locale: fr });
+/** "lun. 1 déc." for a business day YYYY-MM-DD (read as a calendar date, not an instant). */
+export const dayLabel = (day: string, pattern = "EEE d MMM") => {
+    const [y, m, d] = day.split("-").map(Number);
+    return format(new Date(y, m - 1, d), pattern, { locale: fr });
+};
 
 /**
  * Clôture de la journée (Z). The till must hold: cash carried from the previous closure +
@@ -282,7 +289,15 @@ export default function CashCountPanel({
                     )}
                 </div>
 
-                {/* What was counted */}
+                {/* What was counted: the manager or the admin closes, when the money is handed over */}
+                {!canSettle ? (
+                    <div className="rounded border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 self-start">
+                        <p className="font-bold text-gray-800">Clôture faite par le gérant ou l&apos;administrateur</p>
+                        <p className="mt-1 text-xs">
+                            Le matin, l&apos;argent est compté et remis au patron : c&apos;est à ce moment que la journée est clôturée.
+                        </p>
+                    </div>
+                ) : (
                 <div className="space-y-3">
                     <label className="block">
                         <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Argent compté</span>
@@ -338,7 +353,7 @@ export default function CashCountPanel({
                                 />
                             </label>
                             <div className="rounded border border-gray-200 px-3 py-2 flex flex-col justify-center">
-                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Reste en caisse pour demain</span>
+                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Reste en caisse (fond suivant)</span>
                                 <span className={`font-black ${withdrawalTooHigh ? "text-red-600" : "text-gray-800"}`}>
                                     {withdrawalTooHigh ? "Versement trop élevé" : fc(countedCdf - withdrawalCdf)}
                                 </span>
@@ -402,6 +417,7 @@ export default function CashCountPanel({
                         </button>
                     )}
                 </div>
+                )}
             </div>
 
             {counts.length > 0 && (
@@ -426,9 +442,9 @@ export default function CashCountPanel({
                                 return (
                                     <tr key={c.id} className="border-t border-gray-100 align-top">
                                         <td className="px-4 py-2 whitespace-nowrap">
-                                            <div className="font-semibold">{format(new Date(c.periodEnd), "EEE d MMM", { locale: fr })}</div>
+                                            <div className="font-semibold capitalize">{dayLabel(c.businessDay)}</div>
                                             <div className="text-[11px] text-gray-400">
-                                                {format(new Date(c.periodStart), "d/MM HH:mm")} → {format(new Date(c.periodEnd), "HH:mm")}
+                                                {format(new Date(c.periodStart), "d/MM HH:mm")} → {format(new Date(c.periodEnd), "d/MM HH:mm")}
                                             </div>
                                         </td>
                                         <td className="px-4 py-2 text-right whitespace-nowrap">{fc(c.expectedCdf)}</td>
@@ -575,8 +591,10 @@ function ZTicket({ c }: { c: DayClosure }) {
     return (
         <div style={{ width: "72mm", fontFamily: "monospace", fontSize: 12, padding: "4mm", color: "#000" }}>
             <div style={{ textAlign: "center", fontWeight: 700 }}>CLÔTURE DE LA JOURNÉE (Z)</div>
-            <div style={{ textAlign: "center" }}>{format(new Date(c.periodEnd), "EEEE d MMMM yyyy HH:mm", { locale: fr })}</div>
-            <div style={{ textAlign: "center", fontSize: 11 }}>Depuis {format(new Date(c.periodStart), "d/MM HH:mm")}</div>
+            <div style={{ textAlign: "center" }}>Journée du {dayLabel(c.businessDay, "EEEE d MMMM yyyy")}</div>
+            <div style={{ textAlign: "center", fontSize: 11 }}>
+                Du {format(new Date(c.periodStart), "d/MM HH:mm")} au {format(new Date(c.periodEnd), "d/MM HH:mm")}
+            </div>
             {rule}
             {row("Fond de caisse", fc(c.openingFloatCdf))}
             {row("Ventes espèces", `+ ${fc(c.salesCashCdf)}`)}
@@ -597,7 +615,7 @@ function ZTicket({ c }: { c: DayClosure }) {
             )}
             {c.notes && <div style={{ marginTop: 4 }}>Note : {c.notes}</div>}
             {rule}
-            <div>Caissier : {c.userName}</div>
+            <div>Clôturé par : {c.userName}</div>
             <div style={{ marginTop: 16 }}>Signature : ____________</div>
         </div>
     );

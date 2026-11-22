@@ -173,5 +173,27 @@ export async function ensureExpenseCategory(name: string, description: string): 
 
 export const CASH_GAP_CATEGORY = "Écart de caisse";
 
+// ------------------------------------------------------------------ business day
+
+const KINSHASA_MS = 3600_000; // UTC+1, no daylight saving
+const DAY_CUTOFF_MS = 12 * 3600_000;
+
+/**
+ * The day a closure accounts for, as YYYY-MM-DD (Kinshasa). The till is counted and the
+ * money handed over in the morning, so a closure made before noon closes the previous
+ * day; one made in the afternoon or evening closes that same day.
+ */
+export function businessDay(periodEnd: Date): string {
+  return new Date(periodEnd.getTime() + KINSHASA_MS - DAY_CUTOFF_MS).toISOString().slice(0, 10);
+}
+
+/** periodEnd range of the closures whose business day falls in month `m` (1-12) of `y`. */
+export function businessMonthRange(y: number, m: number): { gte: Date; lt: Date } {
+  return {
+    gte: new Date(Date.UTC(y, m - 1, 1) - KINSHASA_MS + DAY_CUTOFF_MS),
+    lt: new Date(Date.UTC(y, m, 1) - KINSHASA_MS + DAY_CUTOFF_MS),
+  };
+}
+
 export const CASH_COUNT_STATUSES = ["BALANCED", "TO_VERIFY", "LOSS", "JUSTIFIED"] as const;
 export type CashCountStatusValue = (typeof CASH_COUNT_STATUSES)[number];
