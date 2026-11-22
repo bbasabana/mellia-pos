@@ -1,3 +1,4 @@
+import 'package:mellia_pos_mobile/core/services/business_time.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mellia_pos_mobile/core/constants/app_assets.dart';
@@ -92,8 +93,7 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authNotifierProvider).asData?.value;
-    final createdAt =
-        DateTime.tryParse(saleData['createdAt'] ?? "") ?? DateTime.now();
+    final createdAt = kinshasaFrom(saleData['createdAt']);
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
     final items = saleData['items'] as List? ?? [];

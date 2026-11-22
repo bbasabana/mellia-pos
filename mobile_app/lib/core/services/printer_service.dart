@@ -1,3 +1,4 @@
+import 'package:mellia_pos_mobile/core/services/business_time.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -292,6 +293,7 @@ class PrinterService extends _$PrinterService {
     String paidCurrency = 'CDF',
     double changeCdf = 0,
     double rate = 0,
+    bool duplicate = false,
   }) async {
     await _load();
     if (kind == PrinterKind.none) await autoConnect();
@@ -311,6 +313,7 @@ class PrinterService extends _$PrinterService {
       paidCurrency: paidCurrency,
       changeCdf: changeCdf,
       rate: rate,
+      duplicate: duplicate,
     );
     if (!await _send(bytes)) {
       throw Exception(lastError ?? 'Impression impossible');
@@ -419,7 +422,7 @@ class PrinterService extends _$PrinterService {
         ..._boldOff,
       ],
       ..._encode('$rule\nTest d\'impression\nAccents : é è à ç ô\n'),
-      ..._encode('${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}\n'),
+      ..._encode('${DateFormat('dd/MM/yyyy HH:mm').format(nowKinshasa())}\n'),
       ..._encode('$printerName - $paperColumns colonnes\n$rule\n'),
       ..._qr('${ApiConstants.baseUrl}/v/test'),
       ..._encode('Scannez pour vérifier\n\n'),
@@ -508,6 +511,7 @@ class PrinterService extends _$PrinterService {
     String paidCurrency = 'CDF',
     double changeCdf = 0,
     double rate = 0,
+    bool duplicate = false,
   }) {
     double num0(Object? v) => double.tryParse(v?.toString() ?? '') ?? 0.0;
 
@@ -516,9 +520,7 @@ class PrinterService extends _$PrinterService {
     final totalUsd = num0(saleData['totalNet']);
     var totalCdf = num0(saleData['totalCdf']);
     final clientName = saleData['client']?['name'] ?? 'Passant';
-    final created =
-        DateTime.tryParse(saleData['createdAt']?.toString() ?? '')?.toLocal() ??
-        DateTime.now();
+    final created = kinshasaFrom(saleData['createdAt']);
     final method = paymentMethod ?? saleData['paymentMethod']?.toString();
     final rule = '-' * paperColumns;
 
@@ -538,6 +540,13 @@ class PrinterService extends _$PrinterService {
     }
     for (final l in _wrap('10, Bypass, Mont-Ngafula, Kinshasa')) {
       line(l);
+    }
+    if (duplicate) {
+      // A reprint must never pass for a second sale.
+      bytes.addAll([..._boldOn, ..._tallOn]);
+      line('DUPLICATA');
+      bytes.addAll([..._sizeOff, ..._boldOff]);
+      line('Réimprimé le ${DateFormat('dd/MM/yyyy HH:mm').format(nowKinshasa())}');
     }
     bytes.addAll(_left);
     line(rule);
@@ -618,8 +627,7 @@ class PrinterService extends _$PrinterService {
 
   List<int> _zBytes(Map<String, dynamic> c) {
     double n(Object? v) => double.tryParse(v?.toString() ?? '') ?? 0.0;
-    DateTime d(Object? v) =>
-        DateTime.tryParse(v?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    DateTime d(Object? v) => kinshasaFrom(v);
     final fmt = DateFormat('dd/MM/yyyy HH:mm');
     final rule = '-' * paperColumns;
     final diff = n(c['differenceCdf']);
@@ -682,7 +690,7 @@ class PrinterService extends _$PrinterService {
       }
     }
     line(rule);
-    line('Imprimé le ${fmt.format(DateTime.now())}');
+    line('Imprimé le ${fmt.format(nowKinshasa())}');
     bytes.add(0x0A);
     line('Signature caissier :');
     bytes.addAll([0x0A, 0x0A]);
