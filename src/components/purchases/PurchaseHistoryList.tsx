@@ -1,83 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { formatCurrency, formatDate, formatDateUTC, cn } from "@/lib/utils";
-import { User, Calendar, DollarSign, Wallet, Eye, Trash2, Edit } from "lucide-react";
+import { useState } from "react";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Calendar, DollarSign, Edit, Eye, Trash2, User, Wallet } from "lucide-react";
 import { PurchaseDetailsModal } from "./PurchaseDetailsModal";
-import { PurchaseAnalytics } from "./PurchaseAnalytics";
 import { ConfirmDeleteModal } from "@/components/ui/ConfirmDeleteModal";
 import { showToast } from "@/components/ui/Toast";
+import { fc } from "./purchase-format";
 
-export function PurchaseHistoryList({ 
-    onEdit, 
-    period, 
-    setPeriod 
-}: { 
+/** Kinshasa calendar date of a stored moment (purchases are dated by day). */
+export function purchaseDay(date: string | Date): string {
+    const d = new Date(new Date(date).getTime() + 3600_000);
+    return format(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), "dd MMM yyyy", { locale: fr });
+}
+
+/** Journal des achats: one line per purchase, with who bought, who recorded and the source. */
+export function PurchaseHistoryList({
+    investments,
+    loading,
+    onEdit,
+    onChanged,
+}: {
+    investments: any[];
+    loading: boolean;
     onEdit?: (id: string) => void;
-    period: string;
-    setPeriod: (p: string) => void;
+    onChanged: () => void;
 }) {
-    const [loading, setLoading] = useState(true);
-    const [investments, setInvestments] = useState<any[]>([]);
-    const [analytics, setAnalytics] = useState<any>(null);
-
-    // Detail Modal State
-    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedInvestment, setSelectedInvestment] = useState<any>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
-    const [loadingDetail, setLoadingDetail] = useState(false);
-
-    // Delete Modal State
     const [idToDelete, setIdToDelete] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    useEffect(() => {
-        fetchHistory();
-    }, [period]);
-
-    const fetchHistory = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch(`/api/investments?period=${period}`);
-            const data = await res.json();
-            if (data.success) {
-                setInvestments(data.data.history || []);
-                setAnalytics(data.data.analytics || null);
-            }
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const getPeriodLabel = () => {
-        switch (period) {
-            case "day": return "Aujourd'hui";
-            case "week": return "Cette Semaine";
-            case "month": return "Ce Mois";
-            case "year": return "Cette Année";
-            default: return "Tout";
-        }
-    };
     const handleViewDetails = async (id: string) => {
-        setLoadingDetail(true);
-        setSelectedId(id);
         setIsDetailOpen(true);
+        setSelectedInvestment(null);
         try {
             const res = await fetch(`/api/investments?id=${id}`);
             const json = await res.json();
-            if (json.success) {
-                setSelectedInvestment(json.data);
-            } else {
-                showToast("Erreur lors du chargement des détails", "error");
+            if (json.success) setSelectedInvestment(json.data);
+            else {
+                showToast(json.error || "Erreur lors du chargement des détails", "error");
                 setIsDetailOpen(false);
             }
-        } catch (error) {
+        } catch {
             showToast("Erreur de connexion", "error");
             setIsDetailOpen(false);
-        } finally {
-            setLoadingDetail(false);
         }
     };
 
@@ -88,13 +56,13 @@ export function PurchaseHistoryList({
             const res = await fetch(`/api/investments?id=${idToDelete}`, { method: "DELETE" });
             const json = await res.json();
             if (json.success) {
-                showToast("Achat supprimé avec succès. Stock inversé.", "success");
-                fetchHistory();
+                showToast("Achat supprimé : le stock a été retiré.", "success");
                 setIdToDelete(null);
+                onChanged();
             } else {
                 showToast(json.error || "Erreur lors de la suppression", "error");
             }
-        } catch (error) {
+        } catch {
             showToast("Erreur de connexion", "error");
         } finally {
             setIsDeleting(false);
@@ -104,55 +72,19 @@ export function PurchaseHistoryList({
     if (loading) return <div className="p-8 text-center text-gray-400">Chargement...</div>;
 
     return (
-        <div className="flex flex-col gap-6">
-            {/* PERIOD FILTERS */}
-            <div className="flex items-center justify-between px-4 pt-4">
-                <div className="flex bg-gray-100 p-1 rounded-md">
-                    {[
-                        { id: 'day', label: 'Jour' },
-                        { id: 'week', label: 'Semaine' },
-                        { id: 'month', label: 'Mois' },
-                        { id: 'year', label: 'Année' },
-                        { id: 'all', label: 'Tout' }
-                    ].map((p) => (
-                        <button
-                            key={p.id}
-                            onClick={() => setPeriod(p.id)}
-                            className={cn(
-                                "px-4 py-1.5 text-xs font-bold rounded-md transition-all",
-                                period === p.id 
-                                    ? "bg-white text-blue-600 shadow-sm" 
-                                    : "text-gray-500 hover:text-gray-700"
-                            )}
-                        >
-                            {p.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* ANALYTICS SECTION */}
-            {analytics?.topItems?.length > 0 && (
-                <div className="px-4">
-                    <PurchaseAnalytics 
-                        topItems={analytics.topItems} 
-                        periodLabel={getPeriodLabel()} 
-                    />
-                </div>
-            )}
-
+        <div className="flex flex-col">
             <div className="overflow-x-auto">
                 {investments.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400">Aucun achat enregistré pour cette période.</div>
+                    <div className="p-8 text-center text-gray-400">Aucun achat pour ces filtres.</div>
                 ) : (
-                    <table className="w-full text-sm text-left border-t border-gray-100">
+                    <table className="w-full text-sm text-left min-w-[760px]">
                         <thead className="bg-gray-50/50 text-[10px] text-gray-500 uppercase">
                             <tr>
                                 <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Description</th>
+                                <th className="px-4 py-3">Acheteur / notes</th>
                                 <th className="px-4 py-3 text-center">Source</th>
-                                <th className="px-4 py-3 text-right">Montant Investi</th>
-                                <th className="px-4 py-3 text-right text-green-600">ROI Attendu</th>
+                                <th className="px-4 py-3 text-right">Montant</th>
+                                <th className="px-4 py-3 text-right text-green-600">Marge attendue</th>
                                 <th className="px-4 py-3 text-center">Actions</th>
                             </tr>
                         </thead>
@@ -162,43 +94,35 @@ export function PurchaseHistoryList({
                                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">
                                         <div className="flex items-center gap-2">
                                             <Calendar size={14} className="text-gray-400" />
-                                            {formatDateUTC(new Date(inv.date))}
+                                            {purchaseDay(inv.date)}
                                         </div>
                                     </td>
                                     <td className="px-4 py-3">
-                                        {(() => {
-                                            const desc = inv.description || "";
-                                            const buyerMatch = desc.match(/^\[Acheteur:\s*([^\]]+)\]\s*(.*)/);
-                                            const realBuyer = buyerMatch ? buyerMatch[1] : null;
-                                            const cleanDesc = buyerMatch ? buyerMatch[2] : (inv.description || "Sans description");
-
-                                            return (
-                                                <>
-                                                    <div className="font-medium text-gray-800">{cleanDesc || "Sans description"}</div>
-                                                    <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                                                        <span className={realBuyer ? "font-bold text-blue-600 flex items-center gap-1" : "flex items-center gap-1"}>
-                                                            <User size={10} />
-                                                            {realBuyer || inv.user?.name || "Inconnu"}
-                                                        </span>
-                                                    </div>
-                                                </>
-                                            );
-                                        })()}
+                                        <div className="font-bold text-blue-700 flex items-center gap-1">
+                                            <User size={12} />
+                                            {inv.buyer || inv.user?.name || "Inconnu"}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                            {inv.notes || `${inv._count?.movements ?? 0} produit(s)`}
+                                        </div>
+                                        <div className="text-[10px] text-gray-400">Saisi par {inv.user?.name || "—"}</div>
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase ${inv.source === 'OWNER_CAPITAL'
-                                            ? 'bg-purple-50 text-purple-600'
-                                            : 'bg-orange-50 text-orange-600'
-                                            }`}>
-                                            {inv.source === 'OWNER_CAPITAL' ? <Wallet size={10} /> : <DollarSign size={10} />}
-                                            {inv.source === 'OWNER_CAPITAL' ? 'Patron' : 'Caisse'}
+                                        <span
+                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase ${inv.source === "OWNER_CAPITAL" ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"}`}
+                                        >
+                                            {inv.source === "OWNER_CAPITAL" ? <Wallet size={10} /> : <DollarSign size={10} />}
+                                            {inv.source === "OWNER_CAPITAL" ? "Patron" : "Caisse"}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-right font-bold text-gray-700">
-                                        {formatCurrency(Number(inv.totalAmount))}
+                                    <td className="px-4 py-3 text-right">
+                                        <div className="font-bold text-gray-800">{fc(Number(inv.totalAmountCdf || 0))}</div>
+                                        {Number(inv.transportFeeCdf || 0) > 0 && (
+                                            <div className="text-[10px] text-purple-500">dont transport {fc(Number(inv.transportFeeCdf))}</div>
+                                        )}
                                     </td>
-                                    <td className="px-4 py-3 text-right font-medium text-[#71de00]">
-                                        {inv.expectedProfit > 0 ? `+${formatCurrency(Number(inv.expectedProfit))}` : "-"}
+                                    <td className="px-4 py-3 text-right font-medium text-[#5bb300]">
+                                        {Number(inv.expectedProfitCdf || 0) > 0 ? `+${fc(Number(inv.expectedProfitCdf))}` : "—"}
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         <div className="flex items-center justify-center gap-2">
@@ -234,7 +158,6 @@ export function PurchaseHistoryList({
                 )}
             </div>
 
-            {/* MODALS */}
             <PurchaseDetailsModal
                 isOpen={isDetailOpen}
                 onClose={() => {
@@ -248,8 +171,8 @@ export function PurchaseHistoryList({
                 isOpen={!!idToDelete}
                 onClose={() => setIdToDelete(null)}
                 onConfirm={confirmDelete}
-                title="Supprimer l'Achat"
-                message="Attention: Supprimer cet achat inversera les entrées en stock correspondantes. Voulez-vous continuer ?"
+                title="Supprimer l'achat"
+                message="Supprimer cet achat retire du stock les quantités qu'il avait ajoutées. Voulez-vous continuer ?"
                 isLoading={isDeleting}
             />
         </div>
