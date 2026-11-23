@@ -27,7 +27,8 @@ enum PrinterKind { none, sunmi, bluetooth }
 class PrinterService extends _$PrinterService {
   static const _channel = MethodChannel('mellia/printer');
   static const _prefKey = 'mellia_printer';
-  static const _prefAutoPrint = 'mellia_auto_print';
+  // New key: every terminal starts with auto-print off (it used to be on by default).
+  static const _prefAutoPrint = 'mellia_auto_print_v2';
   static const _prefReceiptName = ReceiptNameNotifier.prefKey;
 
   PrinterKind kind = PrinterKind.none;
@@ -37,11 +38,14 @@ class PrinterService extends _$PrinterService {
   /// 32 characters on 58 mm paper, 48 on 80 mm.
   int paperColumns = 32;
 
-  /// Print the receipt as soon as a sale is paid.
-  bool autoPrint = true;
+  /// Print the receipt as soon as a sale is paid. Off by default: the cashier prints on demand.
+  bool autoPrint = false;
 
   /// Logo for the ticket header, as ESC/POS raster bytes (built once, then reused).
   List<int>? _logoRaster;
+
+  /// The same logo as PNG bytes, for the Sunmi printer which prints it as a bitmap.
+  Uint8List? _logoPngBytes;
 
   bool sunmiAvailable = false;
   bool _loaded = false;
@@ -66,12 +70,17 @@ class PrinterService extends _$PrinterService {
     if (_loaded) return;
     _loaded = true;
     final prefs = await SharedPreferences.getInstance();
-    autoPrint = prefs.getBool(_prefAutoPrint) ?? true;
+    autoPrint = prefs.getBool(_prefAutoPrint) ?? false;
     final saved = prefs.getString(_prefKey) ?? 'auto';
 
     sunmiAvailable = await _sunmiBind();
 
-    if (saved.startsWith('bt:')) {
+    if (saved.startsWith('bt:') && sunmiAvailable && _isSunmiVirtual(saved)) {
+      // The Sunmi "InnerPrinter" Bluetooth device is the built-in printer seen through a
+      // virtual link that cuts tickets after the logo: use Sunmi's printer service instead.
+      kind = PrinterKind.sunmi;
+      await prefs.setString(_prefKey, 'sunmi');
+    } else if (saved.startsWith('bt:')) {
       final parts = saved.substring(3).split('|');
       _btMac = parts.first;
       _btName = parts.length > 1 ? parts[1] : '';
@@ -83,6 +92,12 @@ class PrinterService extends _$PrinterService {
     } else {
       kind = PrinterKind.none;
     }
+  }
+
+  /// The virtual Bluetooth printer every Sunmi terminal exposes for its built-in printer.
+  static bool _isSunmiVirtual(String macOrSaved, [String name = '']) {
+    final text = '$macOrSaved $name'.toLowerCase();
+    return text.contains('00:11:22:33:44:55') || text.contains('innerprinter');
   }
 
   /// True on a Sunmi terminal whose printer service answered. Reads the paper width too.
@@ -153,6 +168,26 @@ class PrinterService extends _$PrinterService {
     }
   }
 
+  /// The logo PNG for the Sunmi bitmap call; null if the asset cannot be read.
+  Future<Uint8List?> _logoPng() async {
+    if (_logoPngBytes != null) return _logoPngBytes;
+    try {
+      final data = await rootBundle.load('assets/images/receipt_logo.png');
+      return _logoPngBytes = data.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// What goes to the printer: the logo apart (Sunmi bitmap) or inside the ESC/POS bytes.
+  Future<({List<int> raster, Uint8List? png})> _header() async {
+    if (kind == PrinterKind.sunmi) {
+      final png = await _logoPng();
+      if (png != null) return (raster: const <int>[], png: png);
+    }
+    return (raster: await _logo(), png: null);
+  }
+
   Future<void> setAutoPrint(bool value) async {
     autoPrint = value;
     final prefs = await SharedPreferences.getInstance();
@@ -191,6 +226,11 @@ class PrinterService extends _$PrinterService {
 
   /// Connects to a paired Bluetooth printer and remembers it for the next launches.
   Future<bool> connect(BluetoothInfo device) async {
+    // On a Sunmi terminal "InnerPrinter" is the built-in printer: drive it directly.
+    if (sunmiAvailable && _isSunmiVirtual(device.macAdress, device.name)) {
+      await useSunmi();
+      return true;
+    }
     try {
       if (!await _bluetoothPermission()) return false;
       final ok = await PrintBluetoothThermal.connect(
@@ -255,7 +295,11 @@ class PrinterService extends _$PrinterService {
       if (kind == PrinterKind.none) {
         return "Échec : aucune imprimante trouvée (ni Sunmi intégrée, ni Bluetooth jumelée)";
       }
-      final ok = await _send(_testBytes(await _logo()));
+      final logo = await _header();
+      final ok = await _send(
+        _testBytes(logo.raster, logoApart: logo.png != null),
+        logoPng: logo.png,
+      );
       return ok
           ? 'Test imprimé sur $printerName'
           : 'Échec : ${lastError ?? "impression impossible"}';
@@ -300,12 +344,13 @@ class PrinterService extends _$PrinterService {
     if (kind == PrinterKind.none) {
       throw Exception('Aucune imprimante configurée (Paramètres > Imprimante)');
     }
-    final logo = await _logo();
+    final logo = await _header();
     // Read at print time: a name changed in Settings applies to the very next ticket.
     final prefs = await SharedPreferences.getInstance();
     final custom = prefs.getString(_prefReceiptName) ?? '';
     final bytes = _receiptBytes(
-      logo: logo,
+      logo: logo.raster,
+      logoApart: logo.png != null,
       saleData: saleData,
       cashierName: receiptCashier(custom, cashierName),
       paymentMethod: paymentMethod,
@@ -315,7 +360,7 @@ class PrinterService extends _$PrinterService {
       rate: rate,
       duplicate: duplicate,
     );
-    if (!await _send(bytes)) {
+    if (!await _send(bytes, logoPng: logo.png)) {
       throw Exception(lastError ?? 'Impression impossible');
     }
   }
@@ -332,7 +377,8 @@ class PrinterService extends _$PrinterService {
     }
   }
 
-  Future<bool> _send(List<int> bytes) async {
+  /// Sends a ticket. On Sunmi, [logoPng] is printed first as a bitmap by the printer service.
+  Future<bool> _send(List<int> bytes, {Uint8List? logoPng}) async {
     lastError = null;
     switch (kind) {
       case PrinterKind.sunmi:
@@ -340,8 +386,9 @@ class PrinterService extends _$PrinterService {
           final reply = await _channel
               .invokeMapMethod<String, dynamic>('raw', {
                 'bytes': Uint8List.fromList(bytes),
+                'logo': ?logoPng,
               })
-              .timeout(const Duration(seconds: 12));
+              .timeout(const Duration(seconds: 15));
           if (reply?['ok'] == true) return true;
           lastError =
               _sunmiState(reply?['state'] ?? reply?['code']) ??
@@ -387,9 +434,9 @@ class PrinterService extends _$PrinterService {
   bool get _utf8 => kind == PrinterKind.sunmi;
 
   /// Sunmi printers take UTF-8 (FS C 0xFF); other thermal printers take Windows-1252 (ESC t 16).
-  List<int> get _init => [
-    0x1B,
-    0x40,
+  /// After a Sunmi bitmap logo the printer is already reset: an ESC @ here could drop it.
+  List<int> _init({bool reset = true}) => [
+    if (reset) ...const [0x1B, 0x40],
     ...(_utf8 ? const [0x1C, 0x43, 0xFF] : const [0x1B, 0x74, 0x10]),
   ];
 
@@ -409,14 +456,14 @@ class PrinterService extends _$PrinterService {
   static const _cut = [0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x42, 0x00];
 
   /// Test page: the same header logo and QR code size as a real receipt.
-  List<int> _testBytes([List<int> logo = const []]) {
+  List<int> _testBytes(List<int> logo, {bool logoApart = false}) {
     final rule = '-' * paperColumns;
     return [
-      ..._init,
+      ..._init(reset: !logoApart),
       ..._center,
       if (logo.isNotEmpty)
         ...logo
-      else ...[
+      else if (!logoApart) ...[
         ..._boldOn,
         ..._encode('MELLIA RESTO\n'),
         ..._boldOff,
@@ -504,6 +551,7 @@ class PrinterService extends _$PrinterService {
 
   List<int> _receiptBytes({
     List<int> logo = const [],
+    bool logoApart = false,
     required Map<String, dynamic> saleData,
     String? cashierName,
     String? paymentMethod,
@@ -524,7 +572,7 @@ class PrinterService extends _$PrinterService {
     final method = paymentMethod ?? saleData['paymentMethod']?.toString();
     final rule = '-' * paperColumns;
 
-    final bytes = <int>[..._init];
+    final bytes = <int>[..._init(reset: !logoApart)];
     void line(String text) => bytes
       ..addAll(_encode(text))
       ..add(0x0A);
@@ -533,7 +581,7 @@ class PrinterService extends _$PrinterService {
     bytes.addAll(_center);
     if (logo.isNotEmpty) {
       bytes.addAll(logo);
-    } else {
+    } else if (!logoApart) {
       bytes.addAll([..._boldOn, ..._bigOn]);
       line('MELLIA RESTO');
       bytes.addAll([..._sizeOff, ..._boldOff]);
@@ -636,7 +684,7 @@ class PrinterService extends _$PrinterService {
     final withdrawal = n(c['withdrawalCdf']);
     final counted = n(c['countedCdf']);
 
-    final bytes = <int>[..._init];
+    final bytes = <int>[..._init()];
     void line(String text) => bytes
       ..addAll(_encode(text))
       ..add(0x0A);

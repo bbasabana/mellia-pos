@@ -180,6 +180,7 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
             paidCurrency: paidCurrency,
             changeCdf: changeCdf,
             rate: rate,
+            paidCart: cartSnapshot,
           ),
         );
       }

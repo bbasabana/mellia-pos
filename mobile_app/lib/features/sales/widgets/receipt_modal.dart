@@ -5,6 +5,7 @@ import 'package:mellia_pos_mobile/core/constants/app_assets.dart';
 import 'package:mellia_pos_mobile/features/auth/providers/auth_provider.dart';
 import 'package:mellia_pos_mobile/core/services/printer_service.dart';
 import 'package:mellia_pos_mobile/core/services/receipt_name.dart';
+import 'package:mellia_pos_mobile/features/cart/cart_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mellia_pos_mobile/core/constants/api_constants.dart';
@@ -25,6 +26,9 @@ class ReceiptModal extends ConsumerStatefulWidget {
   /// FC for 1 dollar applied to this payment.
   final double rate;
 
+  /// The cart as it was paid: "Refaire" puts the same order back in the cart.
+  final CartState? paidCart;
+
   const ReceiptModal({
     super.key,
     required this.saleData,
@@ -33,6 +37,7 @@ class ReceiptModal extends ConsumerStatefulWidget {
     this.paidCurrency = 'CDF',
     this.changeCdf = 0,
     this.rate = 0,
+    this.paidCart,
   });
 
   @override
@@ -50,13 +55,24 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
   @override
   void initState() {
     super.initState();
-    // Prints the receipt by itself once the sale is paid, when auto-print is on.
+    // Nothing prints by itself unless the cashier turned on auto-print in Settings:
+    // the ticket is printed on demand with the "Imprimer" button.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(printerServiceProvider.future);
       final printer = ref.read(printerServiceProvider.notifier);
-      // printTicket finds the built-in printer by itself when none is set yet.
-      if (printer.autoPrint) _print(auto: true);
+      if (printer.autoPrint && mounted) _print(auto: true);
     });
+  }
+
+  /// Same items, client and order type back in the cart, as a new order to pay.
+  void _repeat() {
+    final paid = widget.paidCart;
+    if (paid != null && paid.items.isNotEmpty) {
+      ref
+          .read(cartNotifierProvider.notifier)
+          .restoreCart(paid.copyWith(activeDraftId: null, isLoading: false));
+    }
+    Navigator.of(context).maybePop();
   }
 
   Future<void> _print({bool auto = false}) async {
@@ -302,51 +318,70 @@ class _ReceiptModalState extends ConsumerState<ReceiptModal> {
               const SizedBox(height: 16),
               FadeSlideIn(
                 index: 6,
-                child: Row(
+                child: Column(
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(52),
-                        ),
-                        child: const Text('Nouvelle vente'),
+                    ElevatedButton.icon(
+                      onPressed: _printing ? null : () => _print(),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(54),
+                      ),
+                      icon: AnimatedSwitcher(
+                        duration: AppTheme.fast,
+                        child: _printing
+                            ? const SizedBox(
+                                key: ValueKey('p'),
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                _printed
+                                    ? Icons.check_rounded
+                                    : Icons.print_rounded,
+                                key: ValueKey(_printed),
+                                size: 20,
+                              ),
+                      ),
+                      label: Text(
+                        _printing
+                            ? 'Impression…'
+                            : (_printed
+                                  ? 'Réimprimer le ticket'
+                                  : 'Imprimer le ticket'),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _printing ? null : () => _print(),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        if (widget.paidCart?.items.isNotEmpty == true) ...[
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _repeat,
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                minimumSize: const Size.fromHeight(52),
+                              ),
+                              icon: const Icon(Icons.replay_rounded, size: 20),
+                              label: const Text('Refaire'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).maybePop(),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(52),
+                            ),
+                            icon: const Icon(Icons.add_rounded, size: 20),
+                            label: const Text('Nouvelle commande'),
+                          ),
                         ),
-                        icon: AnimatedSwitcher(
-                          duration: AppTheme.fast,
-                          child: _printing
-                              ? const SizedBox(
-                                  key: ValueKey('p'),
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Icon(
-                                  _printed
-                                      ? Icons.check_rounded
-                                      : Icons.print_rounded,
-                                  key: ValueKey(_printed),
-                                  size: 20,
-                                ),
-                        ),
-                        label: Text(
-                          _printing
-                              ? 'Impression…'
-                              : (_printed ? 'Réimprimer' : 'Imprimer'),
-                        ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
