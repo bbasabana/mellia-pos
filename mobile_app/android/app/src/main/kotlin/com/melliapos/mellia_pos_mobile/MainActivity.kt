@@ -1,5 +1,6 @@
 package com.melliapos.mellia_pos_mobile
 
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -55,8 +56,11 @@ class MainActivity : FlutterActivity() {
         )
     }
 
-    /** Sends ESC/POS bytes straight to the printer queue and answers once with the result. */
-    private fun printRaw(bytes: ByteArray, result: MethodChannel.Result) {
+    /**
+     * Sends ESC/POS bytes straight to the printer queue and answers once with the result.
+     * [logo] (PNG bytes) is printed first, centred, as a bitmap.
+     */
+    private fun printRaw(bytes: ByteArray, logo: ByteArray?, result: MethodChannel.Result) {
         val service = printer
             ?: return result.success(mapOf("ok" to false, "code" to -1, "message" to "printer service not bound"))
         val state = printerState()
@@ -81,6 +85,17 @@ class MainActivity : FlutterActivity() {
         }
 
         try {
+            // The logo goes through Sunmi's own bitmap call: a GS v 0 raster image inside the raw
+            // data makes the printer stop after the picture, and the ticket came out with the logo only.
+            if (logo != null) {
+                val bitmap = BitmapFactory.decodeByteArray(logo, 0, logo.size)
+                if (bitmap != null) {
+                    service.printerInit(null)
+                    service.setAlignment(1, null)
+                    service.printBitmap(bitmap, null)
+                    service.lineWrap(1, null)
+                }
+            }
             service.sendRAWData(bytes, done)
         } catch (error: Throwable) {
             answer(false, -2, error.message)
@@ -105,7 +120,7 @@ class MainActivity : FlutterActivity() {
                 "info" -> result.success(printerInfo())
                 "raw" -> {
                     val bytes = call.argument<ByteArray>("bytes")
-                    if (bytes == null) result.error("bytes", "missing bytes", null) else printRaw(bytes, result)
+                    if (bytes == null) result.error("bytes", "missing bytes", null) else printRaw(bytes, call.argument<ByteArray>("logo"), result)
                 }
                 "drawer" -> {
                     runCatching { printer?.openDrawer(null) }

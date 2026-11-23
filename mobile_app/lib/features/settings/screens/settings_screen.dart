@@ -373,6 +373,9 @@ class _PrinterConfigModalState extends ConsumerState<_PrinterConfigModal> {
                     title: const Text(
                       "Imprimer automatiquement après chaque vente",
                     ),
+                    subtitle: const Text(
+                      "Désactivé : le ticket s'imprime avec le bouton « Imprimer »",
+                    ),
                     value: printer.autoPrint,
                     onChanged: (v) async {
                       await printer.setAutoPrint(v);
