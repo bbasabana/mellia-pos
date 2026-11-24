@@ -5,8 +5,8 @@ import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/audit";
 import {
-  businessDay,
   businessMonthRange,
+  closureDays,
   CASH_GAP_CATEGORY,
   ensureExpenseCategory,
   expectedCash,
@@ -21,12 +21,12 @@ const MANAGERS = ["ADMIN", "MANAGER"];
 const include = { user: { select: { name: true } } } as const;
 type Row = Prisma.CashCountGetPayload<{ include: typeof include }>;
 
-function serialize(row: Row) {
+function serialize(row: Row, day: string) {
   return {
     id: row.id,
     periodStart: row.periodStart,
     periodEnd: row.periodEnd,
-    businessDay: businessDay(row.periodEnd),
+    businessDay: day,
     salesCashCdf: Number(row.salesCashCdf),
     salesOtherCdf: Number(row.salesOtherCdf),
     expensesCdf: Number(row.expensesCdf),
@@ -58,10 +58,13 @@ export async function GET(req: NextRequest) {
   try {
     const month = new URL(req.url).searchParams.get("month");
     let monthFilter: Prisma.CashCountWhereInput = {};
-    if (month && /^\d{4}-\d{2}$/.test(month)) {
-      const [y, m] = month.split("-").map(Number);
-      // By business day: the morning closure of the 1st still belongs to the previous month.
-      monthFilter = { periodEnd: businessMonthRange(y, m) };
+    const byMonth = month && /^\d{4}-\d{2}$/.test(month) ? month : null;
+    if (byMonth) {
+      const [y, m] = byMonth.split("-").map(Number);
+      // By business day (the day of the sales): a closure made on the 1st or 2nd can still
+      // belong to the previous month, so the range is widened and filtered below.
+      const range = businessMonthRange(y, m);
+      monthFilter = { periodEnd: { gte: new Date(range.gte.getTime() - 2 * 86400_000), lt: new Date(range.lt.getTime() + 2 * 86400_000) } };
     }
 
     const open = await getOpenDayPeriod();
@@ -70,7 +73,7 @@ export async function GET(req: NextRequest) {
       prisma.cashCount.findMany({
         where: monthFilter,
         orderBy: { periodEnd: "desc" },
-        take: month ? 62 : 30,
+        take: byMonth ? 70 : 30,
         include,
       }),
       prisma.cashCount.aggregate({
@@ -90,6 +93,19 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
+    const [days, openSales] = await Promise.all([
+      closureDays([...counts, { id: "open", periodStart: open.periodStart, periodEnd: open.periodEnd }]),
+      prisma.sale.aggregate({
+        where: { status: "COMPLETED", createdAt: { gte: open.periodStart, lt: open.periodEnd } },
+        _min: { createdAt: true },
+        _max: { createdAt: true },
+      }),
+    ]);
+    const listed = counts
+      .map((c) => serialize(c, days.get(c.id)!))
+      .filter((c) => !byMonth || c.businessDay.startsWith(byMonth))
+      .slice(0, byMonth ? 62 : 30);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -97,8 +113,12 @@ export async function GET(req: NextRequest) {
           ...open,
           expectation,
           expectedCdf: expectedCash(expectation, open.openingFloatCdf),
+          // The day this closure will account for, and when its sales were rung up.
+          day: days.get("open"),
+          firstSaleAt: openSales._min.createdAt,
+          lastSaleAt: openSales._max.createdAt,
         },
-        counts: counts.map(serialize),
+        counts: listed,
         pending: { count: pending._count, totalCdf: Number(pending._sum.differenceCdf ?? 0) },
         categories,
         rate: Number(rateRow?.rateUsdToCdf ?? 2850) || 2850,
@@ -179,7 +199,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { ...serialize(row), salesCount: e.salesCount, otherCount: e.otherCount },
+      data: { ...serialize(row, (await closureDays([row])).get(row.id)!), salesCount: e.salesCount, otherCount: e.otherCount },
     });
   } catch (error) {
     console.error("[CASH_COUNTS_POST]", error);
@@ -291,7 +311,7 @@ export async function PATCH(req: NextRequest) {
       });
     });
 
-    return NextResponse.json({ success: true, data: serialize(row) });
+    return NextResponse.json({ success: true, data: serialize(row, (await closureDays([row])).get(row.id)!) });
   } catch (error) {
     console.error("[CASH_COUNTS_PATCH]", error);
     return NextResponse.json({ success: false, error: "Erreur serveur" }, { status: 500 });
