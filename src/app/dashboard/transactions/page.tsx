@@ -358,7 +358,19 @@ export default function TransactionsPage() {
                     </div>
 
                     {/* Contrôle de caisse : argent compté vs attendu */}
-                    {!archives && <CashCountPanel role={role} onClosed={fetchTransactions} />}
+                    {!archives && (
+                        <CashCountPanel
+                            role={role}
+                            onClosed={fetchTransactions}
+                            onFindTicket={(ticketNum) => {
+                                setSearch(ticketNum);
+                                setDateRange({ start: "", end: "" });
+                                setPeriod("all");
+                                setPage(1);
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
+                        />
+                    )}
                     {archives && meta.startDate && (
                         <div className="p-3 rounded border border-gray-300 bg-gray-50 text-sm text-gray-600">
                             Archives : ventes d&apos;avant le démarrage du {format(new Date(meta.startDate), "d MMMM yyyy à HH:mm", { locale: fr })}. Elles ne comptent dans aucun total actuel.

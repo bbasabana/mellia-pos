@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     }
 
     const open = await getOpenDayPeriod();
-    const [expectation, counts, pending, categories] = await Promise.all([
+    const [expectation, counts, pending, categories, rateRow] = await Promise.all([
       getCashExpectation(open.periodStart, open.periodEnd),
       prisma.cashCount.findMany({
         where: monthFilter,
@@ -83,6 +83,11 @@ export async function GET(req: NextRequest) {
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       }),
+      prisma.exchangeRate.findFirst({
+        where: { active: true },
+        orderBy: { effectiveDate: "desc" },
+        select: { rateUsdToCdf: true },
+      }),
     ]);
 
     return NextResponse.json({
@@ -96,6 +101,7 @@ export async function GET(req: NextRequest) {
         counts: counts.map(serialize),
         pending: { count: pending._count, totalCdf: Number(pending._sum.differenceCdf ?? 0) },
         categories,
+        rate: Number(rateRow?.rateUsdToCdf ?? 2850) || 2850,
       },
     });
   } catch (error) {
