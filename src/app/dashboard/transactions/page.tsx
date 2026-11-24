@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useSession } from "next-auth/react";
-import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, Trash2, Edit, Receipt, Wine, UtensilsCrossed, Lock } from "lucide-react";
+import { Search, Printer, Calendar, Loader2, ArrowLeft, ArrowRight, Trash2, Edit, Receipt, Wine, UtensilsCrossed, Lock, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useReactToPrint } from "react-to-print";
@@ -12,6 +12,7 @@ import { showToast } from "@/components/ui/Toast";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 import EditTransactionModal from "@/components/transactions/EditTransactionModal";
 import CashCountPanel from "@/components/transactions/CashCountPanel";
+import SalesExportModal from "@/components/transactions/SalesExportModal";
 
 export default function TransactionsPage() {
     const { data: session } = useSession();
@@ -47,6 +48,7 @@ export default function TransactionsPage() {
     const [search, setSearch] = useState("");
     const [dateRange, setDateRange] = useState({ start: "", end: "" });
     const [period, setPeriod] = useState("day");
+    const [exportOpen, setExportOpen] = useState(false);
 
     // Modals State
     const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, id: string | null }>({ isOpen: false, id: null });
@@ -194,6 +196,11 @@ export default function TransactionsPage() {
                                 </h1>
                                 <p className="text-xs md:text-sm text-gray-500 hidden sm:block">Consultez les ventes validées et payées</p>
                             </div>
+                            <button type="button" onClick={() => setExportOpen(true)} className="ui-btn-primary">
+                                <FileDown size={16} />
+                                <span className="hidden sm:inline">Exporter en PDF</span>
+                                <span className="sm:hidden">PDF</span>
+                            </button>
                         </div>
 
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
@@ -619,6 +626,12 @@ export default function TransactionsPage() {
                         </button>
                     </div>
                 </div>
+
+                <SalesExportModal
+                    isOpen={exportOpen}
+                    onClose={() => setExportOpen(false)}
+                    filter={{ period, startDate: dateRange.start, endDate: dateRange.end, query: search, archives }}
+                />
 
                 {/* Confirm Delete Modal */}
                 <ConfirmationModal

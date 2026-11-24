@@ -19,6 +19,7 @@ import {
 } from "@/lib/cash-period";
 import { closedDayRefusal, getLockedUntil } from "@/lib/cash-count";
 import { createAuditLog } from "@/lib/audit";
+import { salesDateFilter } from "@/lib/sales-filter";
 
 /** Refuses changes to a completed sale of a closed day, except for admins (who are logged). */
 async function guardClosedSale(id: string, role: string | undefined) {
@@ -53,42 +54,8 @@ export async function GET(req: NextRequest) {
             ];
         }
 
-        // Date Filtering Logic
-        if (period && period !== "all") {
-            const now = new Date();
-            let start: Date;
-            if (period === "day") {
-                start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            } else if (period === "3days") {
-                start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
-                start.setHours(0, 0, 0, 0);
-            } else if (period === "week") {
-                const day = now.getDay();
-                const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-                start = new Date(now.setDate(diff));
-                start.setHours(0, 0, 0, 0);
-            } else if (period === "month") {
-                start = new Date(now.getFullYear(), now.getMonth(), 1);
-            } else if (period === "year") {
-                start = new Date(now.getFullYear(), 0, 1);
-            } else {
-                start = new Date(0); // Fallback
-            }
-            where.createdAt = { gte: start };
-        } else if (startDate && endDate) {
-            // A full timestamp (the mobile app sends the local day bounds) is taken as is;
-            // a bare date covers that whole day.
-            where.createdAt = {
-                gte: new Date(startDate),
-                lte: endDate.includes("T")
-                    ? new Date(endDate)
-                    : new Date(new Date(endDate).setHours(23, 59, 59, 999)),
-            };
-        } else if (startDate) {
-            where.createdAt = {
-                gte: new Date(startDate),
-            };
-        }
+        const createdAt = salesDateFilter(period, startDate, endDate);
+        if (createdAt) where.createdAt = createdAt;
 
         // Before the start date everything is archived: shown only when asked for.
         const archives = searchParams.get("archives") === "1";
