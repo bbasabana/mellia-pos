@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getStartDate, withEra } from "@/lib/cash-period";
 import { getOpenDayPeriod } from "@/lib/cash-count";
 import { salesDateFilter } from "@/lib/sales-filter";
+import { spaceOf } from "@/lib/sale-space";
 
 const PAYMENT_LABEL: Record<string, string> = {
   CASH: "Espèces",
@@ -21,22 +22,6 @@ const PAYMENT_LABEL: Record<string, string> = {
 };
 
 const MAX_TICKETS = 2000;
-
-type PriceRow = { priceCdf: unknown; priceUsd: unknown; space: { name: string } };
-
-/**
- * The sale line does not store the space (Terrasse / VIP): it is found back from the price
- * charged, compared with the product's prices per space. "Terrasse / VIP" when both cost
- * the same; "Autre prix" when the price no longer matches (changed since, or edited).
- */
-function spaceOf(prices: PriceRow[], unitCdf: number, unitUsd: number): string {
-  const byCdf = prices.filter((p) => Math.round(Number(p.priceCdf)) === Math.round(unitCdf) && unitCdf > 0);
-  const byUsd = prices.filter((p) => Math.abs(Number(p.priceUsd) - unitUsd) < 0.005 && unitUsd > 0);
-  const matches = byCdf.length > 0 ? byCdf : byUsd;
-  const names = [...new Set(matches.map((p) => p.space.name))];
-  if (names.length === 0) return "Autre prix";
-  return names.join(" / ");
-}
 
 /**
  * GET: every completed sale of a period, oldest first, with its articles, the space of

@@ -16,6 +16,8 @@ import {
     Wallet,
 } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
+import { emptyMoney, MoneyCount, moneyAmounts, moneyDetail, type MoneyValue } from "@/components/caisse/MoneyCount";
+import ClosureCheck from "@/components/transactions/ClosureCheck";
 
 type Expectation = {
     salesCashCdf: number;
@@ -83,16 +85,22 @@ export const dayLabel = (day: string, pattern = "EEE d MMM") => {
 /**
  * Clôture de la journée (Z). The drawer must hold: what the previous closure left in it +
  * cash sales − expenses paid from it since then. Purchases are not in it: they are paid
- * from the Caisse (menu Caisse). The cashier types the money
- * counted; the gap shows at once. Closing locks those sales; a manager then settles the gap
- * (loss, justified with its category, or surplus), which books the matching expense.
+ * from the Caisse (menu Caisse). The money counted is typed in dollars and francs; the gap
+ * shows at once and, before it is recorded, the open day is searched for its usual causes
+ * (duplicates, tickets worth the gap…). A gap needs an explanation. Closing locks those
+ * sales; a manager then settles the gap (loss, justified with its category, or surplus),
+ * which books the matching expense.
  */
+const MIN_EXPLANATION = 5;
 export default function CashCountPanel({
     role,
     onClosed,
+    onFindTicket,
 }: {
     role: string | undefined;
     onClosed?: () => void;
+    /** Shows a ticket in the sales list (search by its number). */
+    onFindTicket?: (ticketNum: string) => void;
 }) {
     const canSettle = role === "ADMIN" || role === "MANAGER";
     const isAdmin = role === "ADMIN";
@@ -105,7 +113,8 @@ export default function CashCountPanel({
     const [saving, setSaving] = useState(false);
     const [confirming, setConfirming] = useState(false);
 
-    const [counted, setCounted] = useState("");
+    const [money, setMoney] = useState<MoneyValue>(emptyMoney);
+    const [rate, setRate] = useState(2850);
     const [withdrawal, setWithdrawal] = useState("");
     const [notes, setNotes] = useState("");
     const [lastClosed, setLastClosed] = useState<DayClosure | null>(null);
@@ -123,6 +132,7 @@ export default function CashCountPanel({
             setCounts(json.data.counts);
             setPending(json.data.pending);
             setCategories(json.data.categories);
+            if (json.data.rate) setRate(json.data.rate);
         } catch {
             showToast("Impossible de charger la caisse", "error");
         } finally {
@@ -134,20 +144,25 @@ export default function CashCountPanel({
         load();
     }, [load]);
 
-    const countedCdf = digits(counted) ? Number(digits(counted)) : null;
+    const amounts = moneyAmounts(money, rate);
+    const countedCdf = amounts.filled ? amounts.totalCdf : null;
     const withdrawalCdf = Number(digits(withdrawal) || 0);
     const expected = open?.expectedCdf ?? 0;
     const diff = countedCdf === null ? null : countedCdf - expected;
     const withdrawalTooHigh = countedCdf !== null && withdrawalCdf > countedCdf;
+    const needsExplanation = diff !== null && diff !== 0 && notes.trim().length < MIN_EXPLANATION;
 
     const close = async () => {
-        if (countedCdf === null || withdrawalTooHigh) return;
+        if (countedCdf === null || withdrawalTooHigh || needsExplanation) return;
         setSaving(true);
         try {
+            // Keeps how the money was counted when dollars were in the drawer.
+            const detail = amounts.usd > 0 ? `Compté : ${moneyDetail(money, rate)}` : "";
+            const fullNotes = [notes.trim(), detail].filter(Boolean).join(" — ").slice(0, 500);
             const res = await fetch("/api/cash-counts", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ countedCdf, withdrawalCdf, notes }),
+                body: JSON.stringify({ countedCdf, withdrawalCdf, notes: fullNotes }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error || "Clôture impossible");
@@ -159,7 +174,7 @@ export default function CashCountPanel({
                     : `Journée clôturée avec un écart de ${fc(row.differenceCdf)} (à vérifier)`,
                 row.differenceCdf === 0 ? "success" : "info"
             );
-            setCounted("");
+            setMoney(emptyMoney);
             setWithdrawal("");
             setNotes("");
             setConfirming(false);
@@ -281,12 +296,21 @@ export default function CashCountPanel({
                             </div>
                             {open.expectation.salesOtherCdf > 0 && (
                                 <p className="text-[11px] text-gray-500">
-                                    Carte / Mobile Money : {fc(open.expectation.salesOtherCdf)} ({open.expectation.otherCount} tickets) — hors tiroir.
+                                    Carte / Mobile Money : {fc(open.expectation.salesOtherCdf)} ({open.expectation.otherCount} ticket{open.expectation.otherCount > 1 ? "s" : ""}) — hors tiroir.
                                 </p>
                             )}
-                            <p className="text-[11px] text-gray-500">
-                                Les achats ne sont pas déduits ici : ils sont payés avec l&apos;argent de la caisse (menu Caisse).
-                            </p>
+                            <div className="rounded-md bg-gray-50 border border-gray-100 p-2.5 text-[11px] text-gray-600 space-y-1">
+                                <p className="font-bold text-gray-700">Comment ce montant est calculé</p>
+                                <p>
+                                    Seules les ventes en espèces depuis {when(open.periodStart)} comptent
+                                    {open.openingFloatCdf !== 0 ? ", plus ce qui est resté dans le tiroir" : ""}, moins les dépenses payées
+                                    avec l&apos;argent du tiroir.
+                                </p>
+                                <p>
+                                    L&apos;argent du démarrage et les achats n&apos;y sont pas : ils sont suivis dans le menu Caisse. Les
+                                    factures annulées et le Mobile Money ne sont pas attendus dans le tiroir.
+                                </p>
+                            </div>
                         </>
                     )}
                 </div>
@@ -301,24 +325,17 @@ export default function CashCountPanel({
                     </div>
                 ) : (
                 <div className="space-y-3">
-                    <label className="block">
-                        <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Argent compté</span>
-                        <div className="mt-1 flex items-center border-2 border-gray-200 focus-within:border-[#00d3fa] rounded-lg md:rounded-sm px-3">
-                            <input
-                                id="closure-counted"
-                                inputMode="numeric"
-                                placeholder={expected > 0 ? expected.toLocaleString("fr-FR") : "0"}
-                                value={counted}
-                                onChange={(e) => {
-                                    setCounted(grouped(e.target.value));
-                                    setConfirming(false);
-                                }}
-                                disabled={!open?.ready}
-                                className="flex-1 py-3 text-2xl font-black outline-none bg-transparent"
-                            />
-                            <span className="text-gray-400 font-bold">FC</span>
-                        </div>
-                    </label>
+                    <div className={!open?.ready ? "pointer-events-none opacity-50" : ""}>
+                        <p className="text-[10px] uppercase font-black tracking-wider text-gray-400 mb-1">Argent compté dans le tiroir</p>
+                        <MoneyCount
+                            value={money}
+                            onChange={(v) => {
+                                setMoney(v);
+                                setConfirming(false);
+                            }}
+                            rate={rate}
+                        />
+                    </div>
 
                     {result && (
                         <div
@@ -363,21 +380,45 @@ export default function CashCountPanel({
                         </div>
                     )}
 
-                    {diff !== null && diff !== 0 && (
-                        <input
-                            id="closure-notes"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Explication de l'écart (ex : transport payé, erreur de monnaie…)"
-                            className="w-full text-sm border border-gray-200 rounded px-3 py-2"
-                        />
+                    {diff !== null && diff !== 0 && countedCdf !== null && (
+                        <>
+                            <ClosureCheck countedCdf={countedCdf} onFindTicket={onFindTicket} />
+                            <label className="block">
+                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">
+                                    {diff < 0 ? "Explication du manquant" : "Explication du surplus"} (obligatoire)
+                                </span>
+                                <textarea
+                                    id="closure-notes"
+                                    value={notes}
+                                    onChange={(e) => {
+                                        setNotes(e.target.value);
+                                        setConfirming(false);
+                                    }}
+                                    rows={2}
+                                    maxLength={400}
+                                    placeholder={
+                                        diff < 0
+                                            ? "Ex : facture 0012 en double, à annuler ; 5 000 FC de monnaie rendue en trop…"
+                                            : "Ex : facture annulée mais payée par le client…"
+                                    }
+                                    className={`mt-1 w-full text-sm border rounded px-3 py-2 ${
+                                        needsExplanation && notes.length > 0 ? "border-amber-400" : "border-gray-200"
+                                    }`}
+                                />
+                                {needsExplanation && (
+                                    <span className="text-[11px] text-amber-700">
+                                        Écrivez ce que vous avez trouvé (ou « non trouvé ») : l&apos;écart sera enregistré « à vérifier ».
+                                    </span>
+                                )}
+                            </label>
+                        </>
                     )}
 
                     {!confirming ? (
                         <button
                             type="button"
                             onClick={() => setConfirming(true)}
-                            disabled={countedCdf === null || withdrawalTooHigh || loading || !open?.ready}
+                            disabled={countedCdf === null || withdrawalTooHigh || needsExplanation || loading || !open?.ready}
                             className="w-full py-3 rounded-lg md:rounded-sm bg-gray-900 text-white font-bold disabled:opacity-40 flex items-center justify-center gap-2"
                         >
                             <Lock size={16} /> Clôturer la journée
