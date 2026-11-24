@@ -10,12 +10,14 @@ import {
     ArrowRight,
     Calculator,
     CheckCircle2,
+    FileDown,
     Flag,
     History,
     Info,
     Loader2,
     Lock,
     Minus,
+    Pencil,
     Plus,
     Receipt,
     RefreshCw,
@@ -31,6 +33,7 @@ import { Modal } from "@/components/ui/Modal";
 import { showToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { MoneyCount, emptyMoney, fc, moneyAmounts, moneyDetail, usd, type MoneyValue } from "@/components/caisse/MoneyCount";
+import ClosedDaysCard from "@/components/caisse/ClosedDaysCard";
 
 type CaisseData = {
     rate: number;
@@ -63,6 +66,9 @@ type CaisseData = {
         theoreticalCdf: number;
         differenceCdf: number;
         notes: string | null;
+        /** Only the latest count can be corrected. */
+        editable: boolean;
+        edited: number;
     }>;
     closures: Array<{
         id: string;
@@ -93,6 +99,26 @@ export default function CaissePage() {
     const [data, setData] = useState<CaisseData | null>(null);
     const [loading, setLoading] = useState(true);
     const [modal, setModal] = useState<null | "COUNT" | "OPENING" | "MONTH">(null);
+    const [editing, setEditing] = useState<CaisseData["counts"][number] | null>(null);
+    const [exporting, setExporting] = useState(false);
+
+    const exportPdf = async () => {
+        setExporting(true);
+        try {
+            const res = await fetch("/api/caisse/report");
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error || "Export impossible");
+            const { buildCaissePdf, caisseFileName } = await import("@/lib/caisse-pdf");
+            const { shareOrDownload } = await import("@/lib/sales-pdf");
+            const blob = await buildCaissePdf(json.data);
+            const how = await shareOrDownload(blob, caisseFileName(json.data), "Caisse Mellia");
+            showToast(how === "shared" ? "PDF prêt à partager" : "Rapport de caisse téléchargé", "success");
+        } catch (e) {
+            showToast(e instanceof Error ? e.message : "Export impossible", "error");
+        } finally {
+            setExporting(false);
+        }
+    };
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -134,6 +160,12 @@ export default function CaissePage() {
                         <button type="button" onClick={load} className="ui-btn-ghost" aria-label="Actualiser">
                             <RefreshCw size={16} className={cn(loading && "animate-spin")} />
                         </button>
+                        {isManager && data?.startDate && (
+                            <button type="button" onClick={exportPdf} disabled={exporting} className="ui-btn-ghost">
+                                {exporting ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+                                Exporter en PDF
+                            </button>
+                        )}
                         {canStart && (
                             <button type="button" onClick={() => setModal("OPENING")} className="ui-btn-ghost">
                                 <Flag size={16} />
@@ -194,10 +226,11 @@ export default function CaissePage() {
                                 </div>
                                 <div className="relative mt-auto pt-6 grid grid-cols-3 gap-3">
                                     <HeroStat label="Départ" value={fc(b.openingCdf)} />
-                                    <HeroStat label="Entrées" value={`+ ${fc(b.salesCashCdf)}`} tone="text-[#71de00]" />
+                                    {/* A surplus found when counting is money in, a shortfall money out. */}
+                                    <HeroStat label="Entrées" value={`+ ${fc(b.salesCashCdf + Math.max(0, -b.adjustmentsCdf))}`} tone="text-[#71de00]" />
                                     <HeroStat
                                         label="Sorties"
-                                        value={`− ${fc(b.expensesCdf + b.purchasesCdf + b.adjustmentsCdf)}`}
+                                        value={`− ${fc(b.expensesCdf + b.purchasesCdf + Math.max(0, b.adjustmentsCdf))}`}
                                         tone="text-[#ff8a5c]"
                                     />
                                 </div>
@@ -300,7 +333,8 @@ export default function CaissePage() {
                                 </div>
                             </div>
 
-                            {/* Counts */}
+                            {/* Counts and closed days */}
+                            <div className="flex flex-col gap-4">
                             <div className="ui-card overflow-hidden flex flex-col">
                                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                                     <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -343,10 +377,28 @@ export default function CaissePage() {
                                                     {usd(c.usd)} + {fc(c.cdf)} · {c.userName}
                                                 </p>
                                                 {c.notes && <p className="text-xs text-gray-400 mt-0.5">{c.notes}</p>}
+                                                {(c.edited > 0 || (c.editable && isManager)) && (
+                                                    <div className="mt-1 flex items-center justify-between gap-2">
+                                                        <span className="text-[11px] text-gray-400">
+                                                            {c.edited > 0 ? `Corrigé ${c.edited} fois` : ""}
+                                                        </span>
+                                                        {c.editable && isManager && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditing(c)}
+                                                                className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
+                                                            >
+                                                                <Pencil size={12} /> Modifier
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </li>
                                         ))}
                                     </ul>
                                 )}
+                            </div>
+                            <ClosedDaysCard canEdit={isAdmin} />
                             </div>
                         </div>
 
@@ -407,6 +459,9 @@ export default function CaissePage() {
 
             {data && modal === "COUNT" && (
                 <CountModal data={data} onClose={() => setModal(null)} onDone={load} />
+            )}
+            {data && editing && (
+                <CountModal data={data} count={editing} onClose={() => setEditing(null)} onDone={load} />
             )}
             {data && (modal === "OPENING" || modal === "MONTH") && (
                 <ClosureModal kind={modal} data={data} onClose={() => setModal(null)} onDone={load} />
@@ -492,25 +547,46 @@ function Gap({ diff }: { diff: number }) {
     );
 }
 
-function CountModal({ data, onClose, onDone }: { data: CaisseData; onClose: () => void; onDone: () => void }) {
-    const [money, setMoney] = useState<MoneyValue>(emptyMoney);
-    const [notes, setNotes] = useState("");
+/** A new count, or — with `count` — the correction of the latest one (dollars, francs, rate). */
+function CountModal({
+    data,
+    count,
+    onClose,
+    onDone,
+}: {
+    data: CaisseData;
+    count?: CaisseData["counts"][number];
+    onClose: () => void;
+    onDone: () => void;
+}) {
+    const [money, setMoney] = useState<MoneyValue>(
+        count ? { usd: count.usd ? String(count.usd) : "", cdf: count.cdf ? count.cdf.toLocaleString("fr-FR") : "" } : emptyMoney
+    );
+    const [notes, setNotes] = useState(count?.notes ?? "");
+    const [rateText, setRateText] = useState(String(count?.rate || data.rate));
     const [saving, setSaving] = useState(false);
-    const a = moneyAmounts(money, data.rate);
-    const diff = a.totalCdf - data.balanceCdf;
+    const rate = count ? Number(rateText.replace(/[^0-9.]/g, "")) || 0 : data.rate;
+    const a = moneyAmounts(money, rate);
+    // A correction is compared with what was expected when the money was counted.
+    const expected = count ? count.theoreticalCdf : data.balanceCdf;
+    const diff = a.totalCdf - expected;
 
     const save = async () => {
         setSaving(true);
         try {
             const res = await fetch("/api/caisse", {
-                method: "POST",
+                method: count ? "PATCH" : "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ usd: a.usd, cdf: a.cdf, notes }),
+                body: JSON.stringify(count ? { id: count.id, usd: a.usd, cdf: a.cdf, rate, notes } : { usd: a.usd, cdf: a.cdf, notes }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error);
             showToast(
-                json.data.differenceCdf === 0 ? "Comptage enregistré : caisse correcte" : `Comptage enregistré (${signed(json.data.differenceCdf)})`,
+                count
+                    ? "Comptage corrigé"
+                    : json.data.differenceCdf === 0
+                    ? "Comptage enregistré : caisse correcte"
+                    : `Comptage enregistré (${signed(json.data.differenceCdf)})`,
                 "success"
             );
             onClose();
@@ -523,15 +599,28 @@ function CountModal({ data, onClose, onDone }: { data: CaisseData; onClose: () =
     };
 
     return (
-        <Modal isOpen onClose={onClose} title="Compter la caisse" size="md">
+        <Modal isOpen onClose={onClose} title={count ? "Modifier le comptage" : "Compter la caisse"} size="md">
             <div className="space-y-4">
                 <p className="text-sm text-gray-500">
-                    Comptez l&apos;argent en main, dollars et francs séparément. L&apos;app convertit tout en francs au taux du jour.
+                    {count
+                        ? `Comptage du ${when(count.at, "d MMM 'à' HH:mm")} : corrigez les dollars, les francs ou le taux. L'ancien montant reste dans l'historique.`
+                        : "Comptez l'argent en main, dollars et francs séparément. L'app convertit tout en francs au taux du jour."}
                 </p>
-                <MoneyCount value={money} onChange={setMoney} rate={data.rate} autoFocus />
+                <MoneyCount value={money} onChange={setMoney} rate={rate || data.rate} autoFocus />
+                {count && (
+                    <label className="flex items-center justify-between gap-3 text-sm px-1">
+                        <span className="text-gray-500">Taux utilisé (1 $ en FC)</span>
+                        <input
+                            inputMode="numeric"
+                            value={rateText}
+                            onChange={(e) => setRateText(e.target.value.replace(/[^0-9.]/g, ""))}
+                            className="w-28 rounded-lg border border-gray-200 px-2 py-1.5 text-right font-semibold tabular-nums"
+                        />
+                    </label>
+                )}
                 <div className="flex items-center justify-between text-sm px-1">
-                    <span className="text-gray-500">Solde attendu</span>
-                    <span className="font-semibold tabular-nums">{fc(data.balanceCdf)}</span>
+                    <span className="text-gray-500">{count ? "Solde attendu au moment du comptage" : "Solde attendu"}</span>
+                    <span className="font-semibold tabular-nums">{fc(expected)}</span>
                 </div>
                 {a.filled && <Gap diff={diff} />}
                 <input
@@ -540,9 +629,9 @@ function CountModal({ data, onClose, onDone }: { data: CaisseData; onClose: () =
                     placeholder="Note (optionnel) — ex : argent des ventes du 24"
                     className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-900"
                 />
-                <button type="button" onClick={save} disabled={!a.filled || saving} className="ui-btn-primary w-full py-3">
+                <button type="button" onClick={save} disabled={!a.filled || saving || (!!count && rate <= 0)} className="ui-btn-primary w-full py-3">
                     {saving && <Loader2 size={16} className="animate-spin" />}
-                    Enregistrer {a.filled ? fc(a.totalCdf) : "le comptage"}
+                    {count ? "Enregistrer la correction" : "Enregistrer"} {a.filled ? fc(a.totalCdf) : count ? "" : "le comptage"}
                 </button>
             </div>
         </Modal>

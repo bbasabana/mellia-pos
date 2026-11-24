@@ -4,70 +4,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/audit";
-import {
-  ADJUSTMENT_CATEGORY_FILTER,
-  computeTheoreticalBalance,
-  ensureAdjustmentCategoryId,
-  getCashPeriodTotals,
-  getLastCashClosure,
-  getOpeningBalance,
-  getStartDate,
-} from "@/lib/cash-period";
+import { ensureAdjustmentCategoryId, getStartDate } from "@/lib/cash-period";
+import { activeRate, caisseState } from "@/lib/caisse-state";
 import { getCashExpectation, getOpenDayPeriod } from "@/lib/cash-count";
 
 type SessionUser = { id?: string; name?: string | null; role?: string };
 
 const MANAGERS = ["ADMIN", "MANAGER"];
-const DEFAULT_RATE = 2850;
-
-async function activeRate(): Promise<number> {
-  const row = await prisma.exchangeRate.findFirst({
-    where: { active: true },
-    orderBy: { effectiveDate: "desc" },
-    select: { rateUsdToCdf: true },
-  });
-  const rate = Number(row?.rateUsdToCdf ?? DEFAULT_RATE);
-  return Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_RATE;
-}
-
-/** The Caisse balance since the last start-up / month closure, and what it is made of. */
-async function caisseState() {
-  const lastClosure = await getLastCashClosure();
-  const openingBalance = getOpeningBalance(lastClosure);
-  const since = lastClosure?.closedAt ?? new Date(0);
-  const range = { gte: since, lte: new Date() };
-
-  const [totals, otherSales, cashSalesCount, ownerExpenses, ownerPurchases] = await Promise.all([
-    getCashPeriodTotals(range),
-    prisma.sale.aggregate({
-      where: { createdAt: range, status: "COMPLETED", paymentMethod: { not: "CASH" } },
-      _sum: { totalCdf: true },
-      _count: true,
-    }),
-    prisma.sale.count({ where: { createdAt: range, status: "COMPLETED", paymentMethod: "CASH" } }),
-    prisma.expense.aggregate({
-      where: { date: range, source: "OWNER_CAPITAL", NOT: ADJUSTMENT_CATEGORY_FILTER },
-      _sum: { amount: true },
-    }),
-    prisma.investment.aggregate({
-      where: { date: range, source: "OWNER_CAPITAL" },
-      _sum: { totalAmountCdf: true },
-    }),
-  ]);
-
-  return {
-    lastClosure,
-    openingBalance,
-    since: lastClosure?.closedAt ?? null,
-    totals,
-    balance: Math.round(computeTheoreticalBalance(openingBalance, totals)),
-    otherSales: { cdf: Number(otherSales._sum.totalCdf ?? 0), count: otherSales._count },
-    cashSalesCount,
-    ownerExpensesCdf: Number(ownerExpenses._sum.amount ?? 0),
-    ownerPurchasesCdf: Number(ownerPurchases._sum.totalAmountCdf ?? 0),
-  };
-}
-
 type CountMeta = {
   usd: number;
   cdf: number;
@@ -77,7 +20,27 @@ type CountMeta = {
   differenceCdf: number;
   notes?: string | null;
   expenseId?: string | null;
+  /** Earlier values when the count was corrected. */
+  edits?: Array<{ at: string; by: string; usd: number; cdf: number; rate: number; totalCdf: number }>;
 };
+
+const countDetail = (usd: number, cdf: number, rate: number) =>
+  `${usd.toLocaleString("fr-FR")} $ + ${cdf.toLocaleString("fr-FR")} FC (taux ${rate.toLocaleString("fr-FR")})`;
+
+const countDescription = (usd: number, cdf: number, rate: number, differenceCdf: number, notes: string) =>
+  `Comptage de la caisse : ${countDetail(usd, cdf, rate)} — ${differenceCdf > 0 ? "surplus" : "manquant"}${notes ? ` · ${notes}` : ""}`;
+
+/** Only the latest count can be corrected, and not once a start-up / month closure came after it. */
+async function editableCountId(): Promise<string | null> {
+  const latest = await prisma.auditLog.findFirst({
+    where: { action: "CASH_COUNT", entity: "Caisse" },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, createdAt: true },
+  });
+  if (!latest) return null;
+  const after = await prisma.cashMonthClosure.count({ where: { closedAt: { gt: latest.createdAt } } });
+  return after === 0 ? latest.id : null;
+}
 
 /** GET: the Caisse balance, its breakdown, the open day, recent counts and closures. */
 export async function GET() {
@@ -89,7 +52,7 @@ export async function GET() {
   }
 
   try {
-    const [state, rate, startDate, open, countLogs, closures] = await Promise.all([
+    const [state, rate, startDate, open, countLogs, closures, editableId] = await Promise.all([
       caisseState(),
       activeRate(),
       getStartDate(),
@@ -105,6 +68,7 @@ export async function GET() {
         take: 12,
         include: { user: { select: { name: true } } },
       }),
+      editableCountId(),
     ]);
 
     const expectation = await getCashExpectation(open.periodStart, open.periodEnd);
@@ -161,6 +125,8 @@ export async function GET() {
             theoreticalCdf: Number(m.theoreticalCdf ?? 0),
             differenceCdf: Number(m.differenceCdf ?? 0),
             notes: m.notes ?? null,
+            editable: log.id === editableId,
+            edited: (m.edits ?? []).length,
           };
         }),
         closures: closures.map((c) => ({
@@ -218,13 +184,12 @@ export async function POST(req: NextRequest) {
     const totalCdf = Math.round(usd * rate + cdf);
     const differenceCdf = totalCdf - state.balance;
 
-    const detail = `${usd.toLocaleString("fr-FR")} $ + ${cdf.toLocaleString("fr-FR")} FC (taux ${rate.toLocaleString("fr-FR")})`;
     let expenseId: string | null = null;
     if (differenceCdf !== 0) {
       const categoryId = await ensureAdjustmentCategoryId();
       const expense = await prisma.expense.create({
         data: {
-          description: `Comptage de la caisse : ${detail} — ${differenceCdf > 0 ? "surplus" : "manquant"}${notes ? ` · ${notes}` : ""}`,
+          description: countDescription(usd, cdf, rate, differenceCdf, notes),
           // A surplus is money found (negative correction), a shortfall money missing.
           amount: new Prisma.Decimal(-differenceCdf),
           categoryId,
@@ -251,6 +216,119 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data: meta });
   } catch (error) {
     console.error("[CAISSE_POST]", error);
+    return NextResponse.json({ success: false, error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH {id, usd, cdf, rate?, notes?}: corrects the latest count (a mistake in dollars, in
+ * francs or in the rate). The gap is recomputed against the balance expected at the time of
+ * the count, its correction is updated, and the earlier values are kept in the history.
+ */
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const user = session?.user as SessionUser | undefined;
+  if (!user?.id) return new NextResponse("Unauthorized", { status: 401 });
+  if (!MANAGERS.includes(user.role ?? "")) {
+    return NextResponse.json({ success: false, error: "Réservé au gérant et à l'administrateur" }, { status: 403 });
+  }
+
+  try {
+    const body = await req.json();
+    const id = String(body.id ?? "");
+    const usd = Math.round(Number(body.usd ?? 0) * 100) / 100;
+    const cdf = Math.round(Number(body.cdf ?? 0));
+    const notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 300) : "";
+    if (!Number.isFinite(usd) || usd < 0 || !Number.isFinite(cdf) || cdf < 0) {
+      return NextResponse.json({ success: false, error: "Montants invalides" }, { status: 400 });
+    }
+
+    const log = await prisma.auditLog.findUnique({ where: { id } });
+    if (!log || log.action !== "CASH_COUNT" || log.entity !== "Caisse") {
+      return NextResponse.json({ success: false, error: "Comptage introuvable" }, { status: 404 });
+    }
+    if ((await editableCountId()) !== id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Seul le dernier comptage peut être modifié, et pas après un démarrage ou une clôture du mois.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const before = (log.metadata ?? {}) as CountMeta;
+    const askedRate = Number(body.rate);
+    const rate = Number.isFinite(askedRate) && askedRate > 0 ? askedRate : Number(before.rate) || (await activeRate());
+    const totalCdf = Math.round(usd * rate + cdf);
+    const theoreticalCdf = Number(before.theoreticalCdf ?? 0);
+    const differenceCdf = totalCdf - theoreticalCdf;
+
+    const categoryId = differenceCdf !== 0 ? await ensureAdjustmentCategoryId() : null;
+    const meta = await prisma.$transaction(async (tx) => {
+      let expenseId = before.expenseId ?? null;
+      const existing = expenseId ? await tx.expense.findUnique({ where: { id: expenseId } }) : null;
+      if (differenceCdf === 0) {
+        if (existing) await tx.expense.delete({ where: { id: existing.id } });
+        expenseId = null;
+      } else if (existing) {
+        await tx.expense.update({
+          where: { id: existing.id },
+          data: { amount: new Prisma.Decimal(-differenceCdf), description: countDescription(usd, cdf, rate, differenceCdf, notes) },
+        });
+      } else {
+        const created = await tx.expense.create({
+          data: {
+            description: countDescription(usd, cdf, rate, differenceCdf, notes),
+            amount: new Prisma.Decimal(-differenceCdf),
+            categoryId: categoryId!,
+            source: "CASH_REGISTER",
+            userId: user.id!,
+            date: log.createdAt,
+          },
+        });
+        expenseId = created.id;
+      }
+
+      const next: CountMeta = {
+        usd,
+        cdf,
+        rate,
+        totalCdf,
+        theoreticalCdf,
+        differenceCdf,
+        notes: notes || null,
+        expenseId,
+        edits: [
+          ...(before.edits ?? []),
+          {
+            at: new Date().toISOString(),
+            by: session?.user?.name ?? "",
+            usd: Number(before.usd ?? 0),
+            cdf: Number(before.cdf ?? 0),
+            rate: Number(before.rate ?? 0),
+            totalCdf: Number(before.totalCdf ?? 0),
+          },
+        ],
+      };
+      await tx.auditLog.update({ where: { id }, data: { metadata: next, entityId: expenseId } });
+      return next;
+    }, { timeout: 20000 });
+
+    await createAuditLog({
+      userId: user.id,
+      action: "CASH_COUNT_EDIT",
+      entity: "Caisse",
+      entityId: id,
+      metadata: {
+        before: { usd: before.usd, cdf: before.cdf, rate: before.rate, totalCdf: before.totalCdf },
+        after: { usd, cdf, rate, totalCdf },
+      },
+    });
+
+    return NextResponse.json({ success: true, data: meta });
+  } catch (error) {
+    console.error("[CAISSE_PATCH]", error);
     return NextResponse.json({ success: false, error: "Erreur serveur" }, { status: 500 });
   }
 }

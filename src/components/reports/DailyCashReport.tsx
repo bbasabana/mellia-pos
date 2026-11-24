@@ -8,6 +8,23 @@ import { AlertTriangle, CalendarDays, HandCoins, Loader2, TrendingDown, Trending
 import { cn } from "@/lib/utils";
 import { CLOSURE_STATUS, dayLabel, fc, type DayClosure } from "@/components/transactions/CashCountPanel";
 
+type DayStatus = {
+    day: string;
+    closedReason: string | null;
+    salesCount: number;
+    salesCashCdf: number;
+    status: "CLOSED_OK" | "CLOSED_DAY" | "CLOSED_DAY_SALES" | "TO_CLOSE" | "NO_SALES" | "TODAY";
+};
+
+const DAY_STYLE: Record<DayStatus["status"], { label: string; className: string }> = {
+    CLOSED_OK: { label: "Clôturée", className: "bg-green-50 border-green-200 text-green-800" },
+    CLOSED_DAY: { label: "Fermé", className: "bg-gray-100 border-gray-200 text-gray-500" },
+    CLOSED_DAY_SALES: { label: "Fermé, mais ventes", className: "bg-amber-50 border-amber-300 text-amber-800" },
+    TO_CLOSE: { label: "À clôturer", className: "bg-amber-50 border-amber-300 text-amber-800" },
+    NO_SALES: { label: "Aucune vente", className: "bg-white border-gray-200 text-gray-500" },
+    TODAY: { label: "Aujourd'hui", className: "bg-sky-50 border-sky-200 text-sky-800" },
+};
+
 /** Current month in Kinshasa time (UTC+1), as YYYY-MM. */
 function currentMonth(): string {
     const d = new Date(Date.now() + 3600_000);
@@ -21,6 +38,7 @@ function currentMonth(): string {
 export default function DailyCashReport() {
     const [month, setMonth] = useState(currentMonth);
     const [rows, setRows] = useState<DayClosure[] | null>(null);
+    const [days, setDays] = useState<DayStatus[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(async () => {
@@ -32,6 +50,7 @@ export default function DailyCashReport() {
             if (!data.success) throw new Error(data.error || "Erreur de chargement");
             // Oldest first: the report reads like a ledger.
             setRows([...(data.data.counts as DayClosure[])].reverse());
+            setDays(data.data.days ?? []);
         } catch (e) {
             setError(e instanceof Error ? e.message : "Erreur réseau");
             setRows([]);
@@ -105,6 +124,36 @@ export default function DailyCashReport() {
                         <Tile icon={<HandCoins size={16} />} label="Versé au patron" value={fc(totals.withdrawals)}
                             hint={`Dépenses + achats caisse : ${fc(totals.outflows)}`} tone="text-purple-700" />
                     </div>
+
+                    {days.length > 0 && (
+                        <div className="bg-white border border-gray-200 rounded-sm shadow-sm p-3 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[10px] uppercase font-black tracking-wider text-gray-500">Jour par jour</p>
+                                <p className="text-[11px] text-gray-500">
+                                    {days.filter((d) => !d.closedReason).length} jour(s) ouvert(s) ·{" "}
+                                    {days.filter((d) => d.status === "CLOSED_OK").length} clôturé(s) ·{" "}
+                                    {days.filter((d) => d.closedReason).length} fermé(s)
+                                    {days.some((d) => d.status === "TO_CLOSE" || d.status === "CLOSED_DAY_SALES") && (
+                                        <span className="text-amber-700 font-bold">
+                                            {" "}· {days.filter((d) => d.status === "TO_CLOSE" || d.status === "CLOSED_DAY_SALES").length} à vérifier
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-1.5">
+                                {days.map((d) => {
+                                    const st = DAY_STYLE[d.status];
+                                    return (
+                                        <div key={d.day} className={cn("border rounded-sm px-2 py-1.5", st.className)} title={d.closedReason ?? st.label}>
+                                            <p className="text-[11px] font-bold capitalize">{dayLabel(d.day, "EEE d")}</p>
+                                            <p className="text-[10px] truncate">{d.closedReason && d.status === "CLOSED_DAY" ? d.closedReason : st.label}</p>
+                                            {d.salesCount > 0 && <p className="text-[10px] opacity-80">{d.salesCount} vente(s)</p>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {totals.toVerify > 0 && (
                         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-sm p-3 flex items-start gap-2">
