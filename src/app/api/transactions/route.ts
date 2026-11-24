@@ -475,16 +475,6 @@ export async function DELETE(req: NextRequest) {
         if (guard.refusal) {
             return NextResponse.json({ success: false, error: guard.refusal }, { status: 403 });
         }
-        if (guard.locked) {
-            await createAuditLog({
-                userId: session.user.id,
-                action: "DELETE_SALE",
-                entity: "Sale",
-                entityId: id,
-                metadata: { closedDay: true },
-            });
-        }
-
         const result = await prismaUnpooled.$transaction(async (tx) => {
             // 1. Get Sale with items
             const sale = await tx.sale.findUnique({
@@ -500,8 +490,10 @@ export async function DELETE(req: NextRequest) {
                 throw new Error("Seuls les administrateurs peuvent annuler une vente clôturée");
             }
 
-            // 2. Restore Stock
-            for (const item of sale.items) {
+            // 2. Restore Stock — only what the sale took out: a draft never deducted any, so
+            // cancelling it must not put anything back.
+            const tookStock = sale.status === "COMPLETED";
+            for (const item of tookStock ? sale.items : []) {
                 const product = await tx.product.findUnique({ where: { id: item.productId } });
                 if (product) {
                     await restoreStock(
@@ -540,7 +532,8 @@ export async function DELETE(req: NextRequest) {
             }
 
             // 4. Mark Sale as CANCELLED
-            return await tx.sale.update({
+            const before = { status: sale.status, ticketNum: sale.ticketNum, totalCdf: Number(sale.totalCdf) };
+            const cancelled = await tx.sale.update({
                 where: { id },
                 data: {
                     status: "CANCELLED",
@@ -556,9 +549,19 @@ export async function DELETE(req: NextRequest) {
                     }
                 }
             });
+            return { cancelled, before, stockRestored: tookStock };
         });
 
-        return NextResponse.json({ success: true, data: result });
+        // Every cancellation is traced: who, which ticket, and whether stock came back.
+        await createAuditLog({
+            userId: session.user.id,
+            action: "DELETE_SALE",
+            entity: "Sale",
+            entityId: id,
+            metadata: { ...result.before, stockRestored: result.stockRestored, closedDay: guard.locked },
+        });
+
+        return NextResponse.json({ success: true, data: result.cancelled });
 
     } catch (error: any) {
         console.error("Delete error:", error);
