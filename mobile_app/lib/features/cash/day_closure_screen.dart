@@ -238,12 +238,15 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // The day of the sales (not the start of the counted period).
           Text(
-            'Depuis ${_when(open['periodStart'])}',
+            DateTime.tryParse(open['day']?.toString() ?? '') != null
+                ? 'Journée du ${DateFormat('EEEE d MMMM', 'fr').format(DateTime.parse(open['day'].toString()))}'
+                : 'Depuis ${_when(open['periodStart'])}',
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           ),
           Text(
-            open['floatSource']?.toString() ?? '',
+            'Période comptée : ${open['floatSource']?.toString() ?? ''}',
             style: const TextStyle(color: AppTheme.muted, fontSize: 12),
           ),
           const SizedBox(height: 12),

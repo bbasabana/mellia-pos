@@ -37,6 +37,10 @@ type OpenDay = {
     floatSource: string;
     expectation: Expectation;
     expectedCdf: number;
+    /** YYYY-MM-DD: the day this closure accounts for (the day of its sales). */
+    day?: string;
+    firstSaleAt?: string | null;
+    lastSaleAt?: string | null;
 };
 
 type Status = "BALANCED" | "TO_VERIFY" | "LOSS" | "JUSTIFIED";
@@ -75,7 +79,8 @@ export const CLOSURE_STATUS: Record<Status, { label: string; className: string }
 export const fc = (v: number) => `${Math.round(v).toLocaleString("fr-FR")} FC`;
 const digits = (s: string) => s.replace(/[^0-9]/g, "");
 const grouped = (s: string) => (digits(s) ? Number(digits(s)).toLocaleString("fr-FR") : "");
-const when = (d: string) => format(new Date(d), "EEE d MMM HH:mm", { locale: fr });
+const hm = (d: string) => format(new Date(d), "HH:mm", { locale: fr });
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 /** "lun. 1 déc." for a business day YYYY-MM-DD (read as a calendar date, not an instant). */
 export const dayLabel = (day: string, pattern = "EEE d MMM") => {
     const [y, m, d] = day.split("-").map(Number);
@@ -272,8 +277,16 @@ export default function CashCountPanel({
                         </div>
                     ) : (
                         <>
+                            {open.day && (
+                                <p className="text-lg font-black text-gray-900 capitalize leading-tight">
+                                    Journée du {dayLabel(open.day, "EEEE d MMMM")}
+                                </p>
+                            )}
                             <p className="text-xs text-gray-500">
-                                Depuis {when(open.periodStart)} · {open.floatSource}
+                                {open.firstSaleAt && open.lastSaleAt
+                                    ? `Ventes de ${hm(open.firstSaleAt)} à ${hm(open.lastSaleAt)}`
+                                    : "Aucune vente pour l'instant"}
+                                {" · "}période comptée {lowerFirst(open.floatSource)}
                             </p>
                             {open.openingFloatCdf !== 0 && (
                                 <Line icon={<Wallet size={12} />} label="Resté dans le tiroir (clôture précédente)" tone="text-gray-700">
@@ -302,7 +315,7 @@ export default function CashCountPanel({
                             <div className="rounded-md bg-gray-50 border border-gray-100 p-2.5 text-[11px] text-gray-600 space-y-1">
                                 <p className="font-bold text-gray-700">Comment ce montant est calculé</p>
                                 <p>
-                                    Seules les ventes en espèces depuis {when(open.periodStart)} comptent
+                                    Seules les ventes en espèces depuis la dernière clôture comptent
                                     {open.openingFloatCdf !== 0 ? ", plus ce qui est resté dans le tiroir" : ""}, moins les dépenses payées
                                     avec l&apos;argent du tiroir.
                                 </p>
@@ -426,7 +439,12 @@ export default function CashCountPanel({
                     ) : (
                         <div className="rounded-lg md:rounded-sm border-2 border-gray-900 p-3 space-y-2">
                             <p className="text-sm text-gray-700">
-                                Les ventes depuis {open ? when(open.periodStart) : ""} seront <strong>verrouillées</strong>.
+                                {open?.day ? (
+                                    <>
+                                        La clôture sera enregistrée pour le <strong className="capitalize">{dayLabel(open.day, "EEEE d MMMM")}</strong>.
+                                    </>
+                                ) : null}{" "}
+                                Ces ventes seront ensuite <strong>verrouillées</strong>.
                                 {diff !== 0 && " L'écart sera noté « à vérifier » pour le gérant."}
                             </p>
                             <div className="grid grid-cols-2 gap-2">

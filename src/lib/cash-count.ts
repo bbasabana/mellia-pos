@@ -192,6 +192,37 @@ export function businessDay(periodEnd: Date): string {
   return new Date(periodEnd.getTime() + KINSHASA_MS - DAY_CUTOFF_MS).toISOString().slice(0, 10);
 }
 
+const NIGHT_MS = 6 * 3600_000;
+
+/** YYYY-MM-DD (Kinshasa) of a sale; one rung up before 06:00 belongs to the evening before. */
+export function saleDay(at: Date): string {
+  return new Date(at.getTime() + KINSHASA_MS - NIGHT_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * The day each closure accounts for: the day of its last sale, whatever the hour the till
+ * is counted (the sales of Monday stay Monday's even if the closure is made Tuesday
+ * afternoon). A period without any sale falls back on the closing time (`businessDay`).
+ */
+export async function closureDays(
+  rows: Array<{ id: string; periodStart: Date; periodEnd: Date }>
+): Promise<Map<string, string>> {
+  const days = new Map<string, string>();
+  if (rows.length === 0) return days;
+  const from = new Date(Math.min(...rows.map((r) => r.periodStart.getTime())));
+  const to = new Date(Math.max(...rows.map((r) => r.periodEnd.getTime())));
+  const sales = await prisma.sale.findMany({
+    where: { status: "COMPLETED", createdAt: { gte: from, lt: to } },
+    select: { createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  for (const r of rows) {
+    const last = sales.find((s) => s.createdAt >= r.periodStart && s.createdAt < r.periodEnd);
+    days.set(r.id, last ? saleDay(last.createdAt) : businessDay(r.periodEnd));
+  }
+  return days;
+}
+
 /** periodEnd range of the closures whose business day falls in month `m` (1-12) of `y`. */
 export function businessMonthRange(y: number, m: number): { gte: Date; lt: Date } {
   return {
