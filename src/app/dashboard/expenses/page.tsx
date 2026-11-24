@@ -1,1191 +1,664 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
-import {
-    Plus, Filter, Calendar, TrendingUp, TrendingDown,
-    ShoppingCart, Wallet, Loader2, DollarSign, X,
-    Edit, Trash2, PieChart, AlertCircle, Calculator, Lock, Flag, HandCoins
-} from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import {
+    ArrowRight,
+    Edit,
+    Loader2,
+    PieChart,
+    Plus,
+    Receipt,
+    Search,
+    Store,
+    Trash2,
+    TrendingDown,
+    UserRound,
+    Wallet,
+} from "lucide-react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import { Modal } from "@/components/ui/Modal";
 import { showToast } from "@/components/ui/Toast";
+import { cn } from "@/lib/utils";
 import { kinshasaDateStr, kinshasaTodayStr } from "@/components/purchases/purchase-format";
+import { fc, usd } from "@/components/caisse/MoneyCount";
+import { Pager } from "@/components/ui/Pager";
 
-interface Summary {
-    totalSales: number;
-    totalExpenses: number;
-    totalPurchases: number;
-    totalWithdrawals?: number;
-    balance: number;
-    totalExpensesBoss: number;
-    startDate: string | null;
-    canRedoStart?: boolean;
-    period: string;
-    openingBalance: number;
-    openPeriodStart: string | null;
-    lastClosure: {
-        label: string;
-        kind?: "MONTH" | "OPENING";
-        closedAt: string;
-        totalSalesCdf: number;
-        closingBalanceCdf: number;
-    } | null;
-}
-
-interface ClosurePreview {
-    openingBalance: number;
-    startDate: string | null;
-    checks: {
-        unclosedSales: number;
-        unclosedSince: string;
-        pendingGaps: number;
-    };
-    currentPeriod: {
-        totalSales: number;
-        totalExpenses: number;
-        totalPurchases: number;
-        totalWithdrawals?: number;
-        theoreticalBalance: number;
-    };
-    lastClosure: Summary["lastClosure"];
-}
-
-interface Category {
-    id: string;
-    name: string;
-}
-
-interface Expense {
+type Category = { id: string; name: string };
+type Expense = {
     id: string;
     description: string;
-    amount: number;
+    amount: number | string;
     date: string;
-    source: string;
-    category: { id: string, name: string };
+    source: "CASH_REGISTER" | "OWNER_CAPITAL";
+    category: Category;
     user: { name: string };
-}
+};
+type Source = "ALL" | "CASH_REGISTER" | "OWNER_CAPITAL";
+
+const PERIODS = [
+    { id: "today", label: "Aujourd'hui" },
+    { id: "week", label: "Semaine" },
+    { id: "month", label: "Mois" },
+    { id: "current", label: "Depuis la clôture" },
+    { id: "all", label: "Tout" },
+];
+const PAGE_SIZE = 12;
+
+const SOURCE_LABEL: Record<Expense["source"], string> = {
+    CASH_REGISTER: "Caisse",
+    OWNER_CAPITAL: "Patron",
+};
 
 export default function ExpensesPage() {
     const { data: session } = useSession();
-    const role = (session?.user as { role?: string })?.role || "";
-    const isManager = ["ADMIN", "MANAGER"].includes(role);
-    const isAdmin = role === "ADMIN";
+    const isAdmin = (session?.user as { role?: string } | undefined)?.role === "ADMIN";
 
-    const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState("current");
-    const [summary, setSummary] = useState<Summary | null>(null);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [showModal, setShowModal] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
+    const [rate, setRate] = useState(2850);
+    const [loading, setLoading] = useState(true);
 
-    // Filters
-    const [selectedCategory, setSelectedCategory] = useState("ALL");
+    const [query, setQuery] = useState("");
+    const [category, setCategory] = useState("ALL");
+    const [source, setSource] = useState<Source>("ALL");
+    const [page, setPage] = useState(1);
 
-    const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-    const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
-    const [showClosureModal, setShowClosureModal] = useState(false);
-    const [actualCash, setActualCash] = useState("");
-    const [closingCash, setClosingCash] = useState("");
-    const [closureNotes, setClosureNotes] = useState("");
-    const [closurePreview, setClosurePreview] = useState<ClosurePreview | null>(null);
-    // "OPENING" = clôture de démarrage (admin, once, before going live); "MONTH" = monthly closure.
-    const [closureKind, setClosureKind] = useState<"MONTH" | "OPENING">("MONTH");
-    const [forceClosure, setForceClosure] = useState(false);
+    const [editing, setEditing] = useState<Expense | null>(null);
+    const [formOpen, setFormOpen] = useState(false);
+    const [deleting, setDeleting] = useState<Expense | null>(null);
+    const [busy, setBusy] = useState(false);
 
-    // Form State
-    const [formData, setFormData] = useState({
-        description: "",
-        amount: "",
-        categoryId: "",
-        source: "CASH_REGISTER",
-        date: kinshasaTodayStr()
-    });
-
-    useEffect(() => {
-        if (editingExpense) {
-            setFormData({
-                description: editingExpense.description,
-                amount: editingExpense.amount.toString(),
-                categoryId: editingExpense.category.id,
-                source: editingExpense.source,
-                date: kinshasaDateStr(editingExpense.date)
-            });
-            setShowModal(true);
-        } else {
-            setFormData({
-                description: "",
-                amount: "",
-                categoryId: "",
-                source: "CASH_REGISTER",
-                date: kinshasaTodayStr()
-            });
-        }
-    }, [editingExpense]);
-
-    const fetchData = useCallback(async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [sumRes, expRes, catRes] = await Promise.all([
-                fetch(`/api/expenses/summary?period=${period}`),
+            const [expRes, catRes] = await Promise.all([
                 fetch(`/api/expenses?period=${period}`),
-                fetch(`/api/expenses/categories`)
+                fetch("/api/expenses/categories"),
             ]);
-
-            const sumData = await sumRes.json();
-            const expData = await expRes.json();
-            const catData = await catRes.json();
-
-            if (sumData.success) {
-                setSummary(sumData.data);
-            } else {
-                console.error("❌ [Expenses] Failed to fetch summary:", sumData.error);
-            }
-
-            if (expData.success) setExpenses(expData.data);
-            if (catData.success) {
-                setCategories(catData.data);
-                // Ensure "Ajustement de Caisse" category exists in background if needed
-            }
-        } catch (error) {
-            console.error("❌ [Expenses] Error fetching data:", error);
+            const [expJson, catJson] = await Promise.all([expRes.json(), catRes.json()]);
+            if (expJson.success) setExpenses(expJson.data);
+            // Count corrections live in the Caisse menu, not here.
+            if (catJson.success) setCategories(catJson.data.filter((c: Category) => !/ajustement/i.test(c.name)));
+        } catch {
+            showToast("Impossible de charger les dépenses", "error");
         } finally {
             setLoading(false);
         }
     }, [period]);
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        load();
+    }, [load]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSubmitting(true);
-        try {
-            const method = editingExpense ? "PUT" : "POST";
-            const res = await fetch("/api/expenses", {
-                method,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...formData,
-                    id: editingExpense?.id,
-                    amount: parseFloat(formData.amount)
-                })
-            });
-
-            const data = await res.json();
-            if (data.success) {
-                setShowModal(false);
-                setEditingExpense(null);
-                fetchData();
-                showToast(editingExpense ? "Dépense modifiée" : "Dépense enregistrée", "success");
-            } else {
-                showToast("Erreur: " + data.error, "error");
-            }
-        } catch (error) {
-            showToast("Une erreur est survenue", "error");
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleDelete = async (id: string) => {
-        setIsDeleting(true);
-        try {
-            const res = await fetch(`/api/expenses?id=${id}`, { method: "DELETE" });
-            const data = await res.json();
-            if (data.success) {
-                showToast("Dépense supprimée", "success");
-                setConfirmDeleteId(null);
-                fetchData();
-            } else {
-                showToast(data.error || "Erreur de suppression", "error");
-            }
-        } catch (error) {
-            showToast("Erreur réseau", "error");
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const fetchClosurePreview = useCallback(async (kind: "MONTH" | "OPENING") => {
-        try {
-            const res = await fetch("/api/expenses/month-closure");
-            const data = await res.json();
-            if (data.success) {
-                setClosurePreview(data.data);
-                setClosingCash(kind === "OPENING" ? "" : String(data.data.currentPeriod.theoreticalBalance));
-            }
-        } catch (error) {
-            console.error("Failed to fetch closure preview", error);
-        }
+    useEffect(() => {
+        fetch("/api/exchange-rate")
+            .then((r) => r.json())
+            .then((j) => j.success && setRate(Number(j.data.rateUsdToCdf) || 2850))
+            .catch(() => undefined);
     }, []);
 
-    const openClosureModal = (kind: "MONTH" | "OPENING") => {
-        setClosureKind(kind);
-        setForceClosure(false);
-        setClosurePreview(null);
-        fetchClosurePreview(kind);
-        setClosureNotes("");
-        setShowClosureModal(true);
-    };
+    useEffect(() => setPage(1), [period, query, category, source]);
 
-    const handleMonthClosure = async () => {
-        const closingBalanceCdf = Number(closingCash);
-        if (closingCash.trim() === "" || !Number.isFinite(closingBalanceCdf) || closingBalanceCdf < 0) {
-            showToast("Saisissez l'argent réellement compté en caisse", "error");
-            return;
-        }
-        if (forceClosure && !closureNotes.trim()) {
-            showToast("Le motif est obligatoire pour forcer la clôture", "error");
-            return;
-        }
+    const amount = (e: Expense) => Number(e.amount) || 0;
 
-        setSubmitting(true);
+    const totals = useMemo(() => {
+        const t = { all: 0, caisse: 0, patron: 0 };
+        for (const e of expenses) {
+            t.all += amount(e);
+            if (e.source === "OWNER_CAPITAL") t.patron += amount(e);
+            else t.caisse += amount(e);
+        }
+        return t;
+    }, [expenses]);
+
+    const byCategory = useMemo(() => {
+        const map = new Map<string, { name: string; total: number; count: number }>();
+        for (const e of expenses) {
+            const name = e.category?.name ?? "Autre";
+            const row = map.get(name) ?? { name, total: 0, count: 0 };
+            row.total += amount(e);
+            row.count += 1;
+            map.set(name, row);
+        }
+        return [...map.values()].sort((a, b) => b.total - a.total);
+    }, [expenses]);
+
+    const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return expenses.filter(
+            (e) =>
+                (category === "ALL" || e.category?.id === category) &&
+                (source === "ALL" || e.source === source) &&
+                (!q || e.description.toLowerCase().includes(q) || e.category?.name.toLowerCase().includes(q))
+        );
+    }, [expenses, query, category, source]);
+
+    const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const shown = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const filteredTotal = filtered.reduce((s, e) => s + amount(e), 0);
+
+    const remove = async () => {
+        if (!deleting) return;
+        setBusy(true);
         try {
-            const res = await fetch("/api/expenses/month-closure", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    kind: closureKind,
-                    closingBalanceCdf,
-                    notes: closureNotes,
-                    force: forceClosure,
-                }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                showToast(
-                    closureKind === "OPENING"
-                        ? `Démarrage enregistré — ${formatCurrency(data.data.closingBalanceCdf)} en caisse`
-                        : `Mois clôturé — ${formatCurrency(data.data.closingBalanceCdf)} reportés`,
-                    "success"
-                );
-                setShowClosureModal(false);
-                fetchData();
-            } else {
-                showToast(data.error || "Erreur de clôture", "error");
-            }
-        } catch {
-            showToast("Erreur réseau", "error");
+            const res = await fetch(`/api/expenses?id=${deleting.id}`, { method: "DELETE" });
+            const json = await res.json().catch(() => ({ success: false }));
+            if (!json.success) throw new Error(json.error || "Suppression impossible");
+            showToast("Dépense supprimée", "success");
+            setDeleting(null);
+            load();
+        } catch (e) {
+            showToast(e instanceof Error ? e.message : "Suppression impossible", "error");
         } finally {
-            setSubmitting(false);
+            setBusy(false);
         }
     };
-
-    const getPeriodLabel = () => {
-        if (period === "current") return "Période en cours";
-        if (period === "all") return "Depuis le début";
-        if (period === "today") return "Aujourd'hui";
-        if (period === "week") return "Cette semaine";
-        if (period === "month") return "Ce mois";
-        return "Cette année";
-    };
-
-    const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat('fr-CD', {
-            style: 'currency',
-            currency: 'CDF',
-            maximumFractionDigits: 0
-        }).format(val).replace('CDF', 'FC');
-    };
-
-    // Filter Logic
-    const filteredExpenses = selectedCategory === "ALL"
-        ? expenses
-        : expenses.filter(e => e.category?.id === selectedCategory);
-
-    // Group Top Expenses
-    const topExpenses = Object.values(expenses.reduce((acc: any, curr) => {
-        const catName = curr.category?.name || "Autre";
-        if (!acc[catName]) acc[catName] = { name: catName, total: 0, count: 0 };
-        acc[catName].total += Number(curr.amount);
-        acc[catName].count += 1;
-        return acc;
-    }, {})).sort((a: any, b: any) => b.total - a.total).slice(0, 5);
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col h-full">
-                {/* HEADER */}
-                <div className="px-1 pb-5 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="max-w-7xl mx-auto space-y-6">
+                {/* Header */}
+                <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
                     <div>
                         <h1 className="ui-page-title flex items-center gap-2.5">
-                            <DollarSign className="text-[#00d3fa]" />
-                            Gestion des Dépenses & Trésorerie
+                            <TrendingDown className="text-[#ff4900]" />
+                            Dépenses
                         </h1>
-                        <p className="text-sm text-gray-500">Suivi des flux financiers et du solde de caisse</p>
+                        <p className="ui-page-subtitle mt-1">Transport, carburant, petites courses… et qui les a payées.</p>
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 bg-white p-1 rounded-sm border border-gray-200 shadow-sm">
-                            <span className="text-[10px] uppercase font-bold text-gray-400 px-2 flex items-center gap-1">
-                                <Calendar size={12} /> Période
-                            </span>
-                            <select
-                                value={period}
-                                onChange={(e) => setPeriod(e.target.value)}
-                                className="bg-transparent border-l border-gray-100 px-3 py-1.5 text-xs font-bold text-gray-800 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
-                            >
-                                <option value="current">Période en cours</option>
-                                <option value="all">Toutes</option>
-                                <option value="today">Aujourd&apos;hui</option>
-                                <option value="week">Cette Semaine</option>
-                                <option value="month">Ce Mois</option>
-                                <option value="year">Cette Année</option>
-                            </select>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex rounded-lg bg-gray-100 p-1 overflow-x-auto">
+                            {PERIODS.map((p) => (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => setPeriod(p.id)}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-semibold rounded-md whitespace-nowrap transition-colors",
+                                        period === p.id ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
+                                    )}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
                         </div>
-                        {summary && isAdmin && (!summary.startDate || summary.canRedoStart) && (
-                            <button
-                                className={cn(
-                                    "px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 transition-all shadow-md active:scale-95",
-                                    summary.startDate
-                                        ? "bg-white text-indigo-900 border border-indigo-200 hover:bg-indigo-50"
-                                        : "bg-indigo-900 text-white hover:bg-indigo-950"
-                                )}
-                                onClick={() => openClosureModal("OPENING")}
-                            >
-                                <Flag size={16} />
-                                {summary.startDate ? "Refaire le démarrage" : "Clôture de démarrage"}
-                            </button>
-                        )}
-                        {summary?.startDate && isManager && (
-                            <button
-                                className="bg-blue-600 text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition-all shadow-md active:scale-95"
-                                onClick={() => openClosureModal("MONTH")}
-                            >
-                                <Lock size={16} />
-                                Clôturer le mois
-                            </button>
-                        )}
                         <button
-                            className="bg-black text-white px-4 py-2 rounded-sm font-bold text-sm flex items-center gap-2 hover:bg-gray-800 transition-all shadow-md active:scale-95"
-                            onClick={() => { setEditingExpense(null); setShowModal(true); }}
+                            type="button"
+                            onClick={() => {
+                                setEditing(null);
+                                setFormOpen(true);
+                            }}
+                            className="ui-btn-primary"
                         >
-                            <Plus size={16} />
-                            Nouvelle Dépense
+                            <Plus size={16} /> Nouvelle dépense
                         </button>
                     </div>
                 </div>
 
-                {/* CONTENT AREA */}
-                <div className="flex-1 overflow-auto px-1 pb-2 space-y-6">
-                    {/* Summary Cards */}
-                    {loading && !summary ? (
-                        <div className="flex justify-center p-12">
-                            <Loader2 className="animate-spin text-[#00d3fa]" size={40} />
-                        </div>
-                    ) : (
-                        <>
-                            {summary && !summary.startDate && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-sm p-4 flex items-start gap-3">
-                                    <Flag size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                                    <div className="text-sm text-amber-900">
-                                        <p className="font-bold">La caisse n&apos;a pas encore de date de démarrage.</p>
-                                        <p className="text-xs mt-1 text-amber-800">
-                                            Faites la <strong>Clôture de démarrage</strong>{isAdmin ? " (bouton en haut)" : " (administrateur)"} :
-                                            tout ce qui précède passe en archives (rien n&apos;est supprimé, mais plus rien ne compte dans les totaux).
-                                            Pas encore compté l&apos;argent ? Démarrez avec 0 FC, puis refaites le démarrage avec le bon montant
-                                            après le comptage. Les clôtures de journée et de mois ne sont possibles qu&apos;après.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-                            {summary?.startDate && (
-                                <p className="text-[11px] text-gray-500 flex items-center gap-1.5">
-                                    <Flag size={12} className="text-indigo-500" />
-                                    Démarrage le {format(new Date(summary.startDate), "dd MMMM yyyy 'à' HH:mm", { locale: fr })} —
-                                    les opérations antérieures sont en archives.
-                                    {summary.canRedoStart && (
-                                        <span className="text-indigo-600 font-semibold">
-                                            {" "}Montant de départ : {formatCurrency(summary.openingBalance)} — peut encore être refait tant qu&apos;aucune journée n&apos;est clôturée.
-                                        </span>
-                                    )}
-                                </p>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                                {(summary?.openingBalance || 0) > 0 && (
-                                    <KpiCard
-                                        title="Solde reporté (clôture)"
-                                        value={formatCurrency(summary?.openingBalance || 0)}
-                                        icon={<Lock size={20} />}
-                                        color="bg-indigo-50 text-indigo-600 border-indigo-100"
-                                    />
-                                )}
-                                <KpiCard
-                                    title={`Ventes — ${getPeriodLabel()}`}
-                                    value={formatCurrency(summary?.totalSales || 0)}
-                                    icon={<TrendingUp size={20} />}
-                                    color="bg-green-50 text-green-600 border-green-100"
+                {/* KPIs */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Kpi label="Total des dépenses" value={fc(totals.all)} sub={usd(totals.all / rate)} icon={<Receipt size={18} />} tone="bg-gray-900 text-white" />
+                    <Kpi
+                        label="Payées par la caisse"
+                        value={fc(totals.caisse)}
+                        sub="Retirées du solde de caisse"
+                        icon={<Store size={18} />}
+                        tone="bg-red-50 text-red-600"
+                    />
+                    <Kpi
+                        label="Payées par le patron"
+                        value={fc(totals.patron)}
+                        sub="Son argent : non retiré"
+                        icon={<UserRound size={18} />}
+                        tone="bg-purple-50 text-purple-600"
+                    />
+                    <Kpi
+                        label="Opérations"
+                        value={String(expenses.length)}
+                        sub={byCategory[0] ? `Poste principal : ${byCategory[0].name}` : "—"}
+                        icon={<PieChart size={18} />}
+                        tone="bg-blue-50 text-blue-600"
+                    />
+                </div>
+
+                <Link
+                    href="/dashboard/caisse"
+                    className="ui-card px-4 py-3 flex items-center justify-between gap-3 hover:border-gray-300 transition-colors"
+                >
+                    <span className="flex items-center gap-3 text-sm text-gray-600">
+                        <span className="h-8 w-8 rounded-lg bg-[#00d3fa]/10 text-[#0891b2] flex items-center justify-center shrink-0">
+                            <Wallet size={16} />
+                        </span>
+                        <span>
+                            Le solde de caisse, le comptage de l&apos;argent ($ et FC), le démarrage et la clôture du mois sont dans le
+                            menu <strong className="text-gray-900">Caisse</strong>.
+                        </span>
+                    </span>
+                    <ArrowRight size={16} className="text-gray-400 shrink-0" />
+                </Link>
+
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                    {/* List */}
+                    <div className="xl:col-span-2 ui-card overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:flex-wrap gap-2">
+                            <div className="relative flex-1 min-w-[220px]">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <input
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    placeholder="Rechercher une dépense…"
+                                    className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm outline-none focus:border-gray-900"
                                 />
-                                <KpiCard
-                                    title="Dépenses payées par Caisse"
-                                    value={'- ' + formatCurrency(summary?.totalExpenses || 0)}
-                                    icon={<TrendingDown size={20} />}
-                                    color="bg-red-50 text-red-500 border-red-100"
-                                />
-                                <KpiCard
-                                    title="Achats payés par Caisse"
-                                    value={'- ' + formatCurrency(summary?.totalPurchases || 0)}
-                                    icon={<ShoppingCart size={20} />}
-                                    color="bg-orange-50 text-orange-500 border-orange-100"
-                                />
-                                <div className="bg-blue-600 p-4 rounded-sm shadow-md flex flex-col justify-between text-white relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-110 transition-transform">
-                                        <Wallet size={48} />
-                                    </div>
-                                    <div className="flex justify-between items-start">
-                                        <p className="text-[10px] uppercase font-bold tracking-wider opacity-80">Solde Théorique Caisse</p>
-                                        <button
-                                            onClick={() => { setActualCash(summary?.balance.toString() || "0"); setShowAdjustmentModal(true); }}
-                                            className="text-[8px] font-black uppercase bg-white/20 px-1.5 py-0.5 rounded hover:bg-white/40 transition-colors"
-                                        >
-                                            Ajuster
-                                        </button>
-                                    </div>
-                                    <p className="text-2xl font-black mt-1 tracking-tight">
-                                        {formatCurrency(summary?.balance || 0)}
-                                    </p>
-                                    <div className="mt-2 text-[10px] font-medium bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm self-start">
-                                        Total Caisse en FC
-                                    </div>
-                                </div>
                             </div>
-
-                            {summary?.lastClosure && (
-                                <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                    <div>
-                                        <p className="text-[10px] uppercase font-black text-indigo-500 tracking-wider">
-                                        {summary.lastClosure.kind === "OPENING" ? "Clôture de démarrage" : "Dernière clôture"}
-                                    </p>
-                                        <p className="font-bold text-indigo-900 text-sm mt-1">{summary.lastClosure.label}</p>
-                                        <p className="text-xs text-indigo-600 mt-0.5">
-                                            Recettes : {formatCurrency(summary.lastClosure.totalSalesCdf)} · Reporté : {formatCurrency(summary.lastClosure.closingBalanceCdf)}
-                                        </p>
-                                    </div>
-                                    <p className="text-[10px] text-indigo-400 font-medium">
-                                        {format(new Date(summary.lastClosure.closedAt), "dd MMM yyyy HH:mm", { locale: fr })}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Cash Flow Breakdown */}
-                            <div className="bg-white border border-gray-200 rounded-sm shadow-sm p-6">
-                                <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <Calculator size={16} className="text-[#00d3fa]" />
-                                    Détail du Solde de Caisse
-                                </h3>
-                                
-                                <div className="space-y-3">
-                                    {(summary?.openingBalance || 0) > 0 && (
-                                        <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-4">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm text-indigo-700 font-medium flex items-center gap-1">
-                                                    <Lock size={12} className="text-indigo-500" />
-                                                    Solde reporté (après dernière clôture)
-                                                </span>
-                                                <span className="text-lg font-black text-indigo-800">{formatCurrency(summary?.openingBalance || 0)}</span>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Entries */}
-                                    <div className="bg-green-50 border border-green-100 rounded-sm p-4">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <TrendingUp size={16} className="text-green-600" />
-                                                <span className="text-[10px] uppercase font-bold text-green-600 tracking-wider">Entrées</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm text-green-700 font-medium">Ventes encaissées (CASH)</span>
-                                            <span className="text-lg font-black text-green-800">{formatCurrency(summary?.totalSales || 0)}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Exits */}
-                                    <div className="bg-red-50 border border-red-100 rounded-sm p-4">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <TrendingDown size={16} className="text-red-600" />
-                                                <span className="text-[10px] uppercase font-bold text-red-600 tracking-wider">Sorties</span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm text-red-700 font-medium flex items-center gap-1">
-                                                    <DollarSign size={12} className="text-red-500" />
-                                                    Dépenses journalières
-                                                </span>
-                                                <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalExpenses || 0)}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm text-red-700 font-medium flex items-center gap-1">
-                                                    <ShoppingCart size={12} className="text-red-500" />
-                                                    Achats de stock
-                                                </span>
-                                                <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalPurchases || 0)}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm text-red-700 font-medium flex items-center gap-1">
-                                                    <HandCoins size={12} className="text-red-500" />
-                                                    Versements au patron (clôtures de journée)
-                                                </span>
-                                                <span className="text-base font-bold text-red-800">{formatCurrency(summary?.totalWithdrawals || 0)}</span>
-                                            </div>
-                                            <div className="border-t border-red-200 pt-2 mt-2">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-xs uppercase font-bold text-red-600">Total Sorties</span>
-                                                    <span className="text-lg font-black text-red-800">
-                                                        {formatCurrency((summary?.totalExpenses || 0) + (summary?.totalPurchases || 0) + (summary?.totalWithdrawals || 0))}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Final Balance with Adjustment Button */}
-                                    <div className="bg-[#00d3fa]/10 border-2 border-[#00d3fa] rounded-sm p-4">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <Wallet size={16} className="text-[#00d3fa]" />
-                                                <div className="text-[10px] uppercase font-bold text-[#00d3fa] tracking-wider">Résultat</div>
-                                            </div>
-                                            <button
-                                                onClick={() => { setActualCash(summary?.balance.toString() || "0"); setShowAdjustmentModal(true); }}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-blue-700 transition-all shadow-sm"
-                                            >
-                                                <Edit size={12} />
-                                                Ajuster le Solde
-                                            </button>
-                                        </div>
-                                        
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <div className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                                    <Wallet size={14} className="text-gray-500" />
-                                                    Argent à la Main (Caisse)
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-2xl font-black text-[#00d3fa]">
-                                                    {formatCurrency(summary?.balance || 0)}
-                                                </div>
-                                                <div className="text-[10px] text-gray-500 font-medium mt-1">
-                                                    {getPeriodLabel()}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Info Box */}
-                                    <div className="bg-blue-50 border border-blue-100 rounded-sm p-3">
-                                        <div className="flex items-start gap-2">
-                                            <AlertCircle size={14} className="text-blue-600 mt-0.5 shrink-0" />
-                                            <div className="text-xs text-blue-700 leading-relaxed">
-                                                <strong>Formule:</strong> Solde = Report clôture + Ventes cash - Dépenses - Achats - Versements au patron
-                                                <br />
-                                                <span className="text-[10px] text-blue-600 mt-1 inline-block">
-                                                    Chaque soir : Historique des ventes › Clôturer la journée. En fin de mois : « Clôturer le mois », qui vérifie que toutes les journées sont clôturées et les écarts réglés.
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* LEFT: Expenses Table */}
-                        <div className="lg:col-span-2 space-y-4">
-                            {/* Filters */}
-                            <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                                <button
-                                    onClick={() => setSelectedCategory("ALL")}
-                                    className={cn(
-                                        "px-3 py-1.5 text-xs font-bold rounded-full border transition-all whitespace-nowrap",
-                                        selectedCategory === "ALL"
-                                            ? "bg-gray-800 text-white border-gray-800"
-                                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                                    )}
-                                >
-                                    Tout voir
-                                </button>
-                                {categories.map(cat => (
+                            <select
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white outline-none focus:border-gray-900"
+                                aria-label="Catégorie"
+                            >
+                                <option value="ALL">Toutes les catégories</option>
+                                {categories.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="flex rounded-lg bg-gray-100 p-1">
+                                {(["ALL", "CASH_REGISTER", "OWNER_CAPITAL"] as Source[]).map((s) => (
                                     <button
-                                        key={cat.id}
-                                        onClick={() => setSelectedCategory(cat.id)}
+                                        key={s}
+                                        type="button"
+                                        onClick={() => setSource(s)}
                                         className={cn(
-                                            "px-3 py-1.5 text-xs font-bold rounded-full border transition-all whitespace-nowrap",
-                                            selectedCategory === cat.id
-                                                ? "bg-gray-800 text-white border-gray-800"
-                                                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                                            "px-3 py-1 text-xs font-semibold rounded-md whitespace-nowrap",
+                                            source === s ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
                                         )}
                                     >
-                                        {cat.name}
+                                        {s === "ALL" ? "Tous" : SOURCE_LABEL[s]}
                                     </button>
                                 ))}
                             </div>
-
-                            <div className="bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm">
-                                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
-                                    <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider flex items-center gap-2">
-                                        <Filter size={14} className="text-gray-400" />
-                                        Historique Détaillé
-                                    </h3>
-                                    <span className="text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-sm">
-                                        {filteredExpenses.length} opérations
-                                    </span>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase font-bold tracking-wider">
-                                            <tr>
-                                                <th className="px-6 py-3 border-b border-gray-100">Date</th>
-                                                <th className="px-6 py-3 border-b border-gray-100">Description</th>
-                                                <th className="px-6 py-3 border-b border-gray-100">Catégorie</th>
-                                                <th className="px-6 py-3 border-b border-gray-100">Source</th>
-                                                <th className="px-6 py-3 border-b border-gray-100 text-right">Montant</th>
-                                                <th className="px-6 py-3 border-b border-gray-100 text-right">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {loading ? (
-                                                <tr>
-                                                    <td colSpan={6} className="text-center py-12 text-gray-400 italic text-sm">
-                                                        <Loader2 className="animate-spin inline-block mr-2" size={16} /> Chargement...
-                                                    </td>
-                                                </tr>
-                                            ) : filteredExpenses.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={6} className="text-center py-12 text-gray-400 italic text-sm">
-                                                        Aucune dépense trouvée pour ce filtre.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                filteredExpenses.map((exp) => (
-                                                    <tr key={exp.id} className="hover:bg-gray-50/50 transition-colors group">
-                                                        <td className="px-6 py-4 text-xs font-medium text-gray-500 whitespace-nowrap">
-                                                            {format(new Date(exp.date), "dd MMM HH:mm", { locale: fr })}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-sm text-gray-800 font-bold group-hover:text-[#00d3fa] transition-colors">
-                                                            {exp.description}
-                                                            <div className="text-[10px] text-gray-400 font-medium mt-0.5">Par {exp.user?.name}</div>
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <span className="text-[10px] font-bold uppercase px-2 py-1 bg-gray-100 text-gray-600 rounded-sm border border-gray-200">
-                                                                {exp.category?.name}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4">
-                                                            <span className={cn(
-                                                                "text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border",
-                                                                exp.source === "CASH_REGISTER"
-                                                                    ? "bg-blue-50 text-blue-600 border-blue-100"
-                                                                    : "bg-purple-50 text-purple-600 border-purple-100"
-                                                            )}>
-                                                                {exp.source === "CASH_REGISTER" ? "Caisse" : "Boss"}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right">
-                                                            <span className="text-sm font-black text-gray-800">
-                                                                {formatCurrency(exp.amount)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right">
-                                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button
-                                                                    onClick={() => setEditingExpense(exp)}
-                                                                    className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors"
-                                                                >
-                                                                    <Edit size={14} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setConfirmDeleteId(exp.id)}
-                                                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
                         </div>
 
-                        {/* RIGHT: Top Expenses & Stats */}
-                        <div className="space-y-6">
-                            <div className="bg-white border border-gray-200 rounded-sm p-5 shadow-sm">
-                                <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <PieChart size={16} className="text-gray-400" />
-                                    Postes de Dépenses
-                                </h3>
-
-                                {topExpenses.length === 0 ? (
-                                    <div className="text-sm text-gray-400 italic text-center py-4">Pas de données</div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {topExpenses.map((group: any, i: number) => (
-                                            <div key={i} className="group">
-                                                <div className="flex justify-between items-end mb-1">
-                                                    <span className="text-xs font-bold text-gray-700">{group.name}</span>
-                                                    <span className="text-xs font-bold text-gray-900">{formatCurrency(group.total)}</span>
-                                                </div>
-                                                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                                                    <div
-                                                        className="bg-gray-800 h-full rounded-full group-hover:bg-[#00d3fa] transition-colors"
-                                                        style={{ width: `${(group.total / (summary?.totalExpenses || 1)) * 100}%` }}
+                        {loading ? (
+                            <div className="py-20 flex justify-center">
+                                <Loader2 className="animate-spin text-gray-400" size={28} />
+                            </div>
+                        ) : shown.length === 0 ? (
+                            <div className="py-16 text-center text-sm text-gray-400">
+                                <Receipt size={32} strokeWidth={1.5} className="mx-auto mb-2" />
+                                Aucune dépense pour ces filtres.
+                            </div>
+                        ) : (
+                            <>
+                                {/* Desktop */}
+                                <table className="hidden md:table w-full text-sm">
+                                    <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
+                                        <tr>
+                                            <th className="text-left px-4 py-2.5 font-semibold">Date</th>
+                                            <th className="text-left px-4 py-2.5 font-semibold">Dépense</th>
+                                            <th className="text-left px-4 py-2.5 font-semibold">Payé par</th>
+                                            <th className="text-right px-4 py-2.5 font-semibold">Montant</th>
+                                            <th className="px-4 py-2.5" />
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {shown.map((e) => (
+                                            <tr key={e.id} className="group hover:bg-gray-50/60">
+                                                <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                                                    {format(new Date(e.date), "d MMM", { locale: fr })}
+                                                    <div className="text-[11px] text-gray-400">{format(new Date(e.date), "HH:mm")}</div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <p className="font-medium text-gray-900">{e.description}</p>
+                                                    <p className="text-xs text-gray-400">
+                                                        {e.category?.name} · {e.user?.name}
+                                                    </p>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <SourceChip source={e.source} />
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-semibold tabular-nums whitespace-nowrap">{fc(amount(e))}</td>
+                                                <td className="px-4 py-3 text-right whitespace-nowrap">
+                                                    <RowActions
+                                                        canDelete={isAdmin}
+                                                        onEdit={() => {
+                                                            setEditing(e);
+                                                            setFormOpen(true);
+                                                        }}
+                                                        onDelete={() => setDeleting(e)}
                                                     />
-                                                </div>
-                                                <div className="text-[10px] text-gray-400 mt-0.5 text-right font-medium">
-                                                    {group.count} opérations
-                                                </div>
-                                            </div>
+                                                </td>
+                                            </tr>
                                         ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Quick Info */}
-                            <div className="bg-blue-50 border border-blue-100 rounded-sm p-4">
-                                <h4 className="font-bold text-blue-800 text-xs uppercase mb-2">Note d&apos;information</h4>
-                                <p className="text-xs text-blue-700 leading-relaxed">
-                                    Le <strong>Solde Caisse</strong> est calculé uniquement sur base des ventes encaissées en CASH et des dépenses sorties de la CAISSE. Les mouvements d&apos;argent du patron ne sont pas déduits du solde caisse.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                {/* Confirm Delete Modal */}
-                {confirmDeleteId && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                            <div className="p-6 text-center">
-                                <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Trash2 size={24} />
-                                </div>
-                                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Supprimer la dépense ?</h3>
-                                <p className="text-sm text-gray-500 mt-2">Cette action est irréversible et affectera le solde de caisse.</p>
-                            </div>
-                            <div className="px-6 py-4 bg-gray-50 flex gap-3">
-                                <button
-                                    onClick={() => setConfirmDeleteId(null)}
-                                    className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 font-bold text-sm rounded-sm hover:bg-white transition-all"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(confirmDeleteId)}
-                                    disabled={isDeleting}
-                                    className="flex-1 px-4 py-2 bg-red-600 text-white font-bold text-sm rounded-sm hover:bg-red-700 shadow-md flex items-center justify-center gap-2"
-                                >
-                                    {isDeleting ? <Loader2 size={16} className="animate-spin" /> : "Supprimer"}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Add/Edit Modal */}
-                {showModal && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                                <h3 className="font-bold text-gray-800 text-lg">
-                                    {editingExpense ? "Modifier la dépense" : "Ajouter une dépense"}
-                                </h3>
-                                <button onClick={() => { setShowModal(false); setEditingExpense(null); }} className="text-gray-400 hover:text-red-500 transition-colors">
-                                    <X size={20} />
-                                </button>
-                            </div>
-                            <form onSubmit={handleSubmit}>
-                                <div className="p-6 space-y-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-gray-400">Description</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Ex: Carburant pour générateur"
-                                            required
-                                            value={formData.description}
-                                            onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] transition-all"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold uppercase text-gray-400">Montant (FC)</label>
-                                            <input
-                                                type="number"
-                                                step="1"
-                                                required
-                                                value={formData.amount}
-                                                onChange={e => setFormData({ ...formData, amount: e.target.value })}
-                                                className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] transition-all font-bold"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold uppercase text-gray-400">Date</label>
-                                            <input
-                                                type="date"
-                                                required
-                                                value={formData.date}
-                                                onChange={e => setFormData({ ...formData, date: e.target.value })}
-                                                className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] transition-all"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-gray-400">Catégorie</label>
-                                        <select
-                                            required
-                                            value={formData.categoryId}
-                                            onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Sélectionner...</option>
-                                            {categories.map(cat => (
-                                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-gray-400">Source de fonds</label>
-                                        <select
-                                            value={formData.source}
-                                            onChange={e => setFormData({ ...formData, source: e.target.value })}
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2.5 text-sm outline-none focus:border-[#00d3fa] transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="CASH_REGISTER">Caisse Restaurant (Déduit du solde)</option>
-                                            <option value="OWNER_CAPITAL">Argent du Boss (Non déduit)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-                                    <button
-                                        type="button"
-                                        className="px-6 py-2 rounded-sm text-sm font-bold text-gray-500 hover:bg-gray-200 transition-all border border-transparent"
-                                        onClick={() => { setShowModal(false); setEditingExpense(null); }}
-                                    >
-                                        Annuler
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-8 py-2 bg-black text-white rounded-sm font-bold text-sm hover:bg-gray-800 transition-all shadow-md disabled:opacity-50"
-                                        disabled={submitting}
-                                    >
-                                        {submitting ? "Traitement..." : (editingExpense ? "Mettre à jour" : "Enregistrer")}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-                {/* Adjustment Modal */}
-                {showAdjustmentModal && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                            <div className="px-6 py-4 border-b border-gray-100 bg-gray-900 text-white flex items-center justify-between">
-                                <h3 className="font-bold uppercase tracking-widest text-sm">Ajuster le Solde</h3>
-                                <button onClick={() => setShowAdjustmentModal(false)}><X size={20} /></button>
-                            </div>
-                            <div className="p-6 space-y-6">
-                                <div className="bg-gray-50 p-4 border border-gray-200 rounded-sm">
-                                    <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                                        <span>Solde Théorique</span>
-                                        <span>Solde Réel (Main)</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm font-bold text-gray-500">{formatCurrency(summary?.balance || 0)}</span>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                value={actualCash}
-                                                onChange={e => setActualCash(e.target.value)}
-                                                className="bg-white border-2 border-gray-900 rounded-sm px-3 py-1.5 w-32 text-right font-black text-lg outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {Number(actualCash) !== summary?.balance && (
-                                    <div className={cn(
-                                        "p-4 rounded-sm border flex items-center gap-3",
-                                        Number(actualCash) > (summary?.balance || 0) ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"
-                                    )}>
-                                        <AlertCircle size={20} />
-                                        <div className="text-xs font-bold">
-                                            L&apos;application va créer une entrée de correction de
-                                            <span className="mx-1 font-black">
-                                                {formatCurrency(Math.abs(Number(actualCash) - (summary?.balance || 0)))}
-                                            </span>
-                                            pour équilibrer la caisse.
-                                        </div>
-                                    </div>
-                                )}
-
-                                <button
-                                    onClick={async () => {
-                                        const diff = Number(actualCash) - (summary?.balance || 0);
-                                        if (diff === 0) { setShowAdjustmentModal(false); return; }
-
-                                        setSubmitting(true);
-                                        try {
-                                            // Find adjustment category
-                                            let adjCat = categories.find(c => c.name.toLowerCase().includes("ajustement"));
-                                            if (!adjCat) {
-                                                // Create it if not found
-                                                const res = await fetch("/api/expenses/categories", {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({ name: "Ajustement de Caisse", description: "Corrections de solde" })
-                                                });
-                                                const data = await res.json();
-                                                adjCat = data.data;
-                                            }
-
-                                            // The logic: 
-                                            // If actual > theoretical (surplus), we add a negative expense? 
-                                            // No, our expense model subtracts. So a SURPLUS means we need to "remove" a negative amount.
-                                            // Let's just create an expense with a negative amount if it's a surplus.
-                                            // Backend uses Prisma.Decimal which supports negative.
-
-                                            // Actually, easier: if SURPLUS, it's a negative expense. If LOSS, it's a positive expense.
-                                            const amount = -diff;
-
-                                            const res = await fetch("/api/expenses", {
-                                                method: "POST",
-                                                headers: { "Content-Type": "application/json" },
-                                                body: JSON.stringify({
-                                                    description: diff > 0 ? "Ajustement (Surplus constaté)" : "Ajustement (Manquant constaté)",
-                                                    amount: amount,
-                                                    categoryId: adjCat?.id,
-                                                    source: "CASH_REGISTER",
-                                                    date: new Date().toISOString()
-                                                })
-                                            });
-
-                                            if (res.ok) {
-                                                showToast("Solde ajusté avec succès", "success");
-                                                setShowAdjustmentModal(false);
-                                                fetchData();
-                                            }
-                                        } finally {
-                                            setSubmitting(false);
-                                        }
-                                    }}
-                                    disabled={submitting}
-                                    className="w-full bg-gray-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-black transition-all shadow-lg active:scale-95"
-                                >
-                                    {submitting ? "Traitement..." : "Confirmer l'ajustement"}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {/* Closure Modal: start-up (OPENING) or monthly (MONTH) */}
-                {showClosureModal && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-sm shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 max-h-[95vh] flex flex-col">
-                            <div className="px-6 py-4 border-b border-gray-100 bg-indigo-900 text-white flex items-center justify-between shrink-0">
-                                <div>
-                                    <h3 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
-                                        {closureKind === "OPENING" ? <><Flag size={16} /> Clôture de démarrage</> : <><Lock size={16} /> Clôturer le mois</>}
-                                    </h3>
-                                    <p className="text-[10px] opacity-70 mt-1">
-                                        {closureKind === "OPENING"
-                                            ? "Fixe la date de démarrage et l'argent de départ en caisse"
-                                            : "Archive les recettes et démarre une nouvelle période"}
-                                    </p>
-                                </div>
-                                <button onClick={() => setShowClosureModal(false)}><X size={20} /></button>
-                            </div>
-                            {!closurePreview ? (
-                                <div className="flex justify-center p-12">
-                                    <Loader2 className="animate-spin text-indigo-700" size={32} />
-                                </div>
-                            ) : closureKind === "OPENING" ? (
-                                <div className="p-6 space-y-5 overflow-auto">
-                                    <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-4 text-xs text-indigo-900 space-y-2 leading-relaxed">
-                                        <p>Toutes les ventes, dépenses et achats enregistrés <strong>avant maintenant</strong> passent en archives : ils restent consultables (bouton « Archives » dans l&apos;historique des ventes) mais ne comptent plus dans les totaux, le solde ni les rapports.</p>
-                                        <p>L&apos;argent compté devient le solde de départ. <strong>Pas encore compté ?</strong> Mettez 0 : tout est archivé dès maintenant, et vous referez le démarrage avec le bon montant après le comptage (possible tant qu&apos;aucune journée n&apos;est clôturée).</p>
-                                        <p>Ensuite : inventaire de départ dans Stock › Inventaire, pour ajuster les stocks.</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-gray-500">Argent réellement compté en caisse (FC)</label>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={closingCash}
-                                            onChange={(e) => setClosingCash(e.target.value)}
-                                            placeholder="Ex: 150000"
-                                            autoFocus
-                                            className="w-full bg-white border-2 border-indigo-900 rounded-sm px-3 py-2 text-right font-black text-lg outline-none"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-gray-400">Note (optionnel)</label>
-                                        <input
-                                            type="text"
-                                            value={closureNotes}
-                                            onChange={(e) => setClosureNotes(e.target.value)}
-                                            placeholder="Ex: Montant à compter / Comptage du 23 novembre"
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-sm px-4 py-2 text-sm outline-none focus:border-indigo-500"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={handleMonthClosure}
-                                        disabled={submitting || closingCash.trim() === ""}
-                                        className="w-full bg-indigo-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-indigo-950 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                                    >
-                                        {submitting ? "Enregistrement..." : `Démarrer avec ${formatCurrency(Number(closingCash) || 0)} en caisse`}
-                                    </button>
-                                </div>
-                            ) : (() => {
-                                const { checks, currentPeriod } = closurePreview;
-                                const blockers: string[] = [];
-                                if (checks.unclosedSales > 0) {
-                                    blockers.push(`${checks.unclosedSales} vente(s) depuis le ${format(new Date(checks.unclosedSince), "dd MMM HH:mm", { locale: fr })} ne sont pas encore couvertes par une clôture de la journée.`);
-                                }
-                                if (checks.pendingGaps > 0) {
-                                    blockers.push(`${checks.pendingGaps} écart(s) de caisse sont encore « à vérifier ».`);
-                                }
-                                const blocked = blockers.length > 0 && !forceClosure;
-                                return (
-                                    <div className="p-6 space-y-5 overflow-auto">
-                                        {blockers.length > 0 && (
-                                            <div className="p-3 rounded-sm border bg-red-50 border-red-200 text-red-800 space-y-2">
-                                                <div className="flex items-start gap-2">
-                                                    <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                                                    <div className="text-xs font-bold space-y-1">
-                                                        {blockers.map((b) => <p key={b}>{b}</p>)}
-                                                        <p className="font-medium">
-                                                            Clôturez la journée (Historique des ventes) et réglez les écarts avant de clôturer le mois.
-                                                        </p>
-                                                    </div>
+                                    </tbody>
+                                </table>
+                                {/* Mobile */}
+                                <ul className="md:hidden divide-y divide-gray-100">
+                                    {shown.map((e) => (
+                                        <li key={e.id} className="px-4 py-3 flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="font-medium text-gray-900 text-sm">{e.description}</p>
+                                                <p className="text-xs text-gray-400">
+                                                    {format(new Date(e.date), "d MMM HH:mm", { locale: fr })} · {e.category?.name}
+                                                </p>
+                                                <div className="mt-1.5">
+                                                    <SourceChip source={e.source} />
                                                 </div>
-                                                {isAdmin && (
-                                                    <label className="flex items-center gap-2 text-xs font-bold cursor-pointer pl-6">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={forceClosure}
-                                                            onChange={(e) => setForceClosure(e.target.checked)}
-                                                        />
-                                                        Forcer quand même (motif obligatoire)
-                                                    </label>
-                                                )}
                                             </div>
-                                        )}
-
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
-                                            <div className="bg-gray-50 p-3 rounded-sm border border-gray-100">
-                                                <p className="text-[10px] uppercase font-bold text-gray-400">Solde reporté</p>
-                                                <p className="font-black text-indigo-700 mt-1">{formatCurrency(closurePreview.openingBalance)}</p>
-                                            </div>
-                                            <div className="bg-green-50 p-3 rounded-sm border border-green-100">
-                                                <p className="text-[10px] uppercase font-bold text-green-600">Ventes cash</p>
-                                                <p className="font-black text-green-800 mt-1">{formatCurrency(currentPeriod.totalSales)}</p>
-                                            </div>
-                                            <div className="bg-red-50 p-3 rounded-sm border border-red-100">
-                                                <p className="text-[10px] uppercase font-bold text-red-600">Dépenses caisse</p>
-                                                <p className="font-black text-red-800 mt-1">{formatCurrency(currentPeriod.totalExpenses)}</p>
-                                            </div>
-                                            <div className="bg-orange-50 p-3 rounded-sm border border-orange-100">
-                                                <p className="text-[10px] uppercase font-bold text-orange-600">Achats caisse</p>
-                                                <p className="font-black text-orange-800 mt-1">{formatCurrency(currentPeriod.totalPurchases)}</p>
-                                            </div>
-                                            <div className="bg-purple-50 p-3 rounded-sm border border-purple-100 col-span-2">
-                                                <p className="text-[10px] uppercase font-bold text-purple-600">Versements au patron</p>
-                                                <p className="font-black text-purple-800 mt-1">{formatCurrency(currentPeriod.totalWithdrawals || 0)}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-gray-50 p-4 border border-gray-200 rounded-sm">
-                                            <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                                                <span>Solde théorique</span>
-                                                <span>Argent réel en caisse</span>
-                                            </div>
-                                            <div className="flex justify-between items-center gap-4">
-                                                <span className="text-sm font-bold text-gray-600">{formatCurrency(currentPeriod.theoreticalBalance)}</span>
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    value={closingCash}
-                                                    onChange={(e) => setClosingCash(e.target.value)}
-                                                    className="bg-white border-2 border-indigo-900 rounded-sm px-3 py-2 w-36 text-right font-black text-lg outline-none"
+                                            <div className="text-right shrink-0">
+                                                <p className="font-semibold tabular-nums text-sm">{fc(amount(e))}</p>
+                                                <RowActions
+                                                    canDelete={isAdmin}
+                                                    onEdit={() => {
+                                                        setEditing(e);
+                                                        setFormOpen(true);
+                                                    }}
+                                                    onDelete={() => setDeleting(e)}
                                                 />
                                             </div>
-                                        </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </>
+                        )}
 
-                                        {closingCash.trim() !== "" && Number(closingCash) !== currentPeriod.theoreticalBalance && (
-                                            <div className="p-3 rounded-sm border bg-amber-50 border-amber-200 text-amber-800 flex items-start gap-2">
-                                                <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                                                <p className="text-xs font-bold">
-                                                    Un ajustement de {formatCurrency(Math.abs(Number(closingCash) - currentPeriod.theoreticalBalance))} sera enregistré automatiquement avant la clôture.
-                                                </p>
+                        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-3 text-xs text-gray-500">
+                            <span>
+                                {filtered.length} dépense{filtered.length > 1 ? "s" : ""} · {fc(filteredTotal)}
+                            </span>
+                            <Pager page={page} pages={pages} onPage={setPage} />
+                        </div>
+                    </div>
+
+                    {/* By category */}
+                    <div className="ui-card p-5 self-start">
+                        <p className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                            <PieChart size={16} className="text-gray-400" />
+                            Postes de dépenses
+                        </p>
+                        {byCategory.length === 0 ? (
+                            <p className="text-sm text-gray-400 text-center py-6">Pas de données</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {byCategory.map((c) => {
+                                    const pct = totals.all > 0 ? Math.max(0, (c.total / totals.all) * 100) : 0;
+                                    return (
+                                        <div key={c.name}>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="font-medium text-gray-700">{c.name}</span>
+                                                <span className="font-semibold tabular-nums">{fc(c.total)}</span>
                                             </div>
-                                        )}
-
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold uppercase text-gray-400">
-                                                {forceClosure ? "Motif (obligatoire)" : "Note (optionnel)"}
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={closureNotes}
-                                                onChange={(e) => setClosureNotes(e.target.value)}
-                                                placeholder={forceClosure ? "Pourquoi forcer la clôture ?" : "Ex: Clôture fin décembre"}
-                                                className={cn(
-                                                    "w-full bg-gray-50 border rounded-sm px-4 py-2 text-sm outline-none focus:border-indigo-500",
-                                                    forceClosure && !closureNotes.trim() ? "border-red-300" : "border-gray-200"
-                                                )}
-                                            />
+                                            <div className="mt-1.5 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                                <div className="h-full rounded-full bg-[#ff4900]" style={{ width: `${pct}%` }} />
+                                            </div>
+                                            <p className="text-[11px] text-gray-400 mt-1">
+                                                {c.count} opération{c.count > 1 ? "s" : ""} · {pct.toFixed(0)} %
+                                            </p>
                                         </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
 
-                                        <div className="bg-indigo-50 border border-indigo-100 rounded-sm p-3 text-xs text-indigo-800">
-                                            <strong>Après clôture :</strong> les recettes ({formatCurrency(currentPeriod.totalSales)}) seront archivées.
-                                            La nouvelle période démarrera avec <strong>{formatCurrency(Number(closingCash) || 0)}</strong> en caisse.
-                                        </div>
+            {formOpen && (
+                <ExpenseForm
+                    expense={editing}
+                    categories={categories}
+                    rate={rate}
+                    onClose={() => setFormOpen(false)}
+                    onSaved={() => {
+                        setFormOpen(false);
+                        load();
+                    }}
+                />
+            )}
 
-                                        <button
-                                            onClick={handleMonthClosure}
-                                            disabled={submitting || blocked || (forceClosure && !closureNotes.trim())}
-                                            className="w-full bg-indigo-900 text-white font-black py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-indigo-950 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                                        >
-                                            {submitting ? "Clôture en cours..." : forceClosure ? "Forcer la clôture du mois" : "Confirmer la clôture du mois"}
-                                        </button>
-                                    </div>
-                                );
-                            })()}
+            <Modal isOpen={!!deleting} onClose={() => setDeleting(null)} title="Supprimer la dépense ?" size="sm">
+                {deleting && (
+                    <div className="space-y-4">
+                        <p className="text-sm text-gray-600">
+                            <strong>{deleting.description}</strong> — {fc(amount(deleting))}. Cette action est définitive.
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button type="button" onClick={() => setDeleting(null)} className="ui-btn-ghost">
+                                Annuler
+                            </button>
+                            <button type="button" onClick={remove} disabled={busy} className="ui-btn-danger">
+                                {busy && <Loader2 size={14} className="animate-spin" />}
+                                Supprimer
+                            </button>
                         </div>
                     </div>
                 )}
-            </div>
+            </Modal>
         </DashboardLayout>
     );
 }
 
-function KpiCard({ title, value, icon, color }: any) {
+function Kpi({ label, value, sub, icon, tone }: { label: string; value: string; sub: string; icon: React.ReactNode; tone: string }) {
     return (
-        <div className="bg-white p-4 border border-gray-200 rounded-sm flex items-center justify-between shadow-sm hover:shadow-md transition-all">
-            <div>
-                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{title}</p>
-                <p className="text-lg font-black text-gray-900 mt-1">{value}</p>
+        <div className="ui-card p-4">
+            <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-medium text-gray-500">{label}</p>
+                <span className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", tone)}>{icon}</span>
             </div>
-            <div className={cn("p-2.5 rounded-full border", color)}>
-                {icon}
-            </div>
+            <p className="mt-1 text-xl font-bold tabular-nums text-gray-900">{value}</p>
+            <p className="text-[11px] text-gray-400 truncate">{sub}</p>
         </div>
+    );
+}
+
+function SourceChip({ source }: { source: Expense["source"] }) {
+    return source === "OWNER_CAPITAL" ? (
+        <span className="ui-chip bg-purple-50 text-purple-700">
+            <UserRound size={11} /> Patron
+        </span>
+    ) : (
+        <span className="ui-chip bg-blue-50 text-blue-700">
+            <Store size={11} /> Caisse
+        </span>
+    );
+}
+
+function RowActions({ canDelete, onEdit, onDelete }: { canDelete: boolean; onEdit: () => void; onDelete: () => void }) {
+    return (
+        <span className="inline-flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <button type="button" onClick={onEdit} className="p-1.5 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50" aria-label="Modifier">
+                <Edit size={14} />
+            </button>
+            {canDelete && (
+                <button type="button" onClick={onDelete} className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50" aria-label="Supprimer">
+                    <Trash2 size={14} />
+                </button>
+            )}
+        </span>
+    );
+}
+
+function ExpenseForm({
+    expense,
+    categories,
+    rate,
+    onClose,
+    onSaved,
+}: {
+    expense: Expense | null;
+    categories: Category[];
+    rate: number;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [description, setDescription] = useState(expense?.description ?? "");
+    const [currency, setCurrency] = useState<"CDF" | "USD">("CDF");
+    const [amountText, setAmountText] = useState(expense ? String(Number(expense.amount)) : "");
+    const [categoryId, setCategoryId] = useState(expense?.category?.id ?? "");
+    const [source, setSource] = useState<Expense["source"]>(expense?.source ?? "CASH_REGISTER");
+    const [date, setDate] = useState(expense ? kinshasaDateStr(expense.date) : kinshasaTodayStr());
+    const [saving, setSaving] = useState(false);
+
+    const raw = Number(amountText.replace(",", ".")) || 0;
+    const amountCdf = Math.round(currency === "USD" ? raw * rate : raw);
+
+    const submit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (amountCdf <= 0 || !categoryId || !description.trim()) {
+            showToast("Description, montant et catégorie sont obligatoires", "error");
+            return;
+        }
+        setSaving(true);
+        try {
+            const note = currency === "USD" ? ` (${raw.toLocaleString("fr-FR")} $ au taux ${rate.toLocaleString("fr-FR")})` : "";
+            const res = await fetch("/api/expenses", {
+                method: expense ? "PUT" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: expense?.id,
+                    description: description.trim() + note,
+                    amount: amountCdf,
+                    categoryId,
+                    source,
+                    date,
+                }),
+            });
+            const json = await res.json().catch(() => ({ success: false, error: "Erreur" }));
+            if (!json.success) throw new Error(json.error || "Enregistrement impossible");
+            showToast(expense ? "Dépense modifiée" : "Dépense enregistrée", "success");
+            onSaved();
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Enregistrement impossible", "error");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const field = "w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-900";
+
+    return (
+        <Modal isOpen onClose={onClose} title={expense ? "Modifier la dépense" : "Nouvelle dépense"} size="md">
+            <form onSubmit={submit} className="space-y-4">
+                <label className="block">
+                    <span className="text-xs font-medium text-gray-600">Description</span>
+                    <input
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Ex : Transport pour les achats"
+                        required
+                        autoFocus
+                        className={cn(field, "mt-1")}
+                    />
+                </label>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                        <span className="text-xs font-medium text-gray-600">Montant</span>
+                        <div className="mt-1 flex rounded-lg border border-gray-200 focus-within:border-gray-900 overflow-hidden">
+                            <input
+                                inputMode="decimal"
+                                value={amountText}
+                                onChange={(e) => setAmountText(e.target.value.replace(/[^0-9.,]/g, ""))}
+                                placeholder="0"
+                                className="w-full px-3 py-2.5 text-sm font-semibold outline-none tabular-nums"
+                            />
+                            <select
+                                value={currency}
+                                onChange={(e) => setCurrency(e.target.value as "CDF" | "USD")}
+                                className="bg-gray-50 border-l border-gray-200 px-2 text-xs font-semibold outline-none"
+                                aria-label="Devise"
+                            >
+                                <option value="CDF">FC</option>
+                                <option value="USD">$</option>
+                            </select>
+                        </div>
+                        {currency === "USD" && raw > 0 && <span className="text-[11px] text-gray-500">= {fc(amountCdf)}</span>}
+                    </label>
+                    <label className="block">
+                        <span className="text-xs font-medium text-gray-600">Date</span>
+                        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className={cn(field, "mt-1")} />
+                    </label>
+                </div>
+
+                <label className="block">
+                    <span className="text-xs font-medium text-gray-600">Catégorie</span>
+                    <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required className={cn(field, "mt-1 bg-white")}>
+                        <option value="">Choisir…</option>
+                        {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                                {c.name}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+
+                <div>
+                    <span className="text-xs font-medium text-gray-600">Qui a payé ?</span>
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                        <SourceOption
+                            active={source === "CASH_REGISTER"}
+                            onClick={() => setSource("CASH_REGISTER")}
+                            icon={<Store size={16} />}
+                            title="La caisse"
+                            text="Retiré du solde de caisse"
+                        />
+                        <SourceOption
+                            active={source === "OWNER_CAPITAL"}
+                            onClick={() => setSource("OWNER_CAPITAL")}
+                            icon={<UserRound size={16} />}
+                            title="Mon argent (patron)"
+                            text="Non retiré de la caisse"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button type="button" onClick={onClose} className="ui-btn-ghost">
+                        Annuler
+                    </button>
+                    <button type="submit" disabled={saving} className="ui-btn-primary">
+                        {saving && <Loader2 size={14} className="animate-spin" />}
+                        {expense ? "Mettre à jour" : "Enregistrer"}
+                    </button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
+function SourceOption({
+    active,
+    onClick,
+    icon,
+    title,
+    text,
+}: {
+    active: boolean;
+    onClick: () => void;
+    icon: React.ReactNode;
+    title: string;
+    text: string;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                "text-left rounded-lg border p-3 transition-colors",
+                active ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 hover:border-gray-300"
+            )}
+        >
+            <span className="flex items-center gap-2 text-sm font-semibold">
+                {icon}
+                {title}
+            </span>
+            <span className={cn("block text-[11px] mt-0.5", active ? "text-white/70" : "text-gray-400")}>{text}</span>
+        </button>
     );
 }

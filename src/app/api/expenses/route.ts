@@ -3,9 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { Prisma } from "@prisma/client";
-import { getStartDate, withEra } from "@/lib/cash-period";
+import { ADJUSTMENT_CATEGORY_FILTER, getStartDate, withEra } from "@/lib/cash-period";
 import { closedDayRefusal } from "@/lib/cash-count";
-import { resolveEntryDate } from "@/lib/entry-date";
+import { kinshasaPeriodStart, resolveEntryDate } from "@/lib/entry-date";
 
 const refuse = (error: string) => NextResponse.json({ success: false, error }, { status: 403 });
 
@@ -38,23 +38,10 @@ export async function GET(req: Request) {
             } else {
                 whereClause = {};
             }
-        } else if (period === "today") {
-            const gte = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const lte = new Date();
-            whereClause = { date: { gte, lte } };
-        } else if (period === "week") {
-            const gte = new Date(now);
-            gte.setDate(now.getDate() - 7);
-            const lte = new Date();
-            whereClause = { date: { gte, lte } };
-        } else if (period === "month") {
-            const gte = new Date(now.getFullYear(), now.getMonth(), 1);
-            const lte = new Date();
-            whereClause = { date: { gte, lte } };
-        } else if (period === "year") {
-            const gte = new Date(now.getFullYear(), 0, 1);
-            const lte = new Date();
-            whereClause = { date: { gte, lte } };
+        } else if (["today", "week", "month", "year"].includes(period)) {
+            // Kinshasa calendar, not the server's time zone.
+            const gte = kinshasaPeriodStart(period === "today" ? "day" : period, now);
+            whereClause = gte ? { date: { gte, lte: now } } : {};
         } else if (period === "custom" && start && end) {
             const gte = new Date(start);
             const lte = new Date(end);
@@ -65,9 +52,14 @@ export async function GET(req: Request) {
         // Before the start date everything is archived: shown only with ?archives=1.
         const archives = searchParams.get("archives") === "1";
         const eraWhere = withEra(whereClause, "date", await getStartDate(), archives);
+        // Count corrections of the Caisse are not expenses: they show in the Caisse menu.
+        const where =
+            searchParams.get("adjustments") === "1"
+                ? eraWhere
+                : { AND: [eraWhere, { NOT: ADJUSTMENT_CATEGORY_FILTER }] };
 
         const expenses = await prisma.expense.findMany({
-            where: eraWhere,
+            where,
             include: {
                 category: true,
                 user: {

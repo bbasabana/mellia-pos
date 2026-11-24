@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Faites d'abord la clôture de démarrage (Dépenses › Clôture de démarrage).",
+          error: "Faites d'abord la clôture de démarrage (Caisse › Démarrage).",
         },
         { status: 400 }
       );

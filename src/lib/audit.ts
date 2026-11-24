@@ -20,6 +20,7 @@ export type AuditAction =
   | "UPDATE_PURCHASE"
   | "DELETE_PURCHASE"
   | "STOCK_ADJUSTMENT"
+  | "CASH_COUNT"
   | "CREATE_LOSS"
   | "UPDATE_LOSS"
   | "SYSTEM_RESET"

@@ -7,10 +7,21 @@ export type CashPeriodRange = {
 
 export type CashPeriodTotals = {
   totalSales: number;
+  /** Real expenses paid from the till (cash adjustments excluded, see totalAdjustments). */
   totalExpenses: number;
   totalPurchases: number;
-  /** Cash handed to the owner at day closures ("versements"); optional for older callers. */
+  /**
+   * Cash handed to the owner at day closures. Information only: that money stays the
+   * restaurant's and is part of the Caisse, so it is not taken off the balance.
+   */
   totalWithdrawals?: number;
+  /** Corrections booked when the Caisse is counted (surplus negative, shortfall positive). */
+  totalAdjustments?: number;
+};
+
+/** Expense category of the corrections booked when the Caisse is counted. */
+export const ADJUSTMENT_CATEGORY_FILTER = {
+  category: { name: { contains: "ajustement", mode: "insensitive" as const } },
 };
 
 export type LastCashClosure = {
@@ -150,7 +161,7 @@ export function resolveTransactionsDateRange(
 export async function getCashPeriodTotals(range: CashPeriodRange): Promise<CashPeriodTotals> {
   const dateFilter = { gte: range.gte, lte: range.lte };
 
-  const [sales, expenses, purchases, withdrawals] = await Promise.all([
+  const [sales, expenses, adjustments, purchases, withdrawals] = await Promise.all([
     prisma.sale.aggregate({
       where: {
         createdAt: dateFilter,
@@ -164,6 +175,15 @@ export async function getCashPeriodTotals(range: CashPeriodRange): Promise<CashP
       where: {
         date: dateFilter,
         source: "CASH_REGISTER",
+        NOT: ADJUSTMENT_CATEGORY_FILTER,
+      },
+      _sum: { amount: true },
+    }),
+    prisma.expense.aggregate({
+      where: {
+        date: dateFilter,
+        source: "CASH_REGISTER",
+        ...ADJUSTMENT_CATEGORY_FILTER,
       },
       _sum: { amount: true },
     }),
@@ -185,9 +205,16 @@ export async function getCashPeriodTotals(range: CashPeriodRange): Promise<CashP
     totalExpenses: toNum(expenses._sum.amount),
     totalPurchases: toNum(purchases._sum.totalAmountCdf),
     totalWithdrawals: toNum(withdrawals._sum.withdrawalCdf),
+    totalAdjustments: toNum(adjustments._sum.amount),
   };
 }
 
+/**
+ * Caisse (all the restaurant's cash: the drawer and the money the owner holds) =
+ * starting money + cash sales − expenses and purchases paid from the Caisse ± count
+ * corrections. Money handed to the owner at a day closure stays in the Caisse; what the
+ * owner pays with their own money (OWNER_CAPITAL) never touches it.
+ */
 export function computeTheoreticalBalance(
   openingBalance: number,
   totals: CashPeriodTotals
@@ -197,7 +224,7 @@ export function computeTheoreticalBalance(
     totals.totalSales -
     totals.totalExpenses -
     totals.totalPurchases -
-    (totals.totalWithdrawals ?? 0)
+    (totals.totalAdjustments ?? 0)
   );
 }
 

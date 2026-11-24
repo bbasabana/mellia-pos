@@ -1,10 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { getStartDate } from "@/lib/cash-period";
+import { ADJUSTMENT_CATEGORY_FILTER, getStartDate } from "@/lib/cash-period";
 
 /**
  * Day closure (Z) logic. Each closure covers everything since the previous one — the
  * previous day closure, or the start-up / monthly closure if it is more recent — up to
  * the moment it is made. A sale rung up after closing therefore goes to the next closure.
+ *
+ * The day closure checks the day's takings only: what was left in the drawer at the last
+ * closure + cash sales − expenses paid from the drawer. Purchases are not in it: they are
+ * paid beforehand from the Caisse (the starting money the owner holds), and are taken off
+ * the Caisse balance instead (menu Caisse).
  */
 
 /** What should be in the till for a period, in FC. */
@@ -12,7 +17,8 @@ export type CashExpectation = {
   salesCashCdf: number; // sales paid in cash: the only ones that land in the drawer
   salesOtherCdf: number; // card, mobile money...: shown for information, not in the drawer
   expensesCdf: number; // expenses paid from the till
-  purchasesCdf: number; // purchases (menu Achat) paid from the till
+  /** Always 0 now: purchases come out of the Caisse, not out of the day's takings. */
+  purchasesCdf: number;
   salesCount: number; // cash tickets
   otherCount: number; // non-cash tickets
 };
@@ -23,7 +29,7 @@ export type OpenDayPeriod = {
   startDate: Date | null;
   periodStart: Date;
   periodEnd: Date;
-  /** Cash in the till when the period opened (carried from the previous closure). */
+  /** Cash left in the drawer when the period opened (from the previous day closure). */
   openingFloatCdf: number;
   floatSource: string;
 };
@@ -53,21 +59,23 @@ export async function getOpenDayPeriod(now = new Date()): Promise<OpenDayPeriod>
     prisma.cashMonthClosure.findFirst({ orderBy: { closedAt: "desc" } }),
   ]);
 
+  // The drawer keeps what the last day closure left in it, even across a month closure.
+  // The starting money (start-up closure) is the Caisse's, not the drawer's: it pays the
+  // purchases, so the first day starts from an empty drawer.
+  const drawerFloat = lastCount
+    ? Math.round(toNum(lastCount.countedCdf) - toNum(lastCount.withdrawalCdf))
+    : 0;
+
   const fromCount = lastCount
-    ? {
-        at: lastCount.periodEnd,
-        float: toNum(lastCount.countedCdf) - toNum(lastCount.withdrawalCdf),
-        source: `Clôture du ${fmt(lastCount.periodEnd)}`,
-      }
+    ? { at: lastCount.periodEnd, source: `Reste de la clôture du ${fmt(lastCount.periodEnd)}` }
     : null;
   const fromClosure = lastClosure
     ? {
         at: lastClosure.closedAt,
-        float: toNum(lastClosure.closingBalanceCdf),
         source:
           lastClosure.kind === "OPENING"
-            ? `Clôture de démarrage (${fmt(lastClosure.closedAt)})`
-            : `Clôture du mois (${fmt(lastClosure.closedAt)})`,
+            ? `Depuis le démarrage (${fmt(lastClosure.closedAt)})`
+            : `Depuis la clôture du mois (${fmt(lastClosure.closedAt)})`,
       }
     : null;
 
@@ -83,7 +91,7 @@ export async function getOpenDayPeriod(now = new Date()): Promise<OpenDayPeriod>
     startDate,
     periodStart: latest?.at ?? new Date(now.getFullYear(), now.getMonth(), now.getDate()),
     periodEnd: now,
-    openingFloatCdf: latest ? Math.round(latest.float) : 0,
+    openingFloatCdf: drawerFloat,
     floatSource: latest?.source ?? "Aucune clôture précédente",
   };
 }
@@ -91,7 +99,7 @@ export async function getOpenDayPeriod(now = new Date()): Promise<OpenDayPeriod>
 /** Cash movements in [gte, lt). */
 export async function getCashExpectation(gte: Date, lt: Date): Promise<CashExpectation> {
   const range = { gte, lt };
-  const [cash, other, expenses, purchases] = await Promise.all([
+  const [cash, other, expenses] = await Promise.all([
     prisma.sale.aggregate({
       where: { createdAt: range, status: "COMPLETED", paymentMethod: "CASH" },
       _sum: { totalCdf: true },
@@ -102,13 +110,10 @@ export async function getCashExpectation(gte: Date, lt: Date): Promise<CashExpec
       _sum: { totalCdf: true },
       _count: true,
     }),
+    // Count corrections of the Caisse are not drawer money.
     prisma.expense.aggregate({
-      where: { date: range, source: "CASH_REGISTER" },
+      where: { date: range, source: "CASH_REGISTER", NOT: ADJUSTMENT_CATEGORY_FILTER },
       _sum: { amount: true },
-    }),
-    prisma.investment.aggregate({
-      where: { date: range, source: "CASH_REGISTER" },
-      _sum: { totalAmountCdf: true },
     }),
   ]);
 
@@ -116,15 +121,15 @@ export async function getCashExpectation(gte: Date, lt: Date): Promise<CashExpec
     salesCashCdf: Math.round(toNum(cash._sum.totalCdf)),
     salesOtherCdf: Math.round(toNum(other._sum.totalCdf)),
     expensesCdf: Math.round(toNum(expenses._sum.amount)),
-    purchasesCdf: Math.round(toNum(purchases._sum.totalAmountCdf)),
+    purchasesCdf: 0,
     salesCount: cash._count,
     otherCount: other._count,
   };
 }
 
-/** Expected cash = starting float + cash sales − till expenses − till purchases. */
+/** Expected cash in the drawer = what was left in it + cash sales − expenses paid from it. */
 export function expectedCash(e: CashExpectation, openingFloatCdf: number): number {
-  return openingFloatCdf + e.salesCashCdf - e.expensesCdf - e.purchasesCdf;
+  return openingFloatCdf + e.salesCashCdf - e.expensesCdf;
 }
 
 /**

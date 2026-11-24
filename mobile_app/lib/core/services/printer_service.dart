@@ -708,7 +708,8 @@ class PrinterService extends _$PrinterService {
     if (by.isNotEmpty) line('Clôturé par : $by');
     line(rule);
 
-    line(_row('Fond de caisse', _fc(n(c['openingFloatCdf']))));
+    final float = n(c['openingFloatCdf']);
+    if (float != 0) line(_row('Resté dans le tiroir', _fc(float)));
     final cashCount = c['salesCount'];
     line(
       _row(
@@ -717,7 +718,8 @@ class PrinterService extends _$PrinterService {
       ),
     );
     line(_row('- Dépenses caisse', _fc(n(c['expensesCdf']))));
-    line(_row('- Achats caisse', _fc(n(c['purchasesCdf']))));
+    final purchases = n(c['purchasesCdf']);
+    if (purchases != 0) line(_row('- Achats caisse', _fc(purchases)));
     bytes.addAll(_boldOn);
     line(_row('= Attendu', _fc(n(c['expectedCdf']))));
     bytes.addAll(_boldOff);
@@ -734,8 +736,8 @@ class PrinterService extends _$PrinterService {
     line(_row('Statut', _closureStatus[status] ?? status));
     line(rule);
 
-    if (withdrawal > 0) line(_row('Versé au patron', _fc(withdrawal)));
-    line(_row('Reste en caisse', _fc(counted - withdrawal)));
+    if (withdrawal > 0) line(_row('Remis au patron', _fc(withdrawal)));
+    line(_row('Reste dans le tiroir', _fc(counted - withdrawal)));
     final other = n(c['salesOtherCdf']);
     if (other > 0) {
       line(_row('Hors cash (info)', _fc(other)));

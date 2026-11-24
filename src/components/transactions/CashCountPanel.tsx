@@ -12,7 +12,6 @@ import {
     Minus,
     Printer,
     RotateCcw,
-    TrendingDown,
     TrendingUp,
     Wallet,
 } from "lucide-react";
@@ -82,8 +81,9 @@ export const dayLabel = (day: string, pattern = "EEE d MMM") => {
 };
 
 /**
- * Clôture de la journée (Z). The till must hold: cash carried from the previous closure +
- * cash sales − till expenses − till purchases since then. The cashier types the money
+ * Clôture de la journée (Z). The drawer must hold: what the previous closure left in it +
+ * cash sales − expenses paid from it since then. Purchases are not in it: they are paid
+ * from the Caisse (menu Caisse). The cashier types the money
  * counted; the gap shows at once. Closing locks those sales; a manager then settles the gap
  * (loss, justified with its category, or surplus), which books the matching expense.
  */
@@ -215,8 +215,8 @@ export default function CashCountPanel({
     const result = useMemo(() => {
         if (diff === null) return null;
         if (diff === 0) return { tone: "ok" as const, title: "Caisse correcte", text: "L'argent compté correspond aux ventes." };
-        if (diff < 0) return { tone: "short" as const, title: `Manquant : ${fc(-diff)}`, text: `Il fallait ${fc(expected)}, compté ${fc(countedCdf!)}.` };
-        return { tone: "over" as const, title: `Surplus : ${fc(diff)}`, text: `Il fallait ${fc(expected)}, compté ${fc(countedCdf!)}.` };
+        if (diff < 0) return { tone: "short" as const, title: `Manquant : ${fc(-diff)}`, text: `Attendu ${fc(expected)}, compté ${fc(countedCdf!)}.` };
+        return { tone: "over" as const, title: `Surplus : ${fc(diff)}`, text: `Attendu ${fc(expected)}, compté ${fc(countedCdf!)}.` };
     }, [diff, expected, countedCdf]);
 
     // Only the latest closure can be reopened, and not once a month closure came after it
@@ -243,14 +243,14 @@ export default function CashCountPanel({
             {open && !open.ready && (
                 <div className="mx-4 mt-4 p-3 rounded border border-amber-200 bg-amber-50 text-amber-800 text-sm">
                     <strong>La clôture de démarrage n&apos;est pas encore faite.</strong> L&apos;administrateur la fait dans
-                    Dépenses › « Clôture de démarrage » en comptant l&apos;argent réel. Les journées pourront ensuite être clôturées.
+                    Caisse › « Démarrage » en comptant l&apos;argent réel. Les journées pourront ensuite être clôturées.
                 </div>
             )}
 
             <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* What the till should hold */}
                 <div className="space-y-2">
-                    <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Ce qui doit être en caisse</p>
+                    <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Recette de la journée</p>
                     {loading || !open ? (
                         <div className="h-40 flex items-center justify-center text-gray-400">
                             <Loader2 className="animate-spin" size={18} />
@@ -260,9 +260,11 @@ export default function CashCountPanel({
                             <p className="text-xs text-gray-500">
                                 Depuis {when(open.periodStart)} · {open.floatSource}
                             </p>
-                            <Line icon={<Wallet size={12} />} label="Fond de caisse (repris)" tone="text-gray-700">
-                                {fc(open.openingFloatCdf)}
-                            </Line>
+                            {open.openingFloatCdf !== 0 && (
+                                <Line icon={<Wallet size={12} />} label="Resté dans le tiroir (clôture précédente)" tone="text-gray-700">
+                                    {fc(open.openingFloatCdf)}
+                                </Line>
+                            )}
                             <Line
                                 icon={<TrendingUp size={12} />}
                                 label={`Ventes en espèces (${open.expectation.salesCount} ticket${open.expectation.salesCount > 1 ? "s" : ""})`}
@@ -273,18 +275,18 @@ export default function CashCountPanel({
                             <Line icon={<Minus size={12} />} label="Dépenses payées par la caisse" tone="text-red-700">
                                 − {fc(open.expectation.expensesCdf)}
                             </Line>
-                            <Line icon={<TrendingDown size={12} />} label="Achats payés par la caisse" tone="text-orange-700">
-                                − {fc(open.expectation.purchasesCdf)}
-                            </Line>
                             <div className="flex items-center justify-between rounded-lg md:rounded-sm border-2 border-[#00d3fa] bg-[#00d3fa]/10 px-3 py-3">
-                                <span className="text-xs font-black uppercase tracking-wider text-[#0891b2]">Doit être en caisse</span>
+                                <span className="text-xs font-black uppercase tracking-wider text-[#0891b2]">Recette à remettre</span>
                                 <span className="text-xl font-black text-[#0891b2]">{fc(expected)}</span>
                             </div>
                             {open.expectation.salesOtherCdf > 0 && (
                                 <p className="text-[11px] text-gray-500">
-                                    Carte / Mobile Money : {fc(open.expectation.salesOtherCdf)} ({open.expectation.otherCount} tickets) — hors caisse.
+                                    Carte / Mobile Money : {fc(open.expectation.salesOtherCdf)} ({open.expectation.otherCount} tickets) — hors tiroir.
                                 </p>
                             )}
+                            <p className="text-[11px] text-gray-500">
+                                Les achats ne sont pas déduits ici : ils sont payés avec l&apos;argent de la caisse (menu Caisse).
+                            </p>
                         </>
                     )}
                 </div>
@@ -339,7 +341,7 @@ export default function CashCountPanel({
                     {countedCdf !== null && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <label className="block">
-                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Versement au patron</span>
+                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Remis au patron</span>
                                 <input
                                     id="closure-withdrawal"
                                     inputMode="numeric"
@@ -353,7 +355,7 @@ export default function CashCountPanel({
                                 />
                             </label>
                             <div className="rounded border border-gray-200 px-3 py-2 flex flex-col justify-center">
-                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Reste en caisse (fond suivant)</span>
+                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Reste dans le tiroir</span>
                                 <span className={`font-black ${withdrawalTooHigh ? "text-red-600" : "text-gray-800"}`}>
                                     {withdrawalTooHigh ? "Versement trop élevé" : fc(countedCdf - withdrawalCdf)}
                                 </span>
@@ -429,7 +431,7 @@ export default function CashCountPanel({
                                 <th className="text-right px-4 py-2">Attendu</th>
                                 <th className="text-right px-4 py-2">Compté</th>
                                 <th className="text-right px-4 py-2">Écart</th>
-                                <th className="text-right px-4 py-2">Versé</th>
+                                <th className="text-right px-4 py-2">Remis</th>
                                 <th className="text-left px-4 py-2">Statut</th>
                                 <th className="text-left px-4 py-2">Par / note</th>
                                 {canSettle && <th className="px-4 py-2" />}
@@ -596,17 +598,17 @@ function ZTicket({ c }: { c: DayClosure }) {
                 Du {format(new Date(c.periodStart), "d/MM HH:mm")} au {format(new Date(c.periodEnd), "d/MM HH:mm")}
             </div>
             {rule}
-            {row("Fond de caisse", fc(c.openingFloatCdf))}
+            {c.openingFloatCdf !== 0 && row("Resté dans le tiroir", fc(c.openingFloatCdf))}
             {row("Ventes espèces", `+ ${fc(c.salesCashCdf)}`)}
             {row("Dépenses caisse", `- ${fc(c.expensesCdf)}`)}
-            {row("Achats caisse", `- ${fc(c.purchasesCdf)}`)}
+            {c.purchasesCdf !== 0 && row("Achats caisse", `- ${fc(c.purchasesCdf)}`)}
             {rule}
-            {row("Doit être en caisse", fc(c.expectedCdf), true)}
+            {row("Recette attendue", fc(c.expectedCdf), true)}
             {row("Argent compté", fc(c.countedCdf), true)}
             {row(c.differenceCdf < 0 ? "Manquant" : c.differenceCdf > 0 ? "Surplus" : "Écart", fc(c.differenceCdf), true)}
             {row("Statut", CLOSURE_STATUS[c.status].label)}
-            {c.withdrawalCdf > 0 && row("Versement au patron", fc(c.withdrawalCdf))}
-            {row("Reste en caisse", fc(c.countedCdf - c.withdrawalCdf))}
+            {c.withdrawalCdf > 0 && row("Remis au patron", fc(c.withdrawalCdf))}
+            {row("Reste dans le tiroir", fc(c.countedCdf - c.withdrawalCdf))}
             {c.salesOtherCdf > 0 && (
                 <>
                     {rule}
