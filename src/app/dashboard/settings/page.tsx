@@ -4,10 +4,14 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ExchangeRateCard } from "@/components/settings/ExchangeRateCard";
 import { DangerZoneCard } from "@/components/settings/DangerZoneCard";
 import { AccountSettingsCard } from "@/components/settings/AccountSettingsCard";
+import ClosedDaysCard from "@/components/caisse/ClosedDaysCard";
+import { useSession } from "next-auth/react";
 import { Settings, Tag, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 export default function SettingsPage() {
+    const { data: session } = useSession();
+    const isAdmin = (session?.user as { role?: string } | undefined)?.role === "ADMIN";
     return (
         <DashboardLayout>
             <div className="w-full h-full flex flex-col overflow-y-auto bg-gray-50">
@@ -68,6 +72,11 @@ export default function SettingsPage() {
                             <section>
                                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 ml-1">Finance</h2>
                                 <ExchangeRateCard />
+                            </section>
+
+                            <section>
+                                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 ml-1">Calendrier</h2>
+                                <ClosedDaysCard canEdit={isAdmin} />
                             </section>
 
                             <div className="bg-[#00d3fa]/5 border border-[#00d3fa]/20 p-4 rounded text-sm text-gray-600">

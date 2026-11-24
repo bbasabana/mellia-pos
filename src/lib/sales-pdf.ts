@@ -35,14 +35,14 @@ export type SalesReport = {
 };
 
 // jsPDF's built-in fonts only know Latin-1: no narrow no-break spaces from toLocaleString.
-const group = (n: number) =>
+export const group = (n: number) =>
     Math.round(n)
         .toString()
         .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 const fc = (n: number) => `${group(n)} FC`;
 const qty = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(".", ","));
-const pad = (n: number) => String(n).padStart(2, "0");
-const dt = (iso: string) => {
+export const pad = (n: number) => String(n).padStart(2, "0");
+export const dt = (iso: string) => {
     const d = new Date(iso);
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
@@ -52,29 +52,36 @@ const dayTime = (iso: string) => {
 };
 
 /** Aligns header and footer cells like the body of their column. */
-const alignColumns =
+export const alignColumns =
     (aligns: Record<number, "left" | "center" | "right">) =>
     (data: { section: string; column: { index: number }; cell: { styles: { halign?: string } } }) => {
         const a = aligns[data.column.index];
         if (a && data.section !== "body") data.cell.styles.halign = a;
     };
 
-const INK: [number, number, number] = [15, 23, 42];
-const MUTED: [number, number, number] = [100, 116, 139];
-const LINE: [number, number, number] = [226, 232, 240];
-const TICKET_BG: [number, number, number] = [241, 245, 249];
+export const INK: [number, number, number] = [15, 23, 42];
+export const MUTED: [number, number, number] = [100, 116, 139];
+export const LINE: [number, number, number] = [226, 232, 240];
+export const TICKET_BG: [number, number, number] = [241, 245, 249];
 
-async function logoDataUrl(): Promise<string | null> {
+/**
+ * The logo, shrunk to 600 px wide: the file is 3508 × 2480, and embedded as is it made a
+ * one-page report weigh 30 MB (too heavy for WhatsApp).
+ */
+export async function logoDataUrl(): Promise<string | null> {
     try {
-        const res = await fetch("/images/logos/logo.png");
-        if (!res.ok) return null;
-        const blob = await res.blob();
-        return await new Promise((resolve) => {
-            const r = new FileReader();
-            r.onload = () => resolve(typeof r.result === "string" ? r.result : null);
-            r.onerror = () => resolve(null);
-            r.readAsDataURL(blob);
-        });
+        const img = new Image();
+        img.src = "/images/logos/logo.png";
+        await img.decode();
+        const w = Math.min(600, img.naturalWidth);
+        const h = Math.round((img.naturalHeight * w) / img.naturalWidth);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return null;
+        ctx.drawImage(img, 0, 0, w, h);
+        return canvas.toDataURL("image/png");
     } catch {
         return null;
     }
@@ -93,7 +100,7 @@ export async function buildSalesPdf(r: SalesReport): Promise<Blob> {
 
     // ---- header
     const logo = await logoDataUrl();
-    if (logo) doc.addImage(logo, "PNG", M, 9, 30, 10);
+    if (logo) doc.addImage(logo, "PNG", M, 9, 30, 10, undefined, "FAST");
     doc.setTextColor(...INK);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
@@ -223,13 +230,13 @@ export async function buildSalesPdf(r: SalesReport): Promise<Blob> {
 }
 
 /** On a phone: the share sheet (WhatsApp…); elsewhere a download. */
-export async function shareOrDownload(blob: Blob, fileName: string): Promise<"shared" | "downloaded"> {
+export async function shareOrDownload(blob: Blob, fileName: string, title = "Ventes Mellia"): Promise<"shared" | "downloaded"> {
     const file = new File([blob], fileName, { type: "application/pdf" });
     const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
     const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (mobile && nav.share && nav.canShare?.({ files: [file] })) {
         try {
-            await nav.share({ files: [file], title: "Ventes Mellia" });
+            await nav.share({ files: [file], title });
             return "shared";
         } catch (e) {
             if (e instanceof DOMException && e.name === "AbortError") return "shared";

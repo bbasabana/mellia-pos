@@ -120,6 +120,7 @@ export default function CashCountPanel({
 
     const [money, setMoney] = useState<MoneyValue>(emptyMoney);
     const [rate, setRate] = useState(2850);
+    const [todayClosed, setTodayClosed] = useState<string | null>(null);
     const [withdrawal, setWithdrawal] = useState("");
     const [notes, setNotes] = useState("");
     const [lastClosed, setLastClosed] = useState<DayClosure | null>(null);
@@ -138,6 +139,7 @@ export default function CashCountPanel({
             setPending(json.data.pending);
             setCategories(json.data.categories);
             if (json.data.rate) setRate(json.data.rate);
+            setTodayClosed(json.data.todayClosed ?? null);
         } catch {
             showToast("Impossible de charger la caisse", "error");
         } finally {
@@ -259,6 +261,16 @@ export default function CashCountPanel({
                     </span>
                 )}
             </div>
+
+            {todayClosed && open?.ready && (
+                <div className="mx-4 mt-4 p-3 rounded border border-indigo-200 bg-indigo-50 text-indigo-900 text-sm">
+                    <strong>Aujourd&apos;hui : {todayClosed}.</strong> Aucune vente n&apos;est attendue
+                    {open.expectation.salesCount > 0 && open.day
+                        ? ` ; la journée du ${dayLabel(open.day, "EEEE d MMMM")} peut être clôturée normalement`
+                        : ""}
+                    .
+                </div>
+            )}
 
             {open && !open.ready && (
                 <div className="mx-4 mt-4 p-3 rounded border border-amber-200 bg-amber-50 text-amber-800 text-sm">

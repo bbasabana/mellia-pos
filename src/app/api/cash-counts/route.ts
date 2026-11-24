@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/audit";
+import { closedReason, kinshasaToday } from "@/lib/closed-days";
+import { getClosedDays } from "@/lib/closed-days-store";
+import { dayStatuses, kinshasaDay } from "@/lib/cash-days";
 import {
   businessMonthRange,
   closureDays,
@@ -93,14 +96,26 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    const [days, openSales] = await Promise.all([
+    const [days, openSales, closedDays] = await Promise.all([
       closureDays([...counts, { id: "open", periodStart: open.periodStart, periodEnd: open.periodEnd }]),
       prisma.sale.aggregate({
         where: { status: "COMPLETED", createdAt: { gte: open.periodStart, lt: open.periodEnd } },
         _min: { createdAt: true },
         _max: { createdAt: true },
       }),
+      getClosedDays(),
     ]);
+    const today = kinshasaToday();
+
+    // The month, day by day: closed, closed restaurant, still to close…
+    let monthDays = null;
+    if (byMonth) {
+      const [y, m] = byMonth.split("-").map(Number);
+      const monthEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      const first = [`${byMonth}-01`, open.startDate ? kinshasaDay(open.startDate) : `${byMonth}-01`].sort()[1];
+      const last = [monthEnd, today].sort()[0];
+      monthDays = await dayStatuses(first, last, closedDays);
+    }
     const listed = counts
       .map((c) => serialize(c, days.get(c.id)!))
       .filter((c) => !byMonth || c.businessDay.startsWith(byMonth))
@@ -119,6 +134,9 @@ export async function GET(req: NextRequest) {
           lastSaleAt: openSales._max.createdAt,
         },
         counts: listed,
+        days: monthDays,
+        closedDays,
+        todayClosed: closedReason(today, closedDays),
         pending: { count: pending._count, totalCdf: Number(pending._sum.differenceCdf ?? 0) },
         categories,
         rate: Number(rateRow?.rateUsdToCdf ?? 2850) || 2850,
