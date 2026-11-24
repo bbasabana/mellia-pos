@@ -30,127 +30,38 @@ import {
   type LucideIcon,
   UserCog,
   ClipboardList,
+  Wallet,
 } from "lucide-react";
 import "@/styles/theme.scss";
 import { cn } from "@/lib/utils";
 
 // Menu items with role-based visibility and Lucide icons
+// Menu items with role-based visibility and Lucide icons, in display order within a section.
 const menuItems = [
-  {
-    label: "POS (Ventes)",
-    href: "/dashboard/pos",
-    section: "Ventes",
-    icon: ShoppingCart,
-    roles: ["ADMIN", "MANAGER", "CASHIER"],
-  },
-  {
-    label: "Stock",
-    href: "/dashboard/stock",
-    section: "Cuisine & stock",
-    icon: Package,
-    roles: ["ADMIN", "MANAGER"],
-  },
-  {
-    label: "Mini Inventaire",
-    href: "/dashboard/mini-inventory",
-    section: "Cuisine & stock",
-    icon: ClipboardList,
-    roles: ["ADMIN", "MANAGER", "CASHIER"],
-  },
-  {
-    label: "Amélie",
-    href: "/dashboard/amelie",
-    section: "Gestion",
-    icon: Sparkles,
-    roles: ["ADMIN", "MANAGER"],
-  },
-  {
-    label: "Cuisine (KDS)",
-    href: "/dashboard/kitchen",
-    section: "Cuisine & stock",
-    icon: Flame,
-    roles: ["ADMIN", "MANAGER", "KITCHEN"],
-  },
-  {
-    label: "Produits",
-    href: "/dashboard/products",
-    section: "Cuisine & stock",
-    icon: UtensilsCrossed,
-    roles: ["ADMIN", "MANAGER"],
-  },
-  {
-    label: "Clients",
-    href: "/dashboard/clients",
-    section: "Ventes",
-    icon: Users,
-    roles: ["ADMIN", "MANAGER", "CASHIER"],
-  },
-  {
-    label: "Achats",
-    href: "/dashboard/purchases",
-    section: "Cuisine & stock",
-    icon: ShoppingBag,
-    roles: ["ADMIN", "MANAGER"],
-  },
-  {
-    label: "Dépenses",
-    href: "/dashboard/expenses",
-    section: "Gestion",
-    icon: TrendingDown,
-    roles: ["ADMIN", "MANAGER"],
-  },
-  {
-    label: "Brouillons",
-    href: "/dashboard/sales/drafts",
-    section: "Ventes",
-    icon: FileText,
-    roles: ["ADMIN", "MANAGER", "CASHIER"],
-  },
-  {
-    label: "Historique Ventes",
-    href: "/dashboard/transactions",
-    section: "Ventes",
-    icon: Receipt,
-    roles: ["ADMIN", "MANAGER", "CASHIER"],
-  },
-  {
-    label: "Transactions",
-    href: "/dashboard/sales/transactions",
-    section: "Ventes",
-    icon: TrendingUp,
-    roles: ["ADMIN", "MANAGER"],
-  },
-  {
-    label: "Rapports",
-    href: "/dashboard/reports",
-    section: "Gestion",
-    icon: BarChart3,
-    roles: ["ADMIN", "MANAGER"],
-  },
-  {
-    label: "Utilisateurs",
-    href: "/dashboard/users",
-    section: "Administration",
-    icon: Users,
-    roles: ["ADMIN"],
-  },
-  {
-    label: "Employés (RH)",
-    href: "/dashboard/employees",
-    section: "Administration",
-    icon: UserCog,
-    roles: ["ADMIN"],
-  },
-  {
-    label: "Paramètres",
-    href: "/dashboard/settings",
-    section: "Administration",
-    icon: Settings,
-    roles: ["ADMIN"],
-  },
+  { label: "POS (Ventes)", href: "/dashboard/pos", section: "Ventes", icon: ShoppingCart, roles: ["ADMIN", "MANAGER", "CASHIER"] },
+  { label: "Historique des ventes", href: "/dashboard/transactions", section: "Ventes", icon: Receipt, roles: ["ADMIN", "MANAGER", "CASHIER"] },
+  { label: "Brouillons", href: "/dashboard/sales/drafts", section: "Ventes", icon: FileText, roles: ["ADMIN", "MANAGER", "CASHIER"] },
+  { label: "Transactions", href: "/dashboard/sales/transactions", section: "Ventes", icon: TrendingUp, roles: ["ADMIN", "MANAGER"] },
+  { label: "Clients", href: "/dashboard/clients", section: "Ventes", icon: Users, roles: ["ADMIN", "MANAGER", "CASHIER"] },
+
+  { label: "Caisse", href: "/dashboard/caisse", section: "Argent", icon: Wallet, roles: ["ADMIN", "MANAGER"] },
+  { label: "Dépenses", href: "/dashboard/expenses", section: "Argent", icon: TrendingDown, roles: ["ADMIN", "MANAGER"] },
+  { label: "Achats", href: "/dashboard/purchases", section: "Argent", icon: ShoppingBag, roles: ["ADMIN", "MANAGER"] },
+
+  { label: "Stock", href: "/dashboard/stock", section: "Cuisine & stock", icon: Package, roles: ["ADMIN", "MANAGER"] },
+  { label: "Mini Inventaire", href: "/dashboard/mini-inventory", section: "Cuisine & stock", icon: ClipboardList, roles: ["ADMIN", "MANAGER", "CASHIER"] },
+  { label: "Produits", href: "/dashboard/products", section: "Cuisine & stock", icon: UtensilsCrossed, roles: ["ADMIN", "MANAGER"] },
+  { label: "Cuisine (KDS)", href: "/dashboard/kitchen", section: "Cuisine & stock", icon: Flame, roles: ["ADMIN", "MANAGER", "KITCHEN"] },
+
+  { label: "Rapports", href: "/dashboard/reports", section: "Analyses", icon: BarChart3, roles: ["ADMIN", "MANAGER"] },
+  { label: "Amélie (rentabilité)", href: "/dashboard/amelie", section: "Analyses", icon: Sparkles, roles: ["ADMIN", "MANAGER"] },
+
+  { label: "Utilisateurs", href: "/dashboard/users", section: "Administration", icon: Users, roles: ["ADMIN"] },
+  { label: "Employés (RH)", href: "/dashboard/employees", section: "Administration", icon: UserCog, roles: ["ADMIN"] },
+  { label: "Paramètres", href: "/dashboard/settings", section: "Administration", icon: Settings, roles: ["ADMIN"] },
 ];
 
-const sectionOrder = ["Ventes", "Cuisine & stock", "Gestion", "Administration"];
+const sectionOrder = ["Ventes", "Argent", "Cuisine & stock", "Analyses", "Administration"];
 
 const roleLabels: Record<string, string> = {
   ADMIN: "Administrateur",

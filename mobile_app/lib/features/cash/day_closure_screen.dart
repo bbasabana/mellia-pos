@@ -221,7 +221,7 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
         color: Color(0xFFFFF8E6),
         child: Text(
           "La caisse n'a pas encore de date de démarrage. Un administrateur doit "
-          "d'abord faire la clôture de démarrage sur le site (Dépenses › Clôture de démarrage).",
+          "d'abord faire la clôture de démarrage sur le site (Caisse › Démarrage).",
           style: TextStyle(fontSize: 14, height: 1.4),
         ),
       );
@@ -247,7 +247,8 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
             style: const TextStyle(color: AppTheme.muted, fontSize: 12),
           ),
           const SizedBox(height: 12),
-          _row('Fond de caisse', _fc(_n(open['openingFloatCdf']))),
+          if (_n(open['openingFloatCdf']) != 0)
+            _row('Resté dans le tiroir', _fc(_n(open['openingFloatCdf']))),
           _row(
             '+ Ventes cash (${e['salesCount'] ?? 0})',
             _fc(_n(e['salesCashCdf'])),
@@ -258,13 +259,15 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
             _fc(_n(e['expensesCdf'])),
             color: AppTheme.error,
           ),
-          _row(
-            '- Achats caisse',
-            _fc(_n(e['purchasesCdf'])),
-            color: AppTheme.error,
-          ),
+          // Purchases are paid from the Caisse, not from the day's takings.
+          if (_n(e['purchasesCdf']) != 0)
+            _row(
+              '- Achats caisse',
+              _fc(_n(e['purchasesCdf'])),
+              color: AppTheme.error,
+            ),
           const Divider(height: 20),
-          _row('Doit être en caisse', _fc(expected), bold: true),
+          _row('Recette à remettre', _fc(expected), bold: true),
           if (_n(e['salesOtherCdf']) > 0)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -307,14 +310,14 @@ class _DayClosureScreenState extends ConsumerState<DayClosureScreen> {
             ),
           ],
           const SizedBox(height: 12),
-          _amountField(_withdrawal, 'Versement au patron (optionnel)'),
+          _amountField(_withdrawal, 'Remis au patron (optionnel)'),
           if (countedText.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6, left: 4),
               child: Text(
                 withdrawalTooHigh
                     ? 'Le versement dépasse l\'argent compté'
-                    : 'Reste en caisse (fond suivant) : ${_fc(counted - withdrawal)}',
+                    : 'Reste dans le tiroir : ${_fc(counted - withdrawal)}',
                 style: TextStyle(
                   fontSize: 12.5,
                   color: withdrawalTooHigh ? AppTheme.error : AppTheme.muted,

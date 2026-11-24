@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import { getStartDate } from "@/lib/cash-period";
+import { kinshasaDate, kinshasaMidnight } from "@/lib/entry-date";
+
+const DEFAULT_RATE = 2850;
 
 type MovementType = "IN" | "OUT" | "TRANSFER" | "LOSS" | "ADJUSTMENT";
 
@@ -8,16 +12,14 @@ function toNum(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Midnight of that day in Kinshasa (the server runs in UTC). */
 function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  return kinshasaMidnight(kinshasaDate(d));
 }
 
+/** Last millisecond of that day in Kinshasa. */
 function endOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
+  return new Date(startOfDay(d).getTime() + 86_400_000 - 1);
 }
 
 function getTerracePriceUsd(
@@ -80,16 +82,31 @@ export type AmelieProductRow = {
   investedCdf: number;
   soldQty: number;
   soldUsd: number;
+  soldCdf: number;
   soldProfitUsd: number;
+  soldProfitCdf: number;
   remainingQty: number;
   remainingValueCostCdf: number;
   remainingTerraceUsd: number;
   remainingVipUsd: number;
   remainingProfitTerraceUsd: number;
   remainingProfitVipUsd: number;
+  remainingTerraceCdf: number;
+  remainingVipCdf: number;
+};
+
+export type AmelieTopProduct = {
+  id: string;
+  name: string;
+  type: string;
+  qty: number;
+  revenueUsd: number;
+  revenueCdf: number;
 };
 
 export type AmelieReportData = {
+  /** USD → FC rate used for the FC figures computed from dollar prices. */
+  rate: number;
   sessions: AmelieSessionOption[];
   selected: {
     investmentId: string;
@@ -109,6 +126,10 @@ export type AmelieReportData = {
     soldUsdBeverage: number;
     soldUsdFood: number;
     soldProfitUsd: number;
+    soldCdfTotal: number;
+    soldCdfBeverage: number;
+    soldCdfFood: number;
+    soldProfitCdf: number;
     soldQtyTotal: number;
     soldQtyBeverage: number;
     soldQtyFood: number;
@@ -121,6 +142,10 @@ export type AmelieReportData = {
     remainingVipUsd: number;
     remainingProfitTerraceUsd: number;
     remainingProfitVipUsd: number;
+    remainingTerraceCdf: number;
+    remainingVipCdf: number;
+    topByQty: AmelieTopProduct[];
+    topByRevenue: AmelieTopProduct[];
     topProductByQty: {
       id: string;
       name: string;
@@ -134,7 +159,16 @@ export type AmelieReportData = {
       revenueUsd: number;
     } | null;
   } | null;
-  dailySales: Array<{ date: string; beverage: number; food: number; total: number }>;
+  dailySales: Array<{
+    date: string;
+    beverage: number;
+    food: number;
+    total: number;
+    beverageCdf: number;
+    foodCdf: number;
+    totalCdf: number;
+    tickets: number;
+  }>;
   products: AmelieProductRow[];
 };
 
@@ -160,6 +194,10 @@ function emptySelected(
     soldUsdBeverage: 0,
     soldUsdFood: 0,
     soldProfitUsd: 0,
+    soldCdfTotal: 0,
+    soldCdfBeverage: 0,
+    soldCdfFood: 0,
+    soldProfitCdf: 0,
     soldQtyTotal: 0,
     soldQtyBeverage: 0,
     soldQtyFood: 0,
@@ -172,6 +210,10 @@ function emptySelected(
     remainingVipUsd: 0,
     remainingProfitTerraceUsd: 0,
     remainingProfitVipUsd: 0,
+    remainingTerraceCdf: 0,
+    remainingVipCdf: 0,
+    topByQty: [],
+    topByRevenue: [],
     topProductByQty: null,
     topProductByRevenue: null,
   };
@@ -188,8 +230,19 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
     },
   });
 
+  const [rateRow, startDate] = await Promise.all([
+    prisma.exchangeRate.findFirst({
+      where: { active: true },
+      orderBy: { effectiveDate: "desc" },
+      select: { rateUsdToCdf: true },
+    }),
+    getStartDate(),
+  ]);
+  const rate = toNum(rateRow?.rateUsdToCdf) || DEFAULT_RATE;
+
   if (investments.length === 0) {
     return {
+      rate,
       sessions: [],
       selected: null,
       dailySales: [],
@@ -255,6 +308,7 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
 
   if (productIds.length === 0) {
     return {
+      rate,
       sessions: sessions.slice().reverse(),
       selected: emptySelected(selectedInv, selectedMeta),
       dailySales: [],
@@ -302,7 +356,11 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
         productId: { in: productIds },
         sale: {
           status: "COMPLETED",
-          createdAt: { gte: sessionStart, lte: sessionEnd },
+          // Sales before the start date are archived: they count nowhere.
+          createdAt: {
+            gte: startDate && startDate > sessionStart ? startDate : sessionStart,
+            lte: sessionEnd,
+          },
         },
       },
       select: {
@@ -310,6 +368,8 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
         quantity: true,
         totalPrice: true,
         unitCost: true,
+        unitPriceCdf: true,
+        saleId: true,
         sale: {
           select: {
             createdAt: true,
@@ -378,9 +438,21 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
 
   const soldByProduct = new Map<
     string,
-    { qty: number; revenue: number; cost: number; name: string }
+    { qty: number; revenue: number; revenueCdf: number; cost: number; name: string; type: string }
   >();
-  const dailyMap = new Map<string, { beverage: number; food: number; total: number }>();
+  type Day = {
+    beverage: number;
+    food: number;
+    total: number;
+    beverageCdf: number;
+    foodCdf: number;
+    totalCdf: number;
+    tickets: Set<string>;
+  };
+  const dailyMap = new Map<string, Day>();
+  let soldCdfTotal = 0;
+  let soldCdfBeverage = 0;
+  let soldCdfFood = 0;
 
   let soldUsdTotal = 0;
   let soldUsdBeverage = 0;
@@ -394,37 +466,54 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
     const qty = toNum(item.quantity);
     const revenue = toNum(item.totalPrice);
     const cost = toNum(item.unitCost) * qty;
+    // FC actually charged; older lines without it are converted at today's rate.
+    const revenueCdf = toNum(item.unitPriceCdf) > 0 ? toNum(item.unitPriceCdf) * qty : revenue * rate;
 
+    soldCdfTotal += revenueCdf;
     soldUsdTotal += revenue;
     soldCostUsd += cost;
     soldQtyTotal += qty;
 
     if (item.product.type === "BEVERAGE") {
       soldUsdBeverage += revenue;
+      soldCdfBeverage += revenueCdf;
       soldQtyBeverage += qty;
     } else if (item.product.type === "FOOD") {
       soldUsdFood += revenue;
+      soldCdfFood += revenueCdf;
       soldQtyFood += qty;
     }
 
     const prev = soldByProduct.get(item.productId) || {
       qty: 0,
       revenue: 0,
+      revenueCdf: 0,
       cost: 0,
       name: item.product.name,
+      type: item.product.type,
     };
     soldByProduct.set(item.productId, {
+      ...prev,
       qty: prev.qty + qty,
       revenue: prev.revenue + revenue,
+      revenueCdf: prev.revenueCdf + revenueCdf,
       cost: prev.cost + cost,
-      name: prev.name,
     });
 
-    const dayKey = item.sale.createdAt.toISOString().slice(0, 10);
-    const day = dailyMap.get(dayKey) || { beverage: 0, food: 0, total: 0 };
+    const dayKey = kinshasaDate(item.sale.createdAt);
+    const day =
+      dailyMap.get(dayKey) ||
+      { beverage: 0, food: 0, total: 0, beverageCdf: 0, foodCdf: 0, totalCdf: 0, tickets: new Set<string>() };
     day.total += revenue;
-    if (item.product.type === "BEVERAGE") day.beverage += revenue;
-    else if (item.product.type === "FOOD") day.food += revenue;
+    day.totalCdf += revenueCdf;
+    day.tickets.add(item.saleId);
+    if (item.product.type === "BEVERAGE") {
+      day.beverage += revenue;
+      day.beverageCdf += revenueCdf;
+    } else if (item.product.type === "FOOD") {
+      day.food += revenue;
+      day.foodCdf += revenueCdf;
+    }
     dailyMap.set(dayKey, day);
   }
 
@@ -441,8 +530,10 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
     const soldData = soldByProduct.get(product.id) || {
       qty: 0,
       revenue: 0,
+      revenueCdf: 0,
       cost: 0,
       name: product.name,
+      type: product.type,
     };
     const soldQty = soldData.qty;
     const soldUsd = soldData.revenue;
@@ -472,15 +563,30 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
       investedCdf,
       soldQty,
       soldUsd,
+      soldCdf: soldData.revenueCdf,
       soldProfitUsd: soldProfit,
+      soldProfitCdf: soldData.revenueCdf - soldData.cost * rate,
       remainingQty,
       remainingValueCostCdf,
       remainingTerraceUsd,
       remainingVipUsd,
       remainingProfitTerraceUsd,
       remainingProfitVipUsd,
+      remainingTerraceCdf: remainingTerraceUsd * rate,
+      remainingVipCdf: remainingVipUsd * rate,
     });
   }
+
+  const ranked = [...soldByProduct.entries()].map(([id, v]) => ({
+    id,
+    name: v.name,
+    type: v.type,
+    qty: v.qty,
+    revenueUsd: v.revenue,
+    revenueCdf: v.revenueCdf,
+  }));
+  const topByQtyList = [...ranked].sort((a, b) => b.qty - a.qty || b.revenueCdf - a.revenueCdf).slice(0, 5);
+  const topByRevenueList = [...ranked].sort((a, b) => b.revenueCdf - a.revenueCdf || b.qty - a.qty).slice(0, 5);
 
   const topByQty = [...soldByProduct.entries()].sort(
     (a, b) => b[1].qty - a[1].qty || b[1].revenue - a[1].revenue
@@ -512,9 +618,19 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
 
   const dailySales = [...dailyMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({ date, ...v }));
+    .map(([date, v]) => ({
+      date,
+      beverage: v.beverage,
+      food: v.food,
+      total: v.total,
+      beverageCdf: v.beverageCdf,
+      foodCdf: v.foodCdf,
+      totalCdf: v.totalCdf,
+      tickets: v.tickets.size,
+    }));
 
   return {
+    rate,
     sessions: sessions.slice().reverse(),
     selected: {
       investmentId: selectedInv.id,
@@ -534,6 +650,10 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
       soldUsdBeverage,
       soldUsdFood,
       soldProfitUsd,
+      soldCdfTotal,
+      soldCdfBeverage,
+      soldCdfFood,
+      soldProfitCdf: soldCdfTotal - soldCostUsd * rate,
       soldQtyTotal,
       soldQtyBeverage,
       soldQtyFood,
@@ -546,6 +666,10 @@ export async function buildAmelieReport(investmentId?: string): Promise<AmelieRe
       remainingVipUsd,
       remainingProfitTerraceUsd,
       remainingProfitVipUsd,
+      remainingTerraceCdf: remainingTerraceUsd * rate,
+      remainingVipCdf: remainingVipUsd * rate,
+      topByQty: topByQtyList,
+      topByRevenue: topByRevenueList,
       topProductByQty: topByQty
         ? {
             id: topByQty[0],
