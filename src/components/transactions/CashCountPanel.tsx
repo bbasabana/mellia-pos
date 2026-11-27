@@ -13,7 +13,6 @@ import {
     Printer,
     RotateCcw,
     TrendingUp,
-    Wallet,
 } from "lucide-react";
 import { showToast } from "@/components/ui/Toast";
 import { emptyMoney, MoneyCount, moneyAmounts, moneyDetail, type MoneyValue } from "@/components/caisse/MoneyCount";
@@ -79,10 +78,7 @@ export const CLOSURE_STATUS: Record<Status, { label: string; className: string }
 };
 
 export const fc = (v: number) => `${Math.round(v).toLocaleString("fr-FR")} FC`;
-const digits = (s: string) => s.replace(/[^0-9]/g, "");
-const grouped = (s: string) => (digits(s) ? Number(digits(s)).toLocaleString("fr-FR") : "");
 const hm = (d: string) => format(new Date(d), "HH:mm", { locale: fr });
-const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 /** "lun. 1 déc." for a business day YYYY-MM-DD (read as a calendar date, not an instant). */
 export const dayLabel = (day: string, pattern = "EEE d MMM") => {
     const [y, m, d] = day.split("-").map(Number);
@@ -90,8 +86,9 @@ export const dayLabel = (day: string, pattern = "EEE d MMM") => {
 };
 
 /**
- * Clôture de la journée (Z). The drawer must hold: what the previous closure left in it +
- * cash sales − expenses paid from it since then. Purchases are not in it: they are paid
+ * Clôture de la journée (Z), one day at a time. The money counted must equal that day's
+ * cash sales − the expenses paid from the drawer that day; it is all handed over, nothing is
+ * carried to the next day. Purchases are not in it: they are paid
  * from the Caisse (menu Caisse). The money counted is typed in dollars and francs; the gap
  * shows at once and, before it is recorded, the open day is searched for its usual causes
  * (duplicates, tickets worth the gap…). A gap needs an explanation. Closing locks those
@@ -129,7 +126,6 @@ export default function CashCountPanel({
     const [money, setMoney] = useState<MoneyValue>(emptyMoney);
     const [rate, setRate] = useState(2850);
     const [todayClosed, setTodayClosed] = useState<string | null>(null);
-    const [withdrawal, setWithdrawal] = useState("");
     const [notes, setNotes] = useState("");
     const [lastClosed, setLastClosed] = useState<DayClosure | null>(null);
 
@@ -161,14 +157,12 @@ export default function CashCountPanel({
 
     const amounts = moneyAmounts(money, rate);
     const countedCdf = amounts.filled ? amounts.totalCdf : null;
-    const withdrawalCdf = Number(digits(withdrawal) || 0);
     const expected = open?.expectedCdf ?? 0;
     const diff = countedCdf === null ? null : countedCdf - expected;
-    const withdrawalTooHigh = countedCdf !== null && withdrawalCdf > countedCdf;
     const needsExplanation = diff !== null && diff !== 0 && notes.trim().length < MIN_EXPLANATION;
 
     const close = async () => {
-        if (countedCdf === null || withdrawalTooHigh || needsExplanation) return;
+        if (countedCdf === null || needsExplanation) return;
         setSaving(true);
         try {
             // Keeps how the money was counted when dollars were in the drawer.
@@ -177,7 +171,13 @@ export default function CashCountPanel({
             const res = await fetch("/api/cash-counts", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ countedCdf, withdrawalCdf, notes: fullNotes, day: open?.pendingDays?.[0]?.day }),
+                // The day's money is handed over whole: nothing is carried to the next day.
+                body: JSON.stringify({
+                    countedCdf,
+                    withdrawalCdf: countedCdf,
+                    notes: fullNotes,
+                    day: open?.pendingDays?.[0]?.day,
+                }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error || "Clôture impossible");
@@ -190,7 +190,6 @@ export default function CashCountPanel({
                 row.differenceCdf === 0 ? "success" : "info"
             );
             setMoney(emptyMoney);
-            setWithdrawal("");
             setNotes("");
             setConfirming(false);
             load();
@@ -242,31 +241,6 @@ export default function CashCountPanel({
         }
     };
 
-    // "Remis au patron" of the latest closure: what it leaves in the drawer opens the next day.
-    const [savingRemis, setSavingRemis] = useState(false);
-    const [editingRemis, setEditingRemis] = useState<{ id: string; value: string } | null>(null);
-    const saveRemis = async (id: string, withdrawalCdf: number) => {
-        setSavingRemis(true);
-        try {
-            const res = await fetch(`/api/cash-counts?id=${id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ withdrawalCdf }),
-            });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.error);
-            showToast(`Montant remis corrigé : ${fc(withdrawalCdf)}`, "success");
-            setEditingRemis(null);
-            setMoney(emptyMoney);
-            setConfirming(false);
-            load();
-        } catch (e) {
-            showToast(e instanceof Error ? e.message : "Action impossible", "error");
-        } finally {
-            setSavingRemis(false);
-        }
-    };
-
     // The day the filter shows, compared with the day being closed now.
     const pendingList = open?.pendingDays ?? [];
     const closingDay = pendingList[0]?.day ?? open?.day ?? null;
@@ -287,8 +261,6 @@ export default function CashCountPanel({
         counts[0] && open && new Date(counts[0].periodEnd).getTime() === new Date(open.periodStart).getTime()
             ? counts[0].id
             : undefined;
-    /** The closure the open day starts from, when it can still be corrected. */
-    const previous = counts.find((c) => c.id === latestId);
     /** What this day brought in, without what earlier days left in the drawer. */
     const dayTakings = open ? open.expectation.salesCashCdf - open.expectation.expensesCdf : 0;
 
@@ -383,7 +355,7 @@ export default function CashCountPanel({
                             {open.pendingDays && open.pendingDays.length > 1 && (
                                 <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900 space-y-1.5">
                                     <p className="font-bold">
-                                        {open.pendingDays.length} journées à clôturer, une à la fois (de la plus ancienne à la plus récente)
+                                        {open.pendingDays.length} journées à clôturer, une à la fois
                                     </p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {open.pendingDays.map((d, i) => (
@@ -404,10 +376,6 @@ export default function CashCountPanel({
                                             </button>
                                         ))}
                                     </div>
-                                    <p>
-                                        Comptez l&apos;argent de la première journée et clôturez-la : la suivante s&apos;affichera
-                                        ensuite avec ses propres ventes.
-                                    </p>
                                 </div>
                             )}
                             {open.day && (
@@ -419,7 +387,6 @@ export default function CashCountPanel({
                                 {open.firstSaleAt && open.lastSaleAt
                                     ? `Ventes de ${hm(open.firstSaleAt)} à ${hm(open.lastSaleAt)}`
                                     : "Aucune vente pour l'instant"}
-                                {" · "}période comptée {lowerFirst(open.floatSource)}
                             </p>
                             <Line
                                 icon={<TrendingUp size={12} />}
@@ -435,58 +402,14 @@ export default function CashCountPanel({
                                 <span className="text-xs font-black uppercase tracking-wider text-[#0891b2]">Recette de la journée</span>
                                 <span className="text-xl font-black text-[#0891b2]">{fc(dayTakings)}</span>
                             </div>
-                            {open.openingFloatCdf !== 0 && (
-                                <>
-                                    <Line icon={<Wallet size={12} />} label="+ Resté dans le tiroir (clôture précédente, non remis)" tone="text-gray-700">
-                                        {fc(open.openingFloatCdf)}
-                                    </Line>
-                                    <div className="flex items-center justify-between rounded-lg md:rounded-sm border border-gray-300 bg-gray-50 px-3 py-2">
-                                        <span className="text-xs font-black uppercase tracking-wider text-gray-600">Argent attendu dans le tiroir</span>
-                                        <span className="text-lg font-black text-gray-800">{fc(expected)}</span>
-                                    </div>
-                                    <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[12px] text-amber-900 space-y-1.5">
-                                        <p>
-                                            La clôture précédente a été enregistrée sans argent remis au patron : ses{" "}
-                                            <strong>{fc(open.openingFloatCdf)}</strong> sont donc comptés comme restés dans le tiroir et
-                                            s&apos;ajoutent à cette journée.
-                                        </p>
-                                        {isAdmin && previous ? (
-                                            <>
-                                                <p>Si cet argent a été remis au patron, corrigez la clôture précédente :</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => saveRemis(previous.id, previous.countedCdf)}
-                                                    disabled={savingRemis}
-                                                    className="font-bold px-2.5 py-1.5 rounded bg-amber-600 text-white disabled:opacity-50"
-                                                >
-                                                    Tout a été remis ({fc(previous.countedCdf)}) le {dayLabel(previous.businessDay, "EEEE d MMMM")}
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <p>Si cet argent a été remis au patron, demandez à l&apos;administrateur de corriger « Remis » sur la clôture précédente.</p>
-                                        )}
-                                    </div>
-                                </>
-                            )}
                             {open.expectation.salesOtherCdf > 0 && (
                                 <p className="text-[11px] text-gray-500">
                                     Carte / Mobile Money : {fc(open.expectation.salesOtherCdf)} ({open.expectation.otherCount} ticket{open.expectation.otherCount > 1 ? "s" : ""}) — hors tiroir.
                                 </p>
                             )}
-                            <div className="rounded-md bg-gray-50 border border-gray-100 p-2.5 text-[11px] text-gray-600 space-y-1">
-                                <p className="font-bold text-gray-700">Comment ce montant est calculé</p>
-                                <p>
-                                    Recette de la journée = ventes en espèces de cette journée − dépenses payées avec l&apos;argent du
-                                    tiroir.
-                                    {open.openingFloatCdf !== 0
-                                        ? " Le tiroir doit en plus contenir ce que la clôture précédente y a laissé (argent compté non remis au patron)."
-                                        : ""}
-                                </p>
-                                <p>
-                                    L&apos;argent du démarrage et les achats n&apos;y sont pas : ils sont suivis dans le menu Caisse. Les
-                                    factures annulées et le Mobile Money ne sont pas attendus dans le tiroir.
-                                </p>
-                            </div>
+                            <p className="text-[11px] text-gray-500">
+                                Ventes en espèces du jour − dépenses payées avec l&apos;argent du tiroir.
+                            </p>
                         </>
                     )}
                 </div>
@@ -531,30 +454,6 @@ export default function CashCountPanel({
                         </div>
                     )}
 
-                    {countedCdf !== null && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <label className="block">
-                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Remis au patron</span>
-                                <input
-                                    id="closure-withdrawal"
-                                    inputMode="numeric"
-                                    placeholder="0"
-                                    value={withdrawal}
-                                    onChange={(e) => {
-                                        setWithdrawal(grouped(e.target.value));
-                                        setConfirming(false);
-                                    }}
-                                    className={`mt-1 w-full text-right font-bold border rounded px-3 py-2 ${withdrawalTooHigh ? "border-red-400" : "border-gray-200"}`}
-                                />
-                            </label>
-                            <div className="rounded border border-gray-200 px-3 py-2 flex flex-col justify-center">
-                                <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Reste dans le tiroir</span>
-                                <span className={`font-black ${withdrawalTooHigh ? "text-red-600" : "text-gray-800"}`}>
-                                    {withdrawalTooHigh ? "Versement trop élevé" : fc(countedCdf - withdrawalCdf)}
-                                </span>
-                            </div>
-                        </div>
-                    )}
 
                     {diff !== null && diff !== 0 && countedCdf !== null && (
                         <>
@@ -594,7 +493,7 @@ export default function CashCountPanel({
                         <button
                             type="button"
                             onClick={() => setConfirming(true)}
-                            disabled={countedCdf === null || withdrawalTooHigh || needsExplanation || loading || !open?.ready}
+                            disabled={countedCdf === null || needsExplanation || loading || !open?.ready}
                             className="w-full py-3 rounded-lg md:rounded-sm bg-gray-900 text-white font-bold disabled:opacity-40 flex items-center justify-center gap-2"
                         >
                             <Lock size={16} /> Clôturer la journée
@@ -685,54 +584,7 @@ export default function CashCountPanel({
                                             {fc(c.differenceCdf)}
                                         </td>
                                         <td className="px-4 py-2 text-right whitespace-nowrap text-gray-600">
-                                            {editingRemis?.id === c.id ? (
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <input
-                                                        inputMode="numeric"
-                                                        value={editingRemis.value}
-                                                        onChange={(e) => setEditingRemis({ id: c.id, value: grouped(e.target.value) })}
-                                                        className="w-28 text-right text-xs font-bold border border-gray-300 rounded px-2 py-1"
-                                                        aria-label="Montant remis au patron"
-                                                    />
-                                                    <div className="flex gap-1 text-[11px]">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setEditingRemis({ id: c.id, value: grouped(String(c.countedCdf)) })}
-                                                            className="px-1.5 py-0.5 rounded border border-gray-300"
-                                                        >
-                                                            Tout
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            disabled={savingRemis}
-                                                            onClick={() => saveRemis(c.id, Number(digits(editingRemis.value) || 0))}
-                                                            className="px-1.5 py-0.5 rounded bg-gray-900 text-white font-bold"
-                                                        >
-                                                            OK
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setEditingRemis(null)}
-                                                            className="px-1.5 py-0.5 rounded border border-gray-300"
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    {c.withdrawalCdf > 0 ? fc(c.withdrawalCdf) : "—"}
-                                                    {isAdmin && c.id === latestId && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setEditingRemis({ id: c.id, value: grouped(String(c.withdrawalCdf)) })}
-                                                            className="block ml-auto text-[11px] text-gray-500 hover:text-gray-900 underline"
-                                                        >
-                                                            Corriger
-                                                        </button>
-                                                    )}
-                                                </>
-                                            )}
+                                            {c.withdrawalCdf > 0 ? fc(c.withdrawalCdf) : "—"}
                                         </td>
                                         <td className="px-4 py-2">
                                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${CLOSURE_STATUS[c.status].className}`}>
@@ -880,7 +732,7 @@ function ZTicket({ c }: { c: DayClosure }) {
             {row(c.differenceCdf < 0 ? "Manquant" : c.differenceCdf > 0 ? "Surplus" : "Écart", fc(c.differenceCdf), true)}
             {row("Statut", CLOSURE_STATUS[c.status].label)}
             {c.withdrawalCdf > 0 && row("Remis au patron", fc(c.withdrawalCdf))}
-            {row("Reste dans le tiroir", fc(c.countedCdf - c.withdrawalCdf))}
+            {c.countedCdf !== c.withdrawalCdf && row("Reste dans le tiroir", fc(c.countedCdf - c.withdrawalCdf))}
             {c.salesOtherCdf > 0 && (
                 <>
                     {rule}

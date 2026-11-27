@@ -133,7 +133,7 @@ export default function ClosureCheck({
                 {/* What the app recorded: compare with the paper notes */}
                 <div className="rounded-md bg-sky-50 border border-sky-100 p-2.5 text-xs text-sky-900 space-y-1">
                     <p>
-                        <strong>Comparez avec le cahier :</strong> l&apos;application a {plural(data.summary.count, "facture")} —{" "}
+                        <strong>Cahier :</strong> l&apos;application a {plural(data.summary.count, "facture")} —{" "}
                         {data.summary.cashCount} en espèces ({fc(data.summary.cashCdf)})
                         {data.summary.otherCount > 0 && `, ${data.summary.otherCount} autrement (${fc(data.summary.otherCdf)})`}.
                     </p>
@@ -143,10 +143,6 @@ export default function ClosureCheck({
                                 {c.cashier || "Sans nom"} : {plural(c.count, "facture")} · espèces {fc(c.cashCdf)}
                             </p>
                         ))}
-                    <p className="text-sky-700">
-                        Une facture de plus dans l&apos;application que dans le cahier ? Cherchez-la ci-dessous ; le PDF « Journée en cours »
-                        (bouton Exporter en PDF) liste toutes les factures dans l&apos;ordre.
-                    </p>
                 </div>
 
                 {data.duplicates.length > 0 && (
@@ -154,7 +150,7 @@ export default function ClosureCheck({
                         icon={<Copy size={14} />}
                         tone="red"
                         title={`${plural(data.duplicates.length, "doublon")} possible${data.duplicates.length > 1 ? "s" : ""}`}
-                        text="Mêmes articles, mêmes quantités et mêmes prix, à quelques minutes d'écart : la vente a peut-être été validée deux fois. Si oui, annulez la deuxième."
+                        text="Même vente à quelques minutes d'écart : annulez la deuxième si c'est un doublon."
                     >
                         {data.duplicates.map((d) => (
                             <div key={d.second.id} className="flex flex-wrap items-center gap-1.5">
@@ -171,7 +167,7 @@ export default function ClosureCheck({
                         icon={<Receipt size={14} />}
                         tone="red"
                         title={`Factures qui font exactement ${fc(amount)}`}
-                        text="Le manquant est égal à ces factures. Vérifiez qu'elles sont dans le cahier et que l'argent a bien été encaissé."
+                        text="Vérifiez qu'elles ont bien été encaissées."
                     >
                         {data.matching.singles.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">{data.matching.singles.map((t) => chip(t, true))}</div>
@@ -191,7 +187,7 @@ export default function ClosureCheck({
                         icon={<Receipt size={14} />}
                         tone="amber"
                         title={`Factures qui font exactement ${fc(amount)}`}
-                        text="Le surplus est égal à une facture annulée ou payée en Mobile Money : a-t-elle été payée en espèces ?"
+                        text="Facture annulée ou Mobile Money payée en espèces ?"
                     >
                         <div className="flex flex-wrap gap-1.5">{[...cancelledMatching, ...otherMatching].map((t) => chip(t, true))}</div>
                     </Finding>
@@ -202,7 +198,7 @@ export default function ClosureCheck({
                         icon={<Tag size={14} />}
                         tone="amber"
                         title={`${data.editedPrices.length} prix différent${data.editedPrices.length > 1 ? "s" : ""} de la carte`}
-                        text="Ni le prix Terrasse ni le prix VIP : le prix a été changé à la main."
+                        text="Prix changé à la main."
                     >
                         {data.editedPrices.map((l, i) => (
                             <div key={`${l.ticket.id}-${i}`} className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
@@ -221,11 +217,7 @@ export default function ClosureCheck({
                         icon={<Smartphone size={14} />}
                         tone="gray"
                         title={`${plural(data.otherPayments.length, "facture")} hors espèces · ${fc(data.summary.otherCdf)}`}
-                        text={
-                            shortfall
-                                ? "Le Mobile Money et la carte ne sont pas attendus dans le tiroir. Une vente payée en Mobile Money mais enregistrée « Espèces » crée un manquant."
-                                : "Le Mobile Money et la carte ne sont pas attendus dans le tiroir. Une vente payée en espèces mais enregistrée en Mobile Money crée un surplus."
-                        }
+                        text="Pas attendues dans le tiroir."
                     >
                         <div className="flex flex-wrap gap-1.5">{data.otherPayments.map((t) => chip(t))}</div>
                     </Finding>
@@ -236,7 +228,7 @@ export default function ClosureCheck({
                         icon={<Ban size={14} />}
                         tone="gray"
                         title={data.cancelled.length > 1 ? `${data.cancelled.length} factures annulées` : "1 facture annulée"}
-                        text="Une facture annulée ne compte pas dans la recette. Si le client a quand même payé, l'argent est en plus."
+                        text="Ne comptent pas dans la recette."
                     >
                         <div className="flex flex-wrap gap-1.5">{data.cancelled.map((t) => chip(t))}</div>
                     </Finding>
@@ -247,7 +239,7 @@ export default function ClosureCheck({
                         icon={<Wallet size={14} />}
                         tone="gray"
                         title={`Dépenses payées par la caisse · ${fc(data.summary.expensesCdf)}`}
-                        text="Déjà retirées de la recette attendue. Vérifiez qu'elles ont vraiment été payées avec l'argent du tiroir (sinon : Dépenses › « Mon argent »)."
+                        text="Déjà retirées de la recette."
                     >
                         <ul className="text-xs text-gray-600 space-y-0.5">
                             {data.expenses.map((e) => (
@@ -264,8 +256,7 @@ export default function ClosureCheck({
 
                 {findings === 0 && (
                     <p className="text-xs text-gray-500">
-                        Aucun doublon, aucun prix modifié, aucune facture qui fasse exactement l&apos;écart. Recomptez l&apos;argent, puis
-                        comparez le cahier avec le PDF de la journée.
+                        Aucune cause trouvée : recomptez l&apos;argent.
                     </p>
                 )}
             </div>

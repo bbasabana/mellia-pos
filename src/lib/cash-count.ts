@@ -6,8 +6,8 @@ import { ADJUSTMENT_CATEGORY_FILTER, getStartDate } from "@/lib/cash-period";
  * previous day closure, or the start-up / monthly closure if it is more recent — up to
  * the moment it is made. A sale rung up after closing therefore goes to the next closure.
  *
- * The day closure checks the day's takings only: what was left in the drawer at the last
- * closure + cash sales − expenses paid from the drawer. Purchases are not in it: they are
+ * The day closure checks the day's takings only: its cash sales − the expenses paid from the
+ * drawer that day. Nothing is carried over from earlier days. Purchases are not in it: they are
  * paid beforehand from the Caisse (the starting money the owner holds), and are taken off
  * the Caisse balance instead (menu Caisse).
  */
@@ -59,12 +59,9 @@ export async function getOpenDayPeriod(now = new Date()): Promise<OpenDayPeriod>
     prisma.cashMonthClosure.findFirst({ orderBy: { closedAt: "desc" } }),
   ]);
 
-  // The drawer keeps what the last day closure left in it, even across a month closure.
-  // The starting money (start-up closure) is the Caisse's, not the drawer's: it pays the
-  // purchases, so the first day starts from an empty drawer.
-  const drawerFloat = lastCount
-    ? Math.round(toNum(lastCount.countedCdf) - toNum(lastCount.withdrawalCdf))
-    : 0;
+  // Each day is closed on its own money: its cash sales minus its drawer expenses. What
+  // earlier days left is not carried over (the running total is in the menu Caisse).
+  const drawerFloat = 0;
 
   const fromCount = lastCount
     ? { at: lastCount.periodEnd, source: `Reste de la clôture du ${fmt(lastCount.periodEnd)}` }
