@@ -241,6 +241,7 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * PATCH ?id= {withdrawalCdf}: an admin corrects "Remis au patron" of the latest closure.
  * PATCH ?id= {status, categoryId?, resolutionNote?}: a manager settles a gap.
  *  - LOSS: an expense "Écart de caisse" of the missing amount.
  *  - JUSTIFIED: a shortfall becomes an expense in its real category (e.g. Transport);
@@ -264,6 +265,42 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
+
+    // Correction of "Remis au patron" on the latest closure: what it leaves in the drawer is
+    // the starting point of the next day, so a forgotten handover would be counted again.
+    if (body.withdrawalCdf !== undefined && body.status === undefined) {
+      if (user.role !== "ADMIN") {
+        return NextResponse.json(
+          { success: false, error: "Seul un administrateur peut corriger le montant remis" },
+          { status: 403 }
+        );
+      }
+      const withdrawalCdf = Math.round(Number(body.withdrawalCdf));
+      const latest = await prisma.cashCount.findFirst({ orderBy: { periodEnd: "desc" } });
+      if (!latest || latest.id !== id) {
+        return NextResponse.json(
+          { success: false, error: "Seul le montant remis de la dernière clôture peut être corrigé" },
+          { status: 400 }
+        );
+      }
+      const counted = Number(latest.countedCdf);
+      if (!Number.isFinite(withdrawalCdf) || withdrawalCdf < 0 || withdrawalCdf > counted) {
+        return NextResponse.json(
+          { success: false, error: "Le montant remis doit être compris entre 0 et l'argent compté" },
+          { status: 400 }
+        );
+      }
+      const row = await prisma.cashCount.update({ where: { id }, data: { withdrawalCdf }, include });
+      await createAuditLog({
+        userId: user.id,
+        action: "CASH_COUNT_EDIT",
+        entity: "CashCount",
+        entityId: id,
+        metadata: { withdrawalBefore: Number(latest.withdrawalCdf), withdrawalAfter: withdrawalCdf },
+      });
+      return NextResponse.json({ success: true, data: serialize(row, (await closureDays([row])).get(row.id)!) });
+    }
+
     const status = String(body.status ?? "");
     const resolutionNote =
       typeof body.resolutionNote === "string" ? body.resolutionNote.trim().slice(0, 500) : "";

@@ -242,6 +242,31 @@ export default function CashCountPanel({
         }
     };
 
+    // "Remis au patron" of the latest closure: what it leaves in the drawer opens the next day.
+    const [savingRemis, setSavingRemis] = useState(false);
+    const [editingRemis, setEditingRemis] = useState<{ id: string; value: string } | null>(null);
+    const saveRemis = async (id: string, withdrawalCdf: number) => {
+        setSavingRemis(true);
+        try {
+            const res = await fetch(`/api/cash-counts?id=${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ withdrawalCdf }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error);
+            showToast(`Montant remis corrigé : ${fc(withdrawalCdf)}`, "success");
+            setEditingRemis(null);
+            setMoney(emptyMoney);
+            setConfirming(false);
+            load();
+        } catch (e) {
+            showToast(e instanceof Error ? e.message : "Action impossible", "error");
+        } finally {
+            setSavingRemis(false);
+        }
+    };
+
     // The day the filter shows, compared with the day being closed now.
     const pendingList = open?.pendingDays ?? [];
     const closingDay = pendingList[0]?.day ?? open?.day ?? null;
@@ -262,6 +287,10 @@ export default function CashCountPanel({
         counts[0] && open && new Date(counts[0].periodEnd).getTime() === new Date(open.periodStart).getTime()
             ? counts[0].id
             : undefined;
+    /** The closure the open day starts from, when it can still be corrected. */
+    const previous = counts.find((c) => c.id === latestId);
+    /** What this day brought in, without what earlier days left in the drawer. */
+    const dayTakings = open ? open.expectation.salesCashCdf - open.expectation.expensesCdf : 0;
 
     return (
         <div className="bg-white border border-gray-200 rounded-lg md:rounded-sm shadow-sm overflow-hidden">
@@ -392,11 +421,6 @@ export default function CashCountPanel({
                                     : "Aucune vente pour l'instant"}
                                 {" · "}période comptée {lowerFirst(open.floatSource)}
                             </p>
-                            {open.openingFloatCdf !== 0 && (
-                                <Line icon={<Wallet size={12} />} label="Resté dans le tiroir (clôture précédente)" tone="text-gray-700">
-                                    {fc(open.openingFloatCdf)}
-                                </Line>
-                            )}
                             <Line
                                 icon={<TrendingUp size={12} />}
                                 label={`Ventes en espèces (${open.expectation.salesCount} ticket${open.expectation.salesCount > 1 ? "s" : ""})`}
@@ -408,9 +432,42 @@ export default function CashCountPanel({
                                 − {fc(open.expectation.expensesCdf)}
                             </Line>
                             <div className="flex items-center justify-between rounded-lg md:rounded-sm border-2 border-[#00d3fa] bg-[#00d3fa]/10 px-3 py-3">
-                                <span className="text-xs font-black uppercase tracking-wider text-[#0891b2]">Recette à remettre</span>
-                                <span className="text-xl font-black text-[#0891b2]">{fc(expected)}</span>
+                                <span className="text-xs font-black uppercase tracking-wider text-[#0891b2]">Recette de la journée</span>
+                                <span className="text-xl font-black text-[#0891b2]">{fc(dayTakings)}</span>
                             </div>
+                            {open.openingFloatCdf !== 0 && (
+                                <>
+                                    <Line icon={<Wallet size={12} />} label="+ Resté dans le tiroir (clôture précédente, non remis)" tone="text-gray-700">
+                                        {fc(open.openingFloatCdf)}
+                                    </Line>
+                                    <div className="flex items-center justify-between rounded-lg md:rounded-sm border border-gray-300 bg-gray-50 px-3 py-2">
+                                        <span className="text-xs font-black uppercase tracking-wider text-gray-600">Argent attendu dans le tiroir</span>
+                                        <span className="text-lg font-black text-gray-800">{fc(expected)}</span>
+                                    </div>
+                                    <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[12px] text-amber-900 space-y-1.5">
+                                        <p>
+                                            La clôture précédente a été enregistrée sans argent remis au patron : ses{" "}
+                                            <strong>{fc(open.openingFloatCdf)}</strong> sont donc comptés comme restés dans le tiroir et
+                                            s&apos;ajoutent à cette journée.
+                                        </p>
+                                        {isAdmin && previous ? (
+                                            <>
+                                                <p>Si cet argent a été remis au patron, corrigez la clôture précédente :</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => saveRemis(previous.id, previous.countedCdf)}
+                                                    disabled={savingRemis}
+                                                    className="font-bold px-2.5 py-1.5 rounded bg-amber-600 text-white disabled:opacity-50"
+                                                >
+                                                    Tout a été remis ({fc(previous.countedCdf)}) le {dayLabel(previous.businessDay, "EEEE d MMMM")}
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <p>Si cet argent a été remis au patron, demandez à l&apos;administrateur de corriger « Remis » sur la clôture précédente.</p>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                             {open.expectation.salesOtherCdf > 0 && (
                                 <p className="text-[11px] text-gray-500">
                                     Carte / Mobile Money : {fc(open.expectation.salesOtherCdf)} ({open.expectation.otherCount} ticket{open.expectation.otherCount > 1 ? "s" : ""}) — hors tiroir.
@@ -419,9 +476,11 @@ export default function CashCountPanel({
                             <div className="rounded-md bg-gray-50 border border-gray-100 p-2.5 text-[11px] text-gray-600 space-y-1">
                                 <p className="font-bold text-gray-700">Comment ce montant est calculé</p>
                                 <p>
-                                    Seules les ventes en espèces de cette journée comptent
-                                    {open.openingFloatCdf !== 0 ? ", plus ce qui est resté dans le tiroir" : ""}, moins les dépenses payées
-                                    avec l&apos;argent du tiroir.
+                                    Recette de la journée = ventes en espèces de cette journée − dépenses payées avec l&apos;argent du
+                                    tiroir.
+                                    {open.openingFloatCdf !== 0
+                                        ? " Le tiroir doit en plus contenir ce que la clôture précédente y a laissé (argent compté non remis au patron)."
+                                        : ""}
                                 </p>
                                 <p>
                                     L&apos;argent du démarrage et les achats n&apos;y sont pas : ils sont suivis dans le menu Caisse. Les
@@ -626,7 +685,54 @@ export default function CashCountPanel({
                                             {fc(c.differenceCdf)}
                                         </td>
                                         <td className="px-4 py-2 text-right whitespace-nowrap text-gray-600">
-                                            {c.withdrawalCdf > 0 ? fc(c.withdrawalCdf) : "—"}
+                                            {editingRemis?.id === c.id ? (
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <input
+                                                        inputMode="numeric"
+                                                        value={editingRemis.value}
+                                                        onChange={(e) => setEditingRemis({ id: c.id, value: grouped(e.target.value) })}
+                                                        className="w-28 text-right text-xs font-bold border border-gray-300 rounded px-2 py-1"
+                                                        aria-label="Montant remis au patron"
+                                                    />
+                                                    <div className="flex gap-1 text-[11px]">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingRemis({ id: c.id, value: grouped(String(c.countedCdf)) })}
+                                                            className="px-1.5 py-0.5 rounded border border-gray-300"
+                                                        >
+                                                            Tout
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={savingRemis}
+                                                            onClick={() => saveRemis(c.id, Number(digits(editingRemis.value) || 0))}
+                                                            className="px-1.5 py-0.5 rounded bg-gray-900 text-white font-bold"
+                                                        >
+                                                            OK
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingRemis(null)}
+                                                            className="px-1.5 py-0.5 rounded border border-gray-300"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {c.withdrawalCdf > 0 ? fc(c.withdrawalCdf) : "—"}
+                                                    {isAdmin && c.id === latestId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingRemis({ id: c.id, value: grouped(String(c.withdrawalCdf)) })}
+                                                            className="block ml-auto text-[11px] text-gray-500 hover:text-gray-900 underline"
+                                                        >
+                                                            Corriger
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
                                         </td>
                                         <td className="px-4 py-2">
                                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${CLOSURE_STATUS[c.status].className}`}>
