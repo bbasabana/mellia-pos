@@ -103,9 +103,15 @@ export default function CashCountPanel({
     role,
     onClosed,
     onFindTicket,
+    selectedDay,
+    onSelectDay,
 }: {
     role: string | undefined;
     onClosed?: () => void;
+    /** YYYY-MM-DD picked in the sales filter (a single day), to show where it stands. */
+    selectedDay?: string | null;
+    /** Filters the sales list on that day. */
+    onSelectDay?: (day: string) => void;
     /** Shows a ticket in the sales list (search by its number). */
     onFindTicket?: (ticketNum: string) => void;
 }) {
@@ -236,6 +242,13 @@ export default function CashCountPanel({
         }
     };
 
+    // The day the filter shows, compared with the day being closed now.
+    const pendingList = open?.pendingDays ?? [];
+    const closingDay = pendingList[0]?.day ?? open?.day ?? null;
+    const selectedClosures = selectedDay ? counts.filter((c) => c.businessDay === selectedDay) : [];
+    const selectedPending = selectedDay ? pendingList.find((d) => d.day === selectedDay) : undefined;
+    const showSelected = !!selectedDay && !!open?.ready && selectedDay !== closingDay;
+
     const result = useMemo(() => {
         if (diff === null) return null;
         if (diff === 0) return { tone: "ok" as const, title: "Caisse correcte", text: "L'argent compté correspond aux ventes." };
@@ -291,6 +304,53 @@ export default function CashCountPanel({
                         </div>
                     ) : (
                         <>
+                            {showSelected && selectedDay && (
+                                <div
+                                    className={`rounded-md border p-2.5 text-[12px] space-y-1.5 ${
+                                        selectedClosures.length > 0
+                                            ? "border-green-200 bg-green-50 text-green-900"
+                                            : selectedPending
+                                            ? "border-amber-200 bg-amber-50 text-amber-900"
+                                            : "border-gray-200 bg-gray-50 text-gray-700"
+                                    }`}
+                                >
+                                    {selectedClosures.length > 0 ? (
+                                        <p>
+                                            <strong className="capitalize">{dayLabel(selectedDay, "EEEE d MMMM")}</strong> : journée déjà
+                                            clôturée —{" "}
+                                            {selectedClosures
+                                                .map(
+                                                    (c) =>
+                                                        `attendu ${fc(c.expectedCdf)}, compté ${fc(c.countedCdf)}, écart ${fc(c.differenceCdf)}`
+                                                )
+                                                .join(" ; ")}
+                                            . Voir le tableau ci-dessous.
+                                        </p>
+                                    ) : selectedPending ? (
+                                        <p>
+                                            <strong className="capitalize">{dayLabel(selectedDay, "EEEE d MMMM")}</strong> :{" "}
+                                            {selectedPending.salesCount} ticket{selectedPending.salesCount > 1 ? "s" : ""},{" "}
+                                            {fc(selectedPending.salesCashCdf)} en espèces. Cette journée se clôture juste après le{" "}
+                                            <strong className="capitalize">{closingDay ? dayLabel(closingDay, "EEEE d MMMM") : ""}</strong>,
+                                            car elle part de ce que la journée d&apos;avant laisse dans le tiroir.
+                                        </p>
+                                    ) : (
+                                        <p>
+                                            <strong className="capitalize">{dayLabel(selectedDay, "EEEE d MMMM")}</strong> : aucune vente à
+                                            clôturer ce jour-là.
+                                        </p>
+                                    )}
+                                    {closingDay && onSelectDay && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onSelectDay(closingDay)}
+                                            className="font-bold underline"
+                                        >
+                                            Afficher les ventes du {dayLabel(closingDay, "EEEE d MMMM")} (journée à clôturer)
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                             {open.pendingDays && open.pendingDays.length > 1 && (
                                 <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900 space-y-1.5">
                                     <p className="font-bold">
@@ -298,18 +358,21 @@ export default function CashCountPanel({
                                     </p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {open.pendingDays.map((d, i) => (
-                                            <span
+                                            <button
+                                                type="button"
                                                 key={d.day}
+                                                onClick={() => onSelectDay?.(d.day)}
+                                                title="Afficher les ventes de ce jour"
                                                 className={`px-2 py-1 rounded border font-semibold ${
                                                     i === 0
                                                         ? "bg-white border-amber-400 text-amber-900"
                                                         : "bg-amber-100/50 border-amber-200 text-amber-700"
-                                                }`}
+                                                } ${d.day === selectedDay ? "ring-2 ring-amber-400" : ""}`}
                                             >
                                                 <span className="capitalize">{dayLabel(d.day)}</span> · {d.salesCount} ticket
                                                 {d.salesCount > 1 ? "s" : ""} · {fc(d.salesCashCdf)}
                                                 {i === 0 ? " — maintenant" : " — ensuite"}
-                                            </span>
+                                            </button>
                                         ))}
                                     </div>
                                     <p>
@@ -542,7 +605,10 @@ export default function CashCountPanel({
                                 const draft = settling[c.id];
                                 const shortfall = c.differenceCdf < 0;
                                 return (
-                                    <tr key={c.id} className="border-t border-gray-100 align-top">
+                                    <tr
+                                        key={c.id}
+                                        className={`border-t border-gray-100 align-top ${c.businessDay === selectedDay ? "bg-green-50/60" : ""}`}
+                                    >
                                         <td className="px-4 py-2 whitespace-nowrap">
                                             <div className="font-semibold capitalize">{dayLabel(c.businessDay)}</div>
                                             <div className="text-[11px] text-gray-400">

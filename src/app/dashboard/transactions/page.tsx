@@ -362,6 +362,12 @@ export default function TransactionsPage() {
                         <CashCountPanel
                             role={role}
                             onClosed={fetchTransactions}
+                            selectedDay={dateRange.start && dateRange.start === dateRange.end ? dateRange.start : null}
+                            onSelectDay={(day) => {
+                                setDateRange({ start: day, end: day });
+                                setPeriod("");
+                                setPage(1);
+                            }}
                             onFindTicket={(ticketNum) => {
                                 setSearch(ticketNum);
                                 setDateRange({ start: "", end: "" });
