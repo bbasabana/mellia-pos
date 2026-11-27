@@ -96,6 +96,46 @@ export async function getOpenDayPeriod(now = new Date()): Promise<OpenDayPeriod>
   };
 }
 
+/** A day with sales not yet covered by a day closure. */
+export type PendingDay = { day: string; salesCount: number; salesCashCdf: number };
+
+/** End of business day `day` (YYYY-MM-DD): 06:00 Kinshasa the next morning (see saleDay). */
+export function businessDayEnd(day: string): Date {
+  return new Date(Date.parse(`${day}T06:00:00+01:00`) + 86400_000);
+}
+
+/**
+ * The period the next day closure covers: one day at a time. When several days of sales
+ * are still open (e.g. Wednesday and Thursday), the closure stops at the end of the oldest
+ * one, so each day is closed with its own money; the next closure then takes the next day.
+ * `pendingDays` lists every open day, oldest first.
+ */
+export async function getClosingPeriod(
+  now = new Date()
+): Promise<OpenDayPeriod & { pendingDays: PendingDay[] }> {
+  const open = await getOpenDayPeriod(now);
+  const sales = await prisma.sale.findMany({
+    where: { status: "COMPLETED", createdAt: { gte: open.periodStart, lt: open.periodEnd } },
+    select: { createdAt: true, totalCdf: true, paymentMethod: true },
+  });
+  const byDay = new Map<string, PendingDay>();
+  for (const s of sales) {
+    const day = saleDay(s.createdAt);
+    const row = byDay.get(day) ?? { day, salesCount: 0, salesCashCdf: 0 };
+    row.salesCount += 1;
+    if (s.paymentMethod === "CASH") row.salesCashCdf += Math.round(toNum(s.totalCdf));
+    byDay.set(day, row);
+  }
+  const pendingDays = [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+  const first = pendingDays[0];
+  const end = first ? businessDayEnd(first.day) : null;
+  return {
+    ...open,
+    periodEnd: end && end < open.periodEnd ? end : open.periodEnd,
+    pendingDays,
+  };
+}
+
 /** Cash movements in [gte, lt). */
 export async function getCashExpectation(gte: Date, lt: Date): Promise<CashExpectation> {
   const range = { gte, lt };

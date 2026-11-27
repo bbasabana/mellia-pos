@@ -41,6 +41,8 @@ type OpenDay = {
     day?: string;
     firstSaleAt?: string | null;
     lastSaleAt?: string | null;
+    /** Days with sales still to close, oldest first: they are closed one at a time. */
+    pendingDays?: { day: string; salesCount: number; salesCashCdf: number }[];
 };
 
 type Status = "BALANCED" | "TO_VERIFY" | "LOSS" | "JUSTIFIED";
@@ -169,7 +171,7 @@ export default function CashCountPanel({
             const res = await fetch("/api/cash-counts", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ countedCdf, withdrawalCdf, notes: fullNotes }),
+                body: JSON.stringify({ countedCdf, withdrawalCdf, notes: fullNotes, day: open?.pendingDays?.[0]?.day }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error || "Clôture impossible");
@@ -289,6 +291,33 @@ export default function CashCountPanel({
                         </div>
                     ) : (
                         <>
+                            {open.pendingDays && open.pendingDays.length > 1 && (
+                                <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900 space-y-1.5">
+                                    <p className="font-bold">
+                                        {open.pendingDays.length} journées à clôturer, une à la fois (de la plus ancienne à la plus récente)
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {open.pendingDays.map((d, i) => (
+                                            <span
+                                                key={d.day}
+                                                className={`px-2 py-1 rounded border font-semibold ${
+                                                    i === 0
+                                                        ? "bg-white border-amber-400 text-amber-900"
+                                                        : "bg-amber-100/50 border-amber-200 text-amber-700"
+                                                }`}
+                                            >
+                                                <span className="capitalize">{dayLabel(d.day)}</span> · {d.salesCount} ticket
+                                                {d.salesCount > 1 ? "s" : ""} · {fc(d.salesCashCdf)}
+                                                {i === 0 ? " — maintenant" : " — ensuite"}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <p>
+                                        Comptez l&apos;argent de la première journée et clôturez-la : la suivante s&apos;affichera
+                                        ensuite avec ses propres ventes.
+                                    </p>
+                                </div>
+                            )}
                             {open.day && (
                                 <p className="text-lg font-black text-gray-900 capitalize leading-tight">
                                     Journée du {dayLabel(open.day, "EEEE d MMMM")}
@@ -327,7 +356,7 @@ export default function CashCountPanel({
                             <div className="rounded-md bg-gray-50 border border-gray-100 p-2.5 text-[11px] text-gray-600 space-y-1">
                                 <p className="font-bold text-gray-700">Comment ce montant est calculé</p>
                                 <p>
-                                    Seules les ventes en espèces depuis la dernière clôture comptent
+                                    Seules les ventes en espèces de cette journée comptent
                                     {open.openingFloatCdf !== 0 ? ", plus ce qui est resté dans le tiroir" : ""}, moins les dépenses payées
                                     avec l&apos;argent du tiroir.
                                 </p>

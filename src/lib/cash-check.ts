@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { expectedCash, getCashExpectation, getOpenDayPeriod } from "@/lib/cash-count";
+import { expectedCash, getCashExpectation, getClosingPeriod } from "@/lib/cash-count";
 import { ADJUSTMENT_CATEGORY_FILTER } from "@/lib/cash-period";
 import { OTHER_PRICE, spaceOf } from "@/lib/sale-space";
 
@@ -44,7 +44,8 @@ const n = (v: unknown) => {
 };
 
 export async function checkOpenDay(countedCdf: number | null) {
-  const open = await getOpenDayPeriod();
+  // The day about to be closed (the oldest open day), not every open day at once.
+  const open = await getClosingPeriod();
   const range = { gte: open.periodStart, lt: open.periodEnd };
 
   const [expectation, sales, cancelled, expenses, rateRow] = await Promise.all([

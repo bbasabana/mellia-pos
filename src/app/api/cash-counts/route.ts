@@ -14,7 +14,7 @@ import {
   ensureExpenseCategory,
   expectedCash,
   getCashExpectation,
-  getOpenDayPeriod,
+  getClosingPeriod,
 } from "@/lib/cash-count";
 
 type SessionUser = { id?: string; name?: string | null; role?: string };
@@ -70,7 +70,8 @@ export async function GET(req: NextRequest) {
       monthFilter = { periodEnd: { gte: new Date(range.gte.getTime() - 2 * 86400_000), lt: new Date(range.lt.getTime() + 2 * 86400_000) } };
     }
 
-    const open = await getOpenDayPeriod();
+    // One day at a time: the oldest day with sales still open.
+    const open = await getClosingPeriod();
     const [expectation, counts, pending, categories, rateRow] = await Promise.all([
       getCashExpectation(open.periodStart, open.periodEnd),
       prisma.cashCount.findMany({
@@ -149,8 +150,9 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST {countedCdf, withdrawalCdf?, notes?}: closes the day. Everything since the last
- * closure is recomputed here (never taken from the browser); its sales become locked.
+ * POST {countedCdf, withdrawalCdf?, notes?, day?}: closes the oldest open day. Its period
+ * (from the last closure to the end of that day) is recomputed here, never taken from the
+ * browser; its sales become locked. The next open day is closed by the next closure.
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -180,7 +182,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const open = await getOpenDayPeriod();
+    const open = await getClosingPeriod();
     if (!open.ready) {
       return NextResponse.json(
         {
@@ -188,6 +190,19 @@ export async function POST(req: NextRequest) {
           error: "Faites d'abord la clôture de démarrage (Caisse › Démarrage).",
         },
         { status: 400 }
+      );
+    }
+
+    // The browser says which day it shows; refuse if another closure moved the day meanwhile.
+    const day = typeof body.day === "string" ? body.day : null;
+    const closingDay = open.pendingDays[0]?.day ?? null;
+    if (day && closingDay && day !== closingDay) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "La journée à clôturer a changé : rechargez la page et recomptez.",
+        },
+        { status: 409 }
       );
     }
 
